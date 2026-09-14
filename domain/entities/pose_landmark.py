@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+
 
 @dataclass(frozen=True)  # Inmutable, como debe ser una entidad de dominio
 class PoseLandmark:
@@ -8,7 +8,7 @@ class PoseLandmark:
     y: float          # Normalizado 0-1 (alto)
     z: float          # Profundidad (relativa)
     visibility: float # 0-1 (qué tan visible está)
-    name: Optional[str] = None  # Ej: "left_shoulder", "right_wrist"
+    name: str | None = None  # Ej: "left_shoulder", "right_wrist"
 
     def is_visible(self) -> bool:
         """Regla de negocio: un landmark es útil si tiene visibilidad > 0.5"""
