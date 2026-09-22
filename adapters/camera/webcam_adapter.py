@@ -5,6 +5,9 @@ import cv2
 import numpy as np
 
 from domain.ports.camera_port import CameraPort
+from infrastructure.logging.logger import get_logger
+
+logger = get_logger("adapters.webcam")
 
 
 class WebcamAdapter(CameraPort):
@@ -54,6 +57,7 @@ class WebcamAdapter(CameraPort):
         self._cap = cv2.VideoCapture(self._camera_id)
 
         if not self._cap.isOpened():
+            logger.error(f"No se pudo abrir la cámara {self._camera_id}")
             raise RuntimeError(f"No se pudo abrir la cámara {self._camera_id}")
 
         # Configura resolución
@@ -66,6 +70,10 @@ class WebcamAdapter(CameraPort):
         actual_height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         actual_fps = self._cap.get(cv2.CAP_PROP_FPS)
 
+        logger.info(
+            f"Cámara iniciada: {actual_width}x{actual_height} "
+            f"@ {self._fps} FPS"
+        )
         print(f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS")
 
         self._running = True

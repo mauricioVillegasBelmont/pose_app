@@ -1,8 +1,14 @@
+from collections.abc import Callable
+
 from domain.entities.color import RGBColor
 from domain.entities.pose_landmark import PoseLandmark
 from domain.ports.camera_port import CameraPort
 from domain.ports.pose_estimator_port import PoseEstimatorPort
 from domain.ports.render_port import RenderPort
+from domain.ports.state_port import StatePort
+from infrastructure.logging.logger import get_logger
+
+logger = get_logger("use_cases.color_game")
 
 
 class ColorGame:
@@ -21,39 +27,84 @@ class ColorGame:
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
         renderer: RenderPort,
+        state: StatePort | None = None,
         palette_name: str = 'fire'
     ):
         self._camera = camera
         self._pose_estimator = pose_estimator
         self._renderer = renderer
+        self._state = state
+        self._palette_name = palette_name
         self._palette = self.PALETTES.get(palette_name, self.PALETTES['fire'])
         self._current_color: RGBColor = self._palette[0]
         self._last_landmarks: list[PoseLandmark] = []
 
-    def run(self) -> None:
-        """Bucle principal del juego."""
+    def run(self, should_stop: Callable[[], bool] | None = None) -> None:
+        """
+        Bucle principal del juego.
+        Args:
+            should_stop: Callback que indica si se debe detener el loop.
+                        Si es None, corre hasta KeyboardInterrupt.
+        """
+        should_stop = should_stop or (lambda: False)
+
         self._camera.start()
+        logger.info("Juego de colores iniciado")
 
         try:
-            while True:
+            while not should_stop():
+                # 1. Procesa comandos pendientes
+                self._process_commands()
+
+                # 2. Frame
                 frame = self._camera.get_frame()
                 if frame is None:
                     continue
 
-                # 1. Estimar pose
+                # 3. Estimar pose
                 landmarks = self._pose_estimator.estimate(frame)
                 self._last_landmarks = landmarks
 
-                # 2. Calcular color basado en pose
+                # 4. Actualiza estado compartido
+                if self._state:
+                    self._state.update_game_data("background_color", color)  # noqa: F821
+                    self._state.update_game_data("current_palette", self._current_palette_name)
+
+                # 5. Calcular color basado en pose
                 color = self._calculate_color_from_pose(landmarks)
                 self._current_color = color
 
-                # 3. Renderizar fondo con el color calculado
+                # 6. Renderizar fondo con el color calculado
                 self._renderer.render_background(color, landmarks)
 
         except KeyboardInterrupt:
             self._camera.stop()
             self._renderer.close()
+
+        finally:
+            logger.info(
+                f"Juego colors terminado. Frames procesados: {self._frame_count}"
+            )
+
+    def _process_commands(self) -> None:
+        """Consume comandos pendientes del estado compartido."""
+        if self._state is None:
+            return
+
+        commands = self._state.drain_commands()
+        for cmd in commands:
+            if cmd.action == "change_palette":
+                palette_name = cmd.payload.get("palette")
+                if palette_name in self.PALETTES:
+                    self._palette = self.PALETTES[palette_name]
+                    self._palette_name = palette_name
+                    logger.info(f"Paleta cambiada a: {palette_name}")
+                else:
+                    logger.warning(f"Paleta desconocida: {palette_name}")
+            elif cmd.action == "reset_particles":
+                logger.debug(f"Comando ignorado por ColorGame: {cmd.action}")
+            else:
+                logger.warning(f"Comando desconocido: {cmd.action}")
 
     def _calculate_color_from_pose(self, landmarks: list[PoseLandmark]) -> RGBColor:
         """

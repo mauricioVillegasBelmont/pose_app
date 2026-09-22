@@ -1,4 +1,11 @@
 # tests/integration/test_full_integration.py
+import sys
+from pathlib import Path
+
+# Agrega la raíz del proyecto a sys.path
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root))
+
 from adapters.camera.webcam_adapter import WebcamAdapter
 from adapters.pose.mediapipe_adapter import MediapipeAdapter
 from adapters.render.pygame_render_adapter import PygameRenderAdapter

@@ -1,4 +1,11 @@
 # tests/integration/test_webcam_with_mock_pose.py
+import sys
+from pathlib import Path
+
+# Agrega la raíz del proyecto a sys.path
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root))
+
 import time
 
 from adapters.camera.webcam_adapter import WebcamAdapter
@@ -45,3 +52,7 @@ def test_webcam_with_mock_pose():
     assert len(game._particles) > 0, "No se generaron partículas"
 
     print(f"✅ Prueba exitosa: {camera._frame_count} frames capturados")
+
+
+if __name__ == "__main__":
+    test_webcam_with_mock_pose()

@@ -1,3 +1,6 @@
+import urllib.request
+from pathlib import Path
+
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -8,16 +11,16 @@ from domain.ports.pose_estimator_port import PoseEstimatorPort
 
 class MediapipeAdapter(PoseEstimatorPort):
     """
-    Adaptador de estimación de pose usando Mediapipe.
-
-    Características:
-    - Modelo de 33 landmarks
-    - Coordenadas normalizadas (0-1)
-    - Filtrado por visibilidad
-    - Configurable: static_image_mode, min_detection_confidence
+    Adaptador para Pose Landmarker de mediapipe==1.0.1 (Tasks API).
+    La primera ejecución descargará automáticamente el archivo de modelo pose_landmarker_full.task.
     """
 
-    # Mapeo de índices de Mediapipe a nombres descriptivos
+    # Dirección de descarga del modelo (versión full, equilibra precisión y velocidad)
+    MODEL_URL = (
+        "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
+        "pose_landmarker_full/float16/latest/pose_landmarker_full.task"
+    )
+
     LANDMARK_NAMES: dict[int, str] = {
         0: 'nose',
         1: 'left_eye_inner', 2: 'left_eye', 3: 'left_eye_outer',
@@ -37,7 +40,6 @@ class MediapipeAdapter(PoseEstimatorPort):
         31: 'left_foot_index', 32: 'right_foot_index'
     }
 
-    # Nombres de landmarks que consideramos "clave" para nuestro dominio
     KEY_LANDMARKS = [
         'left_shoulder', 'right_shoulder',
         'left_elbow', 'right_elbow',
@@ -52,58 +54,83 @@ class MediapipeAdapter(PoseEstimatorPort):
         self,
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
-        model_complexity: int = 1  # 0, 1, o 2 (más complejo = más preciso pero más lento)
+        model_complexity: int = 1
     ):
         """
         Args:
-            min_detection_confidence: Confianza mínima para detección (0-1)
-            min_tracking_confidence: Confianza mínima para tracking (0-1)
-            model_complexity: Complejidad del modelo (0=ligero, 1=medio, 2=pesado)
+            min_detection_confidence: Umbral de confianza de detección.
+            min_tracking_confidence: Umbral de confianza de seguimiento (tracking).
+            model_complexity: Se mantiene el parámetro por compatibilidad con llamadas antiguas
+                              (en la Tasks API el modelo se define por el archivo .task).
         """
         self._min_detection_confidence = min_detection_confidence
         self._min_tracking_confidence = min_tracking_confidence
         self._model_complexity = model_complexity
 
-        # Inicializa Mediapipe Pose
-        self._mp_pose = mp.solutions.pose
-        self._pose = self._mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=model_complexity,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence
+        # 1. Asegurar que el archivo del modelo exista
+        model_path = self._ensure_model()
+
+        # 2. Inicializar PoseLandmarker de la Tasks API
+        from mediapipe.tasks import python as mp_python
+        from mediapipe.tasks.python import vision
+
+        base_options = mp_python.BaseOptions(model_asset_path=model_path)
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE,
+            num_poses=1,
+            min_pose_detection_confidence=min_detection_confidence,
+            min_pose_presence_confidence=min_detection_confidence,
+            min_tracking_confidence=min_tracking_confidence,
+            output_segmentation_masks=False,
         )
+        self._landmarker = vision.PoseLandmarker.create_from_options(options)
 
-        # Cache de nombres para conversión rápida
-        self._landmark_name_cache: dict[int, str] = self.LANDMARK_NAMES.copy()
+        # 3. Cachear nombres
+        self._landmark_name_cache = self.LANDMARK_NAMES.copy()
 
-        print(f"🦾 Mediapipe inicializado (modelo complejidad={model_complexity})")
+        print(f"🦾 Mediapipe Tasks API inicializado (complejidad del modelo={model_complexity})")
+
+    def _ensure_model(self) -> str:
+        """Verifica si el archivo del modelo existe; si no, lo descarga automáticamente."""
+        model_dir = Path(__file__).parent / "models"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        model_path = model_dir / "pose_landmarker_full.task"
+
+        if not model_path.exists():
+            print(f"📥 Descargando modelo de MediaPipe en {model_path} …")
+            try:
+                urllib.request.urlretrieve(self.MODEL_URL, str(model_path))
+                print("✅ Descarga del modelo completada")
+            except Exception as e:
+                raise RuntimeError(
+                    f"No se pudo descargar el archivo del modelo. Por favor, descárgalo manualmente desde {self.MODEL_URL} "
+                    f"y guárdalo en {model_path}"
+                ) from e
+        return str(model_path)
 
     def estimate(self, frame: np.ndarray) -> list[PoseLandmark]:
-        """
-        Estima la pose en un frame BGR.
-
-        Args:
-            frame: Imagen en formato BGR (numpy array)
-
-        Returns:
-            Lista de PoseLandmark (solo los visibles con confianza > 0.5)
-        """
+        """Estima la postura y devuelve una lista de PoseLandmark que sean visibles."""
         if frame is None or frame.size == 0:
             return []
 
-        # Mediapipe espera RGB
+        # 1. BGR -> RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        # Procesa el frame
-        results = self._pose.process(rgb_frame)
+        # 2. Construir mp.Image
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
+        # 3. Llamar a detect (la Tasks API ya no utiliza .process)
+        results = self._landmarker.detect(mp_image)
 
         if not results.pose_landmarks:
             return []
 
-        # Convierte los landmarks de Mediapipe a nuestros objetos
+        # 4. La nueva API devuelve una lista (puede haber múltiples posturas por imagen), se toma la primera
+        first_pose_landmarks = results.pose_landmarks[0]
+
         landmarks = []
-        for idx, landmark in enumerate(results.pose_landmarks.landmark):
-            # Solo incluye landmarks con visibilidad > 0.5 (regla de negocio)
+        for idx, landmark in enumerate(first_pose_landmarks):
             if landmark.visibility < 0.5:
                 continue
 
@@ -118,45 +145,27 @@ class MediapipeAdapter(PoseEstimatorPort):
             )
             landmarks.append(pose_landmark)
 
-        # Opcional: filtramos solo landmarks clave (para reducir ruido)
-        # Descomenta si quieres solo los esenciales
-        # landmarks = [lm for lm in landmarks if lm.name in self.KEY_LANDMARKS]
-
         return landmarks
 
     def get_landmark_names(self) -> list[str]:
-        """Devuelve todos los nombres de landmarks soportados."""
         return list(self.LANDMARK_NAMES.values())
 
     def draw_landmarks(self, frame: np.ndarray, landmarks: list[PoseLandmark]) -> np.ndarray:
-        """
-        Dibuja los landmarks en el frame (útil para debugging).
-
-        Args:
-            frame: Imagen original (BGR)
-            landmarks: Lista de PoseLandmark a dibujar
-
-        Returns:
-            Frame con landmarks dibujados
-        """
+        """Dibuja manualmente los puntos de referencia (mantiene la lógica original sin depender del obsoleto drawing_utils)."""
         if not landmarks:
             return frame
 
-        # Obtén dimensiones del frame
         height, width = frame.shape[:2]
 
         for lm in landmarks:
             if not lm.is_visible():
                 continue
 
-            # Convierte coordenadas normalizadas a píxeles
             x = int(lm.x * width)
             y = int(lm.y * height)
 
-            # Dibuja círculo
             cv2.circle(frame, (x, y), 5, (0, 255, 0), -1)
 
-            # Opcional: dibuja nombre
             if lm.name:
                 cv2.putText(
                     frame, lm.name, (x + 10, y - 10),
@@ -166,10 +175,9 @@ class MediapipeAdapter(PoseEstimatorPort):
         return frame
 
     def close(self) -> None:
-        """Libera recursos de Mediapipe."""
-        if hasattr(self, '_pose') and self._pose:
-            self._pose.close()
-            print("🦾 Mediapipe cerrado")
+        if hasattr(self, '_landmarker') and self._landmarker:
+            self._landmarker.close()
+            print("🦾 Mediapipe ha sido cerrado")
 
     def __enter__(self):
         return self
