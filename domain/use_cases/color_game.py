@@ -4,7 +4,7 @@ from domain.entities.color import RGBColor
 from domain.entities.pose_landmark import PoseLandmark
 from domain.ports.camera_port import CameraPort
 from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render_port import RenderPort
+from domain.ports.render_port import ColorRenderPort
 from domain.ports.state_port import StatePort
 from infrastructure.logging.logger import get_logger
 
@@ -26,7 +26,7 @@ class ColorGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
-        renderer: RenderPort,
+        renderer: ColorRenderPort,
         state: StatePort | None = None,
         palette_name: str = 'fire'
     ):
@@ -82,8 +82,12 @@ class ColorGame:
             self._renderer.close()
 
         finally:
+            try:
+                self._renderer.close()
+            except Exception as e:
+                logger.error(f"Error cerrando renderer: {e}")
             logger.info(
-                f"Juego colors terminado. Frames procesados: {self._frame_count}"
+                f"Juego color terminado. Frames: {self._frame_count}"
             )
 
     def _process_commands(self) -> None:

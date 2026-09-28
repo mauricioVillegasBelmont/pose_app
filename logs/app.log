@@ -88,3 +88,26 @@
 {"timestamp": "2026-09-16T03:49:41.556149+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "Deteniendo API..."}
 {"timestamp": "2026-09-16T03:49:41.703895+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "API detenida"}
 {"timestamp": "2026-09-16T03:49:41.960545+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Contenedor DI cerrado"}
+{"timestamp": "2026-09-28T18:54:34.679318+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "=== Pose AR App ==="}
+{"timestamp": "2026-09-28T18:54:34.680029+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "Entorno: development"}
+{"timestamp": "2026-09-28T18:54:34.680399+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "Juego: particles"}
+{"timestamp": "2026-09-28T18:54:34.681008+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "Pose: mock"}
+{"timestamp": "2026-09-28T18:54:34.681398+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "Render: mock"}
+{"timestamp": "2026-09-28T18:54:34.681837+00:00Z", "level": "INFO", "logger": "pose_ar.main", "message": "API: habilitada"}
+{"timestamp": "2026-09-28T18:54:34.751800+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "App FastAPI construida"}
+{"timestamp": "2026-09-28T18:54:34.753662+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "API iniciada en http://0.0.0.0:8000"}
+{"timestamp": "2026-09-28T18:54:34.754006+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "Docs disponibles en http://localhost:8000/docs"}
+{"timestamp": "2026-09-28T18:54:34.754146+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "API iniciada desde el contenedor"}
+{"timestamp": "2026-09-28T18:54:34.754265+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Creando ParticlesGame"}
+{"timestamp": "2026-09-28T18:54:34.754373+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Creando WebcamAdapter (cámara 0)"}
+{"timestamp": "2026-09-28T18:54:34.754540+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Usando MockPoseAdapter"}
+{"timestamp": "2026-09-28T18:54:34.754770+00:00Z", "level": "INFO", "logger": "pose_ar.lifecycle", "message": "Iniciando aplicación..."}
+{"timestamp": "2026-09-28T18:54:34.931374+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.webcam", "message": "Cámara iniciada: 640x480 @ 30 FPS"}
+{"timestamp": "2026-09-28T18:54:35.624147+00:00Z", "level": "INFO", "logger": "pose_ar.use_cases.particles", "message": "Juego de partículas iniciado"}
+{"timestamp": "2026-09-28T19:02:54.871849+00:00Z", "level": "INFO", "logger": "pose_ar.lifecycle", "message": "Señal recibida: 2. Iniciando shutdown..."}
+{"timestamp": "2026-09-28T19:02:54.874688+00:00Z", "level": "INFO", "logger": "pose_ar.use_cases.particles", "message": "Juego particles terminado. Frames: 2153"}
+{"timestamp": "2026-09-28T19:02:54.875369+00:00Z", "level": "INFO", "logger": "pose_ar.lifecycle", "message": "Aplicación finalizada"}
+{"timestamp": "2026-09-28T19:02:54.875702+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Cerrando contenedor DI..."}
+{"timestamp": "2026-09-28T19:02:54.876009+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "Deteniendo API..."}
+{"timestamp": "2026-09-28T19:02:55.032864+00:00Z", "level": "INFO", "logger": "pose_ar.adapters.api", "message": "API detenida"}
+{"timestamp": "2026-09-28T19:02:55.040863+00:00Z", "level": "INFO", "logger": "pose_ar.di", "message": "Contenedor DI cerrado"}

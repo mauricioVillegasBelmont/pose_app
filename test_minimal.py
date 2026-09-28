@@ -4,7 +4,7 @@ Prueba mínima: verifica que la cadena completa funciona.
 """
 from adapters.mock.mock_camera import MockCameraAdapter
 from adapters.mock.mock_pose import MockPoseAdapter
-from adapters.mock.mock_render import MockRenderAdapter
+from adapters.mock.mock_render import MockParticlesRenderAdapter
 from domain.use_cases.particles_game import ParticlesGame
 
 
@@ -14,7 +14,7 @@ def test_minimal_chain():
     # 1. Crea los adaptadores
     camera = MockCameraAdapter()
     pose = MockPoseAdapter()
-    render = MockRenderAdapter()
+    render = MockParticlesRenderAdapter()
 
     # 2. Crea el juego
     game = ParticlesGame(camera, pose, render)

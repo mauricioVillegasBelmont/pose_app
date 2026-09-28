@@ -71,6 +71,12 @@ class RenderSettings(BaseSettings):
         default="pygame",
         description="Adaptador de render a usar"
     )
+
+    debug_overlay: bool = Field(
+        default=False,
+        description="Activar overlay de pose para debug",
+    )
+
     width: int = Field(default=800, ge=320, le=3840)
     height: int = Field(default=600, ge=240, le=2160)
     title: str = Field(default="Pose AR App")

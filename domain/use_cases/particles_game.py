@@ -4,7 +4,10 @@ from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
 from domain.ports.camera_port import CameraPort
 from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render_port import RenderPort
+from domain.ports.render_port import (
+    LandmarkAwareRenderPort,
+    ParticlesRenderPort,
+)
 from domain.ports.state_port import StatePort
 from infrastructure.logging.logger import get_logger
 
@@ -18,7 +21,7 @@ class ParticlesGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
-        renderer: RenderPort,
+        renderer: ParticlesRenderPort,
         state: StatePort | None = None,
         gravity: float = 0.1,
         burst_radius: float = 50.0,
@@ -37,13 +40,6 @@ class ParticlesGame:
         self._frame_count = 0
 
     def run(self, should_stop: Callable[[], bool] | None = None) -> None:
-        """
-        Bucle principal del juego.
-
-        Args:
-            should_stop: Callback que indica si se debe detener el loop.
-                        Si es None, corre hasta KeyboardInterrupt.
-        """
         should_stop = should_stop or (lambda: False)
 
         self._camera.start()
@@ -51,7 +47,7 @@ class ParticlesGame:
 
         try:
             while not should_stop():
-                # 1. Procesa comandos pendientes
+                # 1. Comandos
                 self._process_commands()
 
                 # 2. Frame
@@ -59,51 +55,62 @@ class ParticlesGame:
                 if frame is None:
                     continue
 
-                # 3. Estima pose
+                # 3. Pose
                 try:
                     landmarks = self._pose_estimator.estimate(frame)
                 except Exception as e:
                     logger.warning(f"Error estimando pose: {e}")
                     continue
 
-                # 4. Actualiza estado compartido
+                # 4. Estado compartido
                 if self._state:
                     self._state.update_pose(landmarks)
                     self._state.increment_frames()
 
-                # 5. Genera partículas desde landmarks visibles
+                # 5. Notificar landmarks al renderer (si aplica)
+                if isinstance(self._renderer, LandmarkAwareRenderPort):
+                    self._renderer.update_landmarks(landmarks)
+
+                # 6. Partículas
                 self._spawn_particles_from_landmarks(landmarks)
 
-                # 6. Actualiza física
+                # 7. Física
                 self._update_particles()
 
-                # 7. Renderiza
+                # 8. Render
                 try:
                     self._renderer.render_particles(self._particles)
                 except Exception as e:
                     logger.error(f"Error renderizando: {e}")
                     break
 
-                # 8. Publica partículas al estado
+                # 9. Publicar al estado
                 if self._state:
                     self._state.update_game_data("particles", self._particles)
-                    self._state.update_game_data("particles_count", len(self._particles))
+                    self._state.update_game_data(
+                        "particles_count", len(self._particles)
+                    )
 
                 self._frame_count += 1
 
-                # Log cada 100 frames
                 if self._frame_count % 100 == 0:
                     logger.debug(
                         f"Frame {self._frame_count}, "
                         f"partículas activas: {len(self._particles)}"
                     )
-        except KeyboardInterrupt:
-            self._camera.stop()
-            self._renderer.close()
 
+        except KeyboardInterrupt:
+            logger.info("Interrupción por teclado")
+        except Exception as e:
+            logger.error(f"Error en el loop del juego: {e}", exc_info=True)
         finally:
+            # Cierre garantizado del renderer (idempotente)
+            try:
+                self._renderer.close()
+            except Exception as e:
+                logger.error(f"Error cerrando renderer: {e}")
             logger.info(
-                f"Juego particles terminado. Frames procesados: {self._frame_count}"
+                f"Juego particles terminado. Frames: {self._frame_count}"
             )
 
     def _process_commands(self) -> None:
@@ -117,13 +124,11 @@ class ParticlesGame:
                 self.reset()
                 logger.info("Comando reset_particles aplicado")
             else:
-                # El juego IGNORA comandos que no le pertenecen (silenciosamente)
                 logger.debug(f"Comando ignorado por ParticlesGame: {cmd.action}")
 
     def _spawn_particles_from_landmarks(
         self, landmarks: list[PoseLandmark]
     ) -> None:
-        """Genera partículas desde los puntos clave visibles."""
         for landmark in landmarks:
             if landmark.is_visible():
                 px = landmark.x * 640
@@ -134,11 +139,18 @@ class ParticlesGame:
                 )
                 self._particles.extend(new_particles)
 
-        # Limita el número de partículas (evita memory leak)
         if len(self._particles) > self._max_particles:
-            self._particles = self._particles[-int(self._max_particles * 0.75):]
+            self._particles = self._particles[
+                -int(self._max_particles * 0.75):
+            ]
 
     def _update_particles(self) -> None:
-        """Actualiza física y elimina partículas muertas."""
         for particle in self._particles:
             particle.update(gravity=self._gravity)
+
+        self._particles = [p for p in self._particles if p.is_alive()]
+
+    def reset(self) -> None:
+        """Reinicia el sistema de partículas."""
+        self._particles.clear()
+        logger.info("Sistema de partículas reiniciado")
