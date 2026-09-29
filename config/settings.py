@@ -84,8 +84,6 @@ class RenderSettings(BaseSettings):
 
 
 class GameSettings(BaseSettings):
-    """Configuración del juego."""
-
     model_config = SettingsConfigDict(
         env_prefix="GAME_",
         env_file=".env",
@@ -93,16 +91,22 @@ class GameSettings(BaseSettings):
         extra="ignore",
     )
 
-    type: Literal["particles", "color"] = Field(
+    type: str = Field(
         default="particles",
-        description="Tipo de juego a ejecutar"
+        min_length=1,
+        max_length=50,
+        pattern=r"^[a-z][a-z0-9_]*$",  # snake_case
+        description="ID del plugin de juego (validado por PluginRegistry)"
     )
     gravity: float = Field(default=0.08, ge=0.0, le=1.0)
-    burst_count: int = Field(default=5, ge=1, le=50, description="Partículas por landmark")
+    burst_count: int = Field(default=5, ge=1, le=50)
     max_particles: int = Field(default=2000, ge=100, le=10000)
-    palette: Literal["fire", "ocean", "forest", "neon"] = Field(
+    palette: str = Field(
         default="fire",
-        description="Paleta de colores (solo para juego de color)"
+        min_length=1,
+        max_length=50,
+        pattern=r"^[a-z][a-z0-9_]*$",
+        description="Nombre de la paleta (validado por ColorGame)"
     )
 
 

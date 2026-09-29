@@ -24,9 +24,11 @@ def register_builtin_plugins(registry: PluginRegistry) -> None:
     """
     # Imports locales para evitar ciclos en startup
     from app.plugins.color_plugin import ColorPlugin
+    from app.plugins.gestures_plugin import GesturesPlugin
     from app.plugins.particles_plugin import ParticlesPlugin
 
     registry.register(ParticlesPlugin())
     registry.register(ColorPlugin())
+    registry.register(GesturesPlugin())
 
     logger.info(f"Plugins builtin registrados: {registry.list_ids()}")
