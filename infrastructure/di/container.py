@@ -1,12 +1,13 @@
 """
-Contenedor de inyección de dependencias (manual).
+Contenedor DI.
 
-Responsabilidades:
-- Crear adaptadores según la configuración
-- Inyectarlos en los casos de uso
-- Gestionar el ciclo de vida (creación/cierre)
+Ahora:
+- NO conoce juegos concretos (los delega al PluginRegistry).
+- Construye SOLO dependencias compartidas (camera, pose, bus, registry).
+- Carga plugins al inicio.
 """
 
+import asyncio
 from typing import Self
 
 from adapters.api.fastapi_adapter import FastAPIAdapter
@@ -14,40 +15,36 @@ from adapters.camera.webcam_adapter import WebcamAdapter
 from adapters.mock.mock_camera import MockCameraAdapter
 from adapters.mock.mock_pose import MockPoseAdapter
 from adapters.pose.mediapipe_adapter import MediapipeAdapter
-from adapters.render.pygame_base import PygameBaseAdapter
-from app.state import AppState
+from app.game_context import GameContext
+from app.plugin_registry import PluginRegistry
+from app.plugins import register_builtin_plugins
+from app.state_registry import StateRegistry
 from config.settings import Settings
-from domain.entities.color import RGBColor
+from domain.plugins.game_plugin import GameProtocol
 from domain.ports.camera_port import CameraPort
+from domain.ports.event_bus_port import EventBusPort
 from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render_port import (
-    BaseRenderPort,
-    ColorRenderPort,
-    ParticlesRenderPort,
-)
-from domain.use_cases.color_game import ColorGame
-from domain.use_cases.particles_game import ParticlesGame
 from infrastructure.errors.exceptions import ConfigurationError
+from infrastructure.events.async_event_bus import AsyncEventBus
 from infrastructure.logging.logger import get_logger
 
 logger = get_logger("di")
 
 
 class Container:
-    """Contenedor de dependencias."""
+    """Contenedor de dependencias con plugin system."""
 
     def __init__(self, settings: Settings):
         self._settings = settings
         self._camera: CameraPort | None = None
         self._pose_estimator: PoseEstimatorPort | None = None
-        self._state: AppState | None = None
+        self._event_bus: EventBusPort | None = None
+        self._state_registry: StateRegistry | None = None
+        self._plugin_registry: PluginRegistry | None = None
         self._api: FastAPIAdapter | None = None
-        self._active_renderer: BaseRenderPort | None = None
-        # Nota: los renderers se crean por juego, no como singleton
-        logger.debug("Contenedor DI inicializado")
 
     # ==========================================
-    # Propiedades con lazy initialization
+    # Dependencias compartidas (lazy)
     # ==========================================
 
     @property
@@ -63,25 +60,40 @@ class Container:
         return self._pose_estimator
 
     @property
-    def state(self) -> AppState:
-        if self._state is None:
-            self._state = AppState()
-        return self._state
+    def event_bus(self) -> EventBusPort:
+        if self._event_bus is None:
+            self._event_bus = AsyncEventBus()
+        return self._event_bus
+
+    @property
+    def state_registry(self) -> StateRegistry:
+        if self._state_registry is None:
+            self._state_registry = StateRegistry()
+        return self._state_registry
+
+    @property
+    def plugin_registry(self) -> PluginRegistry:
+        """Registro de plugins (se auto-puebla con los builtin)."""
+        if self._plugin_registry is None:
+            self._plugin_registry = PluginRegistry()
+            register_builtin_plugins(self._plugin_registry)
+        return self._plugin_registry
 
     @property
     def api(self) -> FastAPIAdapter | None:
+        """Adaptador de API (solo si está habilitada)."""
         if not self._settings.api.enabled:
             return None
-
         if self._api is None:
             self._api = FastAPIAdapter(
                 settings=self._settings.api,
-                state=self.state,
+                event_bus=self.event_bus,
+                registry=self.state_registry,
             )
         return self._api
 
     # ==========================================
-    # Fábricas de adaptadores
+    # Fábricas de adaptadores compartidos
     # ==========================================
 
     def _create_camera(self) -> CameraPort:
@@ -127,143 +139,56 @@ class Container:
             context={"provider": cfg.provider},
         )
 
-    def _create_particles_renderer(self) -> ParticlesRenderPort:
-        """Crea el render de partículas, opcionalmente decorado."""
-        cfg = self._settings.render
-
-        # 1. Adaptador base
-        if cfg.provider == "mock":
-            from adapters.mock.mock_render import MockParticlesRenderAdapter
-            base: ParticlesRenderPort = MockParticlesRenderAdapter()
-        elif cfg.provider == "pygame":
-            from adapters.render.pygame_particles_adapter import (
-                PygameParticlesAdapter,
-            )
-            base = PygameParticlesAdapter(
-                width=cfg.width,
-                height=cfg.height,
-                title=cfg.title,
-                target_fps=cfg.target_fps,
-                background_color=RGBColor(20, 20, 30),
-            )
-        else:
-            raise ConfigurationError(
-                f"Proveedor de render desconocido: {cfg.provider}",
-                context={"provider": cfg.provider},
-            )
-
-        # 2. Decorador opcional (solo para Pygame)
-        if cfg.debug_overlay and isinstance(base, PygameBaseAdapter):
-            from adapters.render.decorators.pose_debug_overlay import (
-                PoseDebugOverlay,
-            )
-            logger.info("Activando PoseDebugOverlay sobre Particles")
-            return PoseDebugOverlay(base)
-
-        self._active_renderer = base
-        return base
-
-    def _create_color_renderer(self) -> ColorRenderPort:
-        """Crea el render de color, opcionalmente decorado."""
-        cfg = self._settings.render
-
-        # 1. Adaptador base
-        if cfg.provider == "mock":
-            from adapters.mock.mock_render import MockColorRenderAdapter
-            base: ColorRenderPort = MockColorRenderAdapter()
-        elif cfg.provider == "pygame":
-            from adapters.render.pygame_color_adapter import (
-                PygameColorAdapter,
-            )
-            base = PygameColorAdapter(
-                width=cfg.width,
-                height=cfg.height,
-                title=cfg.title,
-                target_fps=cfg.target_fps,
-            )
-        else:
-            raise ConfigurationError(
-                f"Proveedor de render desconocido: {cfg.provider}",
-                context={"provider": cfg.provider},
-            )
-
-        # 2. Decorador opcional (solo para Pygame)
-        if cfg.debug_overlay and isinstance(base, PygameBaseAdapter):
-            from adapters.render.decorators.pose_debug_overlay import (
-                PoseDebugOverlay,
-            )
-            logger.info("Activando PoseDebugOverlay sobre Color")
-            return PoseDebugOverlay(base)
-
-        self._active_renderer = base
-        return base
-
     # ==========================================
-    # Fábrica de casos de uso
+    # Fábrica de juegos (delegada al plugin)
     # ==========================================
 
-    def create_game(self) -> ParticlesGame | ColorGame:
-        game_type = self._settings.game.type
+    def create_game(self) -> GameProtocol:
+        """
+        Crea el juego configurado usando el plugin correspondiente.
 
-        if game_type == "particles":
-            logger.info("Creando ParticlesGame")
-            return ParticlesGame(
-                camera=self.camera,
-                pose_estimator=self.pose_estimator,
-                renderer=self._create_particles_renderer(),  # ← con ()
-                state=self.state,
-                gravity=self._settings.game.gravity,
-                burst_radius=50.0,
-                burst_count=self._settings.game.burst_count,
-                max_particles=self._settings.game.max_particles,
-            )
+        Flujo:
+            1. Obtiene el plugin del registro.
+            2. Construye el GameContext con las dependencias compartidas.
+            3. Delega en el plugin la creación del juego.
+            4. Registra el estado del juego en el StateRegistry.
+        """
+        game_id = self._settings.game.type
+        logger.info(f"Creando juego desde plugin: {game_id}")
 
-        if game_type == "color":
-            logger.info(
-                f"Creando ColorGame (palette={self._settings.game.palette})"
-            )
-            return ColorGame(
-                camera=self.camera,
-                pose_estimator=self.pose_estimator,
-                renderer=self._create_color_renderer(),  # ← con ()
-                state=self.state,
-                palette_name=self._settings.game.palette,
-            )
+        plugin = self.plugin_registry.get_or_raise(game_id)
 
-        raise ConfigurationError(
-            f"Tipo de juego desconocido: {game_type}",
-            context={"game_type": game_type},
+        context = GameContext(
+            camera=self.camera,
+            pose_estimator=self.pose_estimator,
+            event_bus=self.event_bus,
+            settings=self._settings,
         )
+
+        game = plugin.create_game(context)
+
+        # Registra el estado del juego en el StateRegistry
+        self.state_registry.register(game.state)
+        logger.info(
+            f"Estado del juego '{game.state.game_id}' registrado"
+        )
+
+        return game
 
     # ==========================================
     # Ciclo de vida
     # ==========================================
 
-    def start_api(self) -> None:
-        if self.api is not None:
-            self.api.start()
-            logger.info("API iniciada desde el contenedor")
-
-    def shutdown(self) -> None:
+    async def shutdown(self) -> None:
         logger.info("Cerrando contenedor DI...")
 
-        # API primero
         if self._api is not None:
             try:
-                self._api.stop()
+                await self._api.shutdown()
             except Exception as e:
                 logger.error(f"Error cerrando API: {e}")
             self._api = None
 
-        # Renderer activo
-        if self._active_renderer is not None:
-            try:
-                self._active_renderer.close()  # idempotente
-            except Exception as e:
-                logger.error(f"Error cerrando renderer: {e}")
-            self._active_renderer = None
-
-        # Cámara
         if self._camera is not None:
             try:
                 self._camera.stop()
@@ -271,7 +196,6 @@ class Container:
                 logger.error(f"Error cerrando cámara: {e}")
             self._camera = None
 
-        # Pose
         if self._pose_estimator is not None:
             try:
                 self._pose_estimator.close()
@@ -285,4 +209,8 @@ class Container:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.shutdown()
+        try:
+            asyncio.get_running_loop()
+            asyncio.create_task(self.shutdown())
+        except RuntimeError:
+            asyncio.run(self.shutdown())
