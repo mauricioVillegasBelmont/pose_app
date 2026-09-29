@@ -111,8 +111,6 @@ class GameSettings(BaseSettings):
 
 
 class LoggingSettings(BaseSettings):
-    """Configuración de logging."""
-
     model_config = SettingsConfigDict(
         env_prefix="LOG_",
         env_file=".env",
@@ -122,7 +120,18 @@ class LoggingSettings(BaseSettings):
 
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     format: Literal["json", "console"] = "console"
-    file: str | None = Field(default=None, description="Archivo de log (opcional)")
+
+    # NUEVO: enable/disable file logging
+    file: bool = Field(
+        default=False,
+        description="Si True, escribe logs a logs/app.log y logs/errors.log",
+    )
+
+    # NUEVO: directorio de logs (configurable)
+    directory: str = Field(
+        default="logs",
+        description="Directorio donde guardar los archivos de log",
+    )
 
 class APISettings(BaseSettings):
     """Configuración de la API REST."""
