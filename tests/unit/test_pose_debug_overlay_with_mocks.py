@@ -1,29 +1,29 @@
 """
-Test del decorador PoseDebugOverlay usando mocks.
+Tests del decorador PoseDebugOverlay usando mocks.
 
-Nota: El decorador PoseDebugOverlay requiere un adaptador Pygame real
-para acceder a `screen`, `width`, `height`. Por eso aquí solo
-verificamos la integración con mocks a nivel de puerto.
-
-El decorador en sí se prueba en tests/integration/ con Pygame real.
+Verifica la integración del juego con renderers mock,
+incluyendo el flujo async de `run_async`.
 """
 
+from unittest.mock import Mock
+
+import numpy as np
+import pytest
 
 from adapters.mock.mock_render import MockParticlesRenderAdapter
-from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
+from domain.games.particles.main import ParticlesGame
+from domain.games.particles.state import ParticlesState
+from infrastructure.events.async_event_bus import AsyncEventBus
 
 
-def test_particles_game_with_mock_renderer():
+@pytest.mark.asyncio
+async def test_particles_game_with_mock_renderer():
     """
     Test end-to-end con mocks: verifica que el juego
-    pasa las partículas al renderer.
+    cierra el renderer al terminar `run_async`.
     """
-    from unittest.mock import Mock
-
-    from domain.use_cases.particles_game import ParticlesGame
-
-    # Arrange: mocks de todos los adaptadores
+    # Arrange
     mock_camera = Mock()
     mock_camera.get_frame.return_value = None  # Salir del loop rápido
 
@@ -32,39 +32,35 @@ def test_particles_game_with_mock_renderer():
 
     mock_renderer = MockParticlesRenderAdapter()
 
-    # El juego correrá un ciclo vacío (frame=None)
     game = ParticlesGame(
         camera=mock_camera,
         pose_estimator=mock_pose,
         renderer=mock_renderer,
-        state=None,
+        state=ParticlesState(),
+        event_bus=AsyncEventBus(),
     )
 
-    # Act: corremos un ciclo y paramos
+    # Act
     iterations = [0]
+
     def should_stop():
         iterations[0] += 1
         return iterations[0] > 3
 
-    game.run(should_stop=should_stop)
+    await game.run_async(should_stop=should_stop)  # ← await
 
     # Assert: el renderer fue cerrado por el juego
     assert mock_renderer.is_closed is True
 
 
-def test_particles_game_with_landmarks():
+@pytest.mark.asyncio
+async def test_particles_game_with_landmarks():
     """
     Verifica que el juego notifique landmarks al renderer
     cuando éste implementa LandmarkAwareRenderPort.
     """
-    from unittest.mock import Mock
-
-    from domain.use_cases.particles_game import ParticlesGame
-
     # Arrange
     mock_camera = Mock()
-    # Simula un frame válido la primera vez, luego None
-    import numpy as np
     frames = [np.zeros((480, 640, 3), dtype=np.uint8), None]
     mock_camera.get_frame.side_effect = lambda: frames.pop(0) if frames else None
 
@@ -79,17 +75,19 @@ def test_particles_game_with_landmarks():
         camera=mock_camera,
         pose_estimator=mock_pose,
         renderer=mock_renderer,
-        state=None,
+        state=ParticlesState(),
+        event_bus=AsyncEventBus(),
     )
 
     # Act
     iterations = [0]
+
     def should_stop():
         iterations[0] += 1
         return iterations[0] > 2
 
-    game.run(should_stop=should_stop)
+    await game.run_async(should_stop=should_stop)  # ← await
 
-    # Assert: el renderer recibió landmarks (por ser LandmarkAware)
+    # Assert: el renderer recibió landmarks
     assert mock_renderer.update_landmarks_count > 0
     assert any(lm.name == "nose" for lm in mock_renderer.last_landmarks)

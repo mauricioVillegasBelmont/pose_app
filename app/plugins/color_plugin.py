@@ -6,7 +6,7 @@ from app.game_context import GameContext
 from domain.games.color.state import ColorState
 from domain.plugins.game_plugin import GamePlugin, GameProtocol
 from domain.state.game_state_port import GameStatePort
-from domain.use_cases.color_game import ColorGame
+from domain.games.color.main import ColorGame
 from infrastructure.errors.exceptions import ConfigurationError
 from infrastructure.logging.logger import get_logger
 

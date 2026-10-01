@@ -1,0 +1,123 @@
+[project]
+name = "pose-app"
+version = "0.5.0"
+description = "Aplicación de RA con juegos basados en pose"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "miau", email = "mauricio.vi.be@gmail.com" },
+]
+dependencies = [
+    "absl-py==2.5.0",
+    "annotated-doc==0.0.5",
+    "annotated-types==0.8.0",
+    "anyio==4.15.1",
+    "certifi==2026.7.22",
+    "cffi==2.1.1",
+    "click==8.5.0",
+    "contourpy==1.3.3",
+    "cycler==0.12.1",
+    "fastapi==0.141.1",
+    "flatbuffers==25.12.19",
+    "fonttools==4.65.0",
+    "h11==0.16.0",
+    "httpcore2==2.13.1",
+    "httpx2==2.13.1",
+    "idna==3.19",
+    "iniconfig==2.3.0",
+    "kiwisolver==1.5.1",
+    "matplotlib==3.11.2",
+    "mediapipe==1.0.1",
+    "numpy==2.4.6",
+    "opencv-contrib-python==5.0.0.93",
+    "opencv-python==5.0.0.93",
+    "packaging==26.3",
+    "pillow==12.3.0",
+    "pluggy==1.6.0",
+    "protobuf==7.36.2",
+    "pycparser==3.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "pydantic_core==2.46.5",
+    "pygame==2.6.1",
+    "Pygments==2.21.0",
+    "pyparsing==3.3.2",
+    "python-dateutil==2.9.0.post0",
+    "python-dotenv==1.2.3",
+    "six==1.17.0",
+    "sounddevice==0.5.6",
+    "starlette==1.6.0",
+    "truststore==0.10.4",
+    "typing-inspection==0.4.4",
+    "typing_extensions==4.16.0",
+    "uv==0.12.10",
+    "uvicorn==0.53.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "pytest-forked>=1.6",
+    "hypothesis>=6.100",
+    "mypy>=1.10",
+    "ruff>=0.6",
+    "coverage>=7.16.2",
+    "pre-commit>=4.6.2",
+]
+
+# Configuracion para pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+addopts = "-m 'not slow' --strict-markers --strict-config -ra"
+markers = [
+    "slow: tests que requieren Mediapipe, GPU, o son lentos (>1s)",
+    "requires_mediapipe: tests que inicializan Mediapipe (NO usar con --forked)",
+]
+# Configuracion para pytest-cov
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "conftest.py",
+    "check_structure.py",
+    "directory_tree_generator.py",
+    "debug_*.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+]
+show_missing = true
+precision = 2
+fail_under = 60
+
+[tool.hypothesis]
+# Número de ejemplos por defecto (100 es el default)
+max_examples = 100
+
+# Backend de base de datos (dónde guarda los ejemplos fallidos)
+database = ".hypothesis"
+
+# Modo: normal (default) o "ci" (más exhaustivo, sin randomización real)
+# En CI, usar modo ci reproduce bugs determinísticamente
+# profiles = ...
+
+# Deadline por test (ms) - evita tests colgados
+deadline = 1000
+
+# Suppress warnings comunes
+suppress_health_check = [
+    "too_slow",
+    "filter_too_much",
+]

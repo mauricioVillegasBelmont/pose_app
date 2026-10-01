@@ -7,7 +7,9 @@ import numpy as np
 
 from domain.entities.pose_landmark import PoseLandmark
 from domain.ports.pose_estimator_port import PoseEstimatorPort
+from infrastructure.logging.logger import get_logger
 
+logger = get_logger("adapters.pose.mediapipe_adapter")
 
 class MediapipeAdapter(PoseEstimatorPort):
     """
@@ -113,6 +115,17 @@ class MediapipeAdapter(PoseEstimatorPort):
         """Estima la postura y devuelve una lista de PoseLandmark que sean visibles."""
         if frame is None or frame.size == 0:
             return []
+        if frame.ndim != 3 or frame.shape[2] != 3:
+            logger.warning(f"Frame con shape inválido: {frame.shape}")
+            return []
+
+        height, width = frame.shape[:2]
+        if height < 64 or width < 64:
+            logger.warning(f"Frame demasiado pequeño: {width}x{height}")
+            return []
+
+        if not frame.flags["C_CONTIGUOUS"]:
+            frame = np.ascontiguousarray(frame)
 
         # 1. BGR -> RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

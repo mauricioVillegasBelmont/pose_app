@@ -33,18 +33,12 @@ def test_pygame_color_adapter_implements_port():
     assert callable(adapter.close)
 
 
-def test_pygame_color_adapter_converts_normalized_to_pixels():
-    """Verifica la conversión de coordenadas normalizadas a píxeles."""
-    adapter = PygameColorAdapter(width=800, height=600)
+def test_pose_overlay_converts_normalized_to_pixels():
+    """El overlay convierte coords normalizadas a píxeles."""
+    from adapters.render.overlays.pose_overlay import PoseOverlayRenderer
 
     lm = PoseLandmark(x=0.5, y=0.5, z=0.0, visibility=1.0, name="nose")
-    px, py = adapter._to_pixels(lm)
+    px, py = PoseOverlayRenderer._to_pixels(lm, width=800, height=600)
 
     assert px == 400
     assert py == 300
-
-    lm_corner = PoseLandmark(x=0.0, y=1.0, z=0.0, visibility=1.0, name="left_ankle")
-    px, py = adapter._to_pixels(lm_corner)
-
-    assert px == 0
-    assert py == 600

@@ -6,7 +6,7 @@ from app.game_context import GameContext
 from domain.games.gestures.state import GesturesState
 from domain.plugins.game_plugin import GamePlugin, GameProtocol
 from domain.state.game_state_port import GameStatePort
-from domain.use_cases.gestures_game import GesturesGame
+from domain.games.gestures.main import GesturesGame
 from infrastructure.errors.exceptions import ConfigurationError
 from infrastructure.logging.logger import get_logger
 

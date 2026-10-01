@@ -1,6 +1,5 @@
-
 # Directory Structure
-````
+```
 pose_app/
 │
 ├── adapters/

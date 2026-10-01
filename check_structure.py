@@ -1,170 +1,188 @@
 """
-Script de verificación de estructura.
-Ejecuta: python check_structure.py
+Verificación de estructura y arquitectura.
+
+Corre: python check_structure.py
+
+Verifica:
+1. Estructura de carpetas requerida.
+2. Imports de módulos clave.
+3. Implementación correcta de puertos.
 """
 
 import sys
 from pathlib import Path
 
+# ==========================================
+# Estructura esperada
+# ==========================================
 
 REQUIRED_FILES = [
-    # Entidades
-    "domain/__init__.py",
-    "domain/entities/__init__.py",
+    # Domain
     "domain/entities/pose_landmark.py",
     "domain/entities/particle.py",
     "domain/entities/color.py",
-
-    # Puertos
-    "domain/ports/__init__.py",
+    "domain/entities/gesture.py",
+    "domain/state/game_state_port.py",
+    "domain/plugins/game_plugin.py",
     "domain/ports/camera_port.py",
     "domain/ports/pose_estimator_port.py",
     "domain/ports/render_port.py",
-
-    # Casos de uso
-    "domain/use_cases/__init__.py",
-    "domain/use_cases/color_game.py",
-    "domain/use_cases/particles_game.py",
-
-    # Adaptadores mock
-    "adapters/mock/__init__.py",
+    "domain/ports/event_bus_port.py",
+    "domain/events/base.py",
+    "domain/events/game_events.py",
+    "domain/events/pose_events.py",
+    # Games
+    "domain/games/particles/main.py",
+    "domain/games/particles/state.py",
+    "domain/games/color/main.py",
+    "domain/games/color/state.py",
+    "domain/games/gestures/main.py",
+    "domain/games/gestures/state.py",
+    # App
+    "app/main.py",
+    "app/game_context.py",
+    "app/plugin_registry.py",
+    "app/state_registry.py",
+    "app/plugins/__init__.py",
+    "app/plugins/particles_plugin.py",
+    "app/plugins/color_plugin.py",
+    "app/plugins/gestures_plugin.py",
+    # Adaptadores
+    "adapters/camera/webcam_adapter.py",
+    "adapters/pose/mediapipe_adapter.py",
+    "adapters/render/pygame_particles_adapter.py",
+    "adapters/render/pygame_color_adapter.py",
+    "adapters/render/pygame_base.py",
+    "adapters/render/overlays/pose_overlay.py",
+    "adapters/render/decorators/pose_debug_overlay.py",
     "adapters/mock/mock_camera.py",
     "adapters/mock/mock_pose.py",
     "adapters/mock/mock_render.py",
-
-    # Adaptadores reales
-    "adapters/__init__.py",
-    "adapters/camera/__init__.py",
-    "adapters/camera/webcam_adapter.py",
-
-    "adapters/pose/__init__.py",
-    "adapters/pose/mediapipe_adapter.py",
-
-    "adapters/render/__init__.py",
-    "adapters/render/pygame_render_adapter.py",
+    "adapters/api/fastapi_adapter.py",
+    "adapters/api/routes.py",
+    "adapters/api/schemas.py",
+    # Infraestructura
+    "infrastructure/di/container.py",
+    "infrastructure/events/async_event_bus.py",
+    "infrastructure/logging/logger.py",
+    "infrastructure/errors/exceptions.py",
+    # Configuración
+    "config/settings.py",
 ]
 
 
-def check_structure():
-    """Verifica que todos los archivos requeridos existen."""
-    missing = []
-    present = []
+# ==========================================
+# Checks
+# ==========================================
 
+def check_structure() -> bool:
+    print("=" * 60)
+    print("🔍 VERIFICACIÓN DE ESTRUCTURA")
+    print("=" * 60)
+
+    missing = []
     for file_path in REQUIRED_FILES:
-        path = Path(file_path)
-        if path.exists():
-            present.append(file_path)
-        else:
+        if not Path(file_path).exists():
             missing.append(file_path)
 
-    print("=" * 60)
-    print("🔍 VERIFICACIÓN DE ESTRUCTURA DEL PROYECTO")
-    print("=" * 60)
-
-    print(f"\n✅ Archivos presentes: {len(present)}/{len(REQUIRED_FILES)}")
+    total = len(REQUIRED_FILES)
+    present = total - len(missing)
+    print(f"\n✅ Archivos presentes: {present}/{total}")
 
     if missing:
         print(f"\n❌ Archivos faltantes ({len(missing)}):")
         for file in missing:
             print(f"   - {file}")
         return False
-    else:
-        print("\n🎉 ¡Estructura completa! Todos los archivos están presentes.")
-        return True
+
+    print("\n🎉 Estructura completa.")
+    return True
 
 
-def check_imports():
-    """Verifica que los módulos se pueden importar sin errores."""
+def check_imports() -> bool:
     print("\n" + "=" * 60)
     print("🔍 VERIFICACIÓN DE IMPORTS")
     print("=" * 60)
 
-    modules_to_test = [
-        ("domain.entities.pose_landmark", "PoseLandmark"),
-        ("domain.entities.particle", "Particle"),
-        ("domain.entities.color", "RGBColor"),
-        ("domain.ports.camera_port", "CameraPort"),
-        ("domain.ports.pose_estimator_port", "PoseEstimatorPort"),
-        ("domain.ports.render_port", "RenderPort"),
-        ("domain.use_cases.particles_game", "ParticlesGame"),
-        ("domain.use_cases.color_game", "ColorGame"),
+    modules = [
+        ("domain.entities.gesture", "Gesture"),
+        ("domain.state.game_state_port", "GameStatePort"),
+        ("domain.plugins.game_plugin", "GamePlugin"),
+        ("domain.ports.render_port", "ParticlesRenderPort"),
+        ("domain.ports.event_bus_port", "EventBusPort"),
+        ("domain.games.particles.main", "ParticlesGame"),
+        ("domain.games.color.main", "ColorGame"),
+        ("domain.games.gestures.main", "GesturesGame"),
+        ("app.game_context", "GameContext"),
+        ("app.plugin_registry", "PluginRegistry"),
+        ("app.state_registry", "StateRegistry"),
+        ("adapters.render.pygame_particles_adapter", "PygameParticlesAdapter"),
+        ("adapters.render.pygame_color_adapter", "PygameColorAdapter"),
+        ("adapters.render.decorators.pose_debug_overlay", "PoseDebugOverlay"),
+        ("adapters.mock.mock_render", "MockParticlesRenderAdapter"),
+        ("adapters.mock.mock_render", "MockColorRenderAdapter"),
+        ("infrastructure.events.async_event_bus", "AsyncEventBus"),
     ]
 
     all_ok = True
-    for module_name, class_name in modules_to_test:
+    for module_name, class_name in modules:
         try:
             module = __import__(module_name, fromlist=[class_name])
             getattr(module, class_name)
             print(f"   ✅ {module_name}.{class_name}")
-        except ImportError as e:
+        except (ImportError, AttributeError) as e:
             print(f"   ❌ {module_name}.{class_name}: {e}")
-            all_ok = False
-        except AttributeError as e:
-            print(f"   ❌ {module_name}.{class_name}: clase no encontrada")
             all_ok = False
 
     return all_ok
 
 
-def check_adapters():
-    """Verifica que los adaptadores mock funcionan sin dependencias externas."""
+def check_plugin_registry() -> bool:
     print("\n" + "=" * 60)
-    print("🔍 VERIFICACIÓN DE ADAPTADORES MOCK")
+    print("🔍 VERIFICACIÓN DE PLUGINS")
     print("=" * 60)
 
     try:
-        from adapters.mock.mock_camera import MockCameraAdapter
-        from adapters.mock.mock_pose import MockPoseAdapter
-        from adapters.mock.mock_render import MockRenderAdapter
+        from app.plugin_registry import PluginRegistry
+        from app.plugins import register_builtin_plugins
 
-        # Instancia cada mock
-        camera = MockCameraAdapter()
-        pose = MockPoseAdapter()
-        render = MockRenderAdapter()
+        registry = PluginRegistry()
+        register_builtin_plugins(registry)
 
-        print("   ✅ MockCameraAdapter")
-        print("   ✅ MockPoseAdapter")
-        print("   ✅ MockRenderAdapter")
+        expected = {"particles", "color", "gestures"}
+        registered = set(registry.list_ids())
 
-        # Verifica que los mocks implementan los puertos
-        from domain.ports.camera_port import CameraPort
-        from domain.ports.pose_estimator_port import PoseEstimatorPort
-        from domain.ports.render_port import RenderPort
+        print(f"   Plugins registrados: {sorted(registered)}")
+        missing = expected - registered
+        if missing:
+            print(f"   ❌ Faltan plugins: {sorted(missing)}")
+            return False
 
-        assert isinstance(camera, CameraPort), "MockCamera no implementa CameraPort"
-        assert isinstance(pose, PoseEstimatorPort), "MockPose no implementa PoseEstimatorPort"
-        assert isinstance(render, RenderPort), "MockRender no implementa RenderPort"
-
-        print("   ✅ Todos los mocks implementan sus puertos correctamente")
+        print("   ✅ Todos los plugins builtin registrados.")
         return True
-
-    except ImportError as e:
-        print(f"   ❌ Error de importación: {e}")
-        return False
-    except AssertionError as e:
-        print(f"   ❌ {e}")
+    except Exception as e:
+        print(f"   ❌ Error verificando plugins: {e}")
         return False
 
+
+# ==========================================
+# Main
+# ==========================================
 
 if __name__ == "__main__":
-    structure_ok = check_structure()
-    print()
+    ok = True
+    ok &= check_structure()
+    if ok:
+        ok &= check_imports()
+    if ok:
+        ok &= check_plugin_registry()
 
-    if structure_ok:
-        imports_ok = check_imports()
-        print()
-
-        if imports_ok:
-            adapters_ok = check_adapters()
-            print()
-
-            if adapters_ok:
-                print("=" * 60)
-                print("🎉 ¡Todo listo! Puedes ejecutar las pruebas de integración.")
-                print("=" * 60)
-                sys.exit(0)
-
-    print("=" * 60)
-    print("⚠️ Corrige los errores arriba antes de continuar.")
-    print("=" * 60)
-    sys.exit(1)
+    print("\n" + "=" * 60)
+    if ok:
+        print("🎉 ¡Todo en orden!")
+        print("=" * 60)
+        sys.exit(0)
+    else:
+        print("⚠️ Corrige los errores arriba.")
+        print("=" * 60)
+        sys.exit(1)

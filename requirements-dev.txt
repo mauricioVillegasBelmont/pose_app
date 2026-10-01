@@ -1,0 +1,15 @@
+# requirements-dev.txt (nuevo)
+-r requirements.txt    # incluye las de runtime
+
+# Testing
+pytest>=8.0
+pytest-asyncio>=0.24
+pytest-cov>=6.0
+pytest-forked>=1.6
+
+# Property-based testing (próximo)
+hypothesis>=6.100
+
+# Calidad de código (recomendado)
+mypy>=1.10
+ruff>=0.6

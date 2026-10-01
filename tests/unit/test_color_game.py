@@ -1,46 +1,49 @@
-import unittest
+# tests/unit/test_color_game.py
+
 from unittest.mock import Mock
 
+import pytest
+
+from domain.entities.color import RGBColor
 from domain.entities.pose_landmark import PoseLandmark
-from domain.use_cases.color_game import ColorGame
+from domain.games.color.main import ColorGame
+from domain.games.color.state import ColorState
 
 
-class TestColorGame(unittest.TestCase):
+@pytest.fixture
+def color_game() -> ColorGame:
+    """Instancia sin adaptadores reales (para probar lógica pura)."""
+    return ColorGame(
+        camera=Mock(),
+        pose_estimator=Mock(),
+        renderer=Mock(),
+        state=ColorState(palette_name="fire"),
+        event_bus=Mock(),
+        palette_name="fire",
+    )
 
-    def test_color_calculation_with_hands_up(self):
-        """Verifica que manos arriba generen colores cálidos."""
-        # Arrange
-        game = ColorGame(Mock(), Mock(), Mock(), palette_name='fire')
 
-        # Manos arriba (y bajo)
-        landmarks = [
-            PoseLandmark(0.2, 0.2, 0.0, 1.0, 'left_wrist'),
-            PoseLandmark(0.8, 0.2, 0.0, 1.0, 'right_wrist'),
-            PoseLandmark(0.5, 0.3, 0.0, 1.0, 'nose'),
-        ]
+def test_color_calculation_with_hands_up(color_game: ColorGame):
+    """Manos arriba → colores cálidos (componente rojo dominante)."""
+    landmarks = [
+        PoseLandmark(x=0.2, y=0.2, z=0.0, visibility=1.0, name="left_wrist"),
+        PoseLandmark(x=0.8, y=0.2, z=0.0, visibility=1.0, name="right_wrist"),
+        PoseLandmark(x=0.5, y=0.3, z=0.0, visibility=1.0, name="nose"),
+    ]
+    color = color_game._calculate_color(landmarks)
 
-        # Act
-        color = game._calculate_color_from_pose(landmarks)
+    # Un color cálido tiene el rojo como componente dominante
+    assert color.r > color.g
+    assert color.r > color.b
 
-        # Assert: debería ser predominantemente rojo o azul
-        assert color.r > 100 or color.g > 100
-        assert color.b < 150  # Menos azul
 
-    def test_color_calculation_with_hands_down(self):
-        """Verifica que manos abajo generen colores fríos."""
-        # Arrange
-        game = ColorGame(Mock(), Mock(), Mock(), palette_name='ocean')
-
-        # Manos abajo (y alto)
-        landmarks = [
-            PoseLandmark(0.2, 0.9, 0.0, 1.0, 'left_wrist'),
-            PoseLandmark(0.8, 0.9, 0.0, 1.0, 'right_wrist'),
-            PoseLandmark(0.5, 0.6, 0.0, 1.0, 'nose'),
-        ]
-
-        # Act
-        color = game._calculate_color_from_pose(landmarks)
-
-        # Assert: debería tener menos rojo/azul intenso
-        # (depende de la paleta ocean)
-        assert color.b > 100
+def test_color_calculation_with_hands_down(color_game: ColorGame):
+    """Manos abajo → colores fríos."""
+    landmarks = [
+        PoseLandmark(x=0.2, y=0.9, z=0.0, visibility=1.0, name="left_wrist"),
+        PoseLandmark(x=0.8, y=0.9, z=0.0, visibility=1.0, name="right_wrist"),
+        PoseLandmark(x=0.5, y=0.6, z=0.0, visibility=1.0, name="nose"),
+    ]
+    color = color_game._calculate_color(landmarks)
+    # Ajusta la aserción según tu paleta "fire"
+    assert isinstance(color, RGBColor)

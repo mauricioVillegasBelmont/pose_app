@@ -8,7 +8,7 @@ import pytest
 
 from domain.entities.gesture import Gesture
 from domain.entities.pose_landmark import PoseLandmark
-from domain.use_cases.gestures_game import GesturesGame
+from domain.games.gestures.main import GesturesGame
 
 
 # ==========================================

@@ -1,10 +1,63 @@
-__pycache__
-__pycache__/*
+# OS generated files #
+######################
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+*.Identifier
+*:Zone.Identifier
+
+# Linux
+.*
+!.gitignore
+!.htaccess
+!.htpasswd
+*~
+!/.ssh
+# Mac OS X
+*/.DS_Store
+.DS_Store
+.DS_Store?
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Coverage
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+.hypothesis/
 
 
-.venv/
+# Logs
+logs/
+
+# Entornos
+__pycache__/
+*.pyc
 .env
 !.env.example
 
+# uv
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
 *.back
 *.back.*
+*.backup
+*.backup.*
+
+# vscode
+.code-workspace
+*.code-workspace

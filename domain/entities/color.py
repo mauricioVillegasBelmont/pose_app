@@ -17,6 +17,9 @@ class RGBColor:
     def to_hex(self) -> str:
         return f"#{self.r:02x}{self.g:02x}{self.b:02x}"
 
+    def to_rgb_tuple(self):
+        return (self.r, self.g, self.b)
+
     @classmethod
     def interpolate(cls, color1: 'RGBColor', color2: 'RGBColor', t: float) -> 'RGBColor':
         """Interpolación lineal entre dos colores (regla de negocio)."""

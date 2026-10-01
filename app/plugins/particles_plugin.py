@@ -6,7 +6,7 @@ from app.game_context import GameContext
 from domain.games.particles.state import ParticlesState
 from domain.plugins.game_plugin import GamePlugin, GameProtocol
 from domain.state.game_state_port import GameStatePort
-from domain.use_cases.particles_game import ParticlesGame
+from domain.games.particles.main import ParticlesGame
 from infrastructure.errors.exceptions import ConfigurationError
 from infrastructure.logging.logger import get_logger
 
