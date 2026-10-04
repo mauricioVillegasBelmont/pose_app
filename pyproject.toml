@@ -75,6 +75,12 @@ dev = [
 # Configuracion para pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+norecursedirs = [
+    "tests/manual",
+    ".venv",
+    "node_modules",
+    ".git",
+]
 pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-m 'not slow' --strict-markers --strict-config -ra"

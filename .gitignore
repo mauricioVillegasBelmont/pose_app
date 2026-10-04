@@ -41,7 +41,9 @@ htmlcov/
 logs/
 
 # Entornos
-__pycache__/
+__pycache__/*
+*/__pycache__/*
+__pycache__
 *.pyc
 .env
 !.env.example
