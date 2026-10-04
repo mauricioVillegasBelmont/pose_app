@@ -3,7 +3,8 @@
   "instructions": [
     "AGENTS.md",
     "docs/ports_contract.md",
-    "docs/render_architecture.md"
+    "docs/render_architecture.md",
+    "docs/code_style.md"
   ],
   "permission": {
     "read": "allow",
