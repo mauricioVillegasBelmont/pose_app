@@ -18,9 +18,7 @@ class DomainEvent:
     sin conflictos de orden (los eventos se instancian por keyword).
     """
 
-    occurred_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def event_name(self) -> str:

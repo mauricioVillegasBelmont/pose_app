@@ -26,9 +26,7 @@ class AsyncEventBus(EventBusPort):
     """Implementación async del Event Bus."""
 
     def __init__(self):
-        self._handlers: dict[
-            type[DomainEvent], list[EventHandler]
-        ] = defaultdict(list)
+        self._handlers: dict[type[DomainEvent], list[EventHandler]] = defaultdict(list)
         self._lock = Lock()
 
     def subscribe(
@@ -46,8 +44,7 @@ class AsyncEventBus(EventBusPort):
                 return
             handlers.append(handler)
             logger.debug(
-                f"Handler {handler.__name__} suscrito a "
-                f"{event_type.__name__}"
+                f"Handler {handler.__name__} suscrito a " f"{event_type.__name__}"
             )
 
     def unsubscribe(
@@ -68,9 +65,7 @@ class AsyncEventBus(EventBusPort):
         if not handlers:
             return
 
-        logger.debug(
-            f"Publicando {event.event_name} a {len(handlers)} handlers"
-        )
+        logger.debug(f"Publicando {event.event_name} a {len(handlers)} handlers")
 
         for handler in handlers:
             try:

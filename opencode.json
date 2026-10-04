@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "docs/ports_contract.md",
+    "docs/render_architecture.md"
+  ],
+  "permission": {
+    "read": "allow",
+    "edit": "ask",
+    "write": "ask",
+    "bash": {
+      "*": "allow",
+      "rm:*": "deny",
+      "rmdir:*": "deny",
+      "git reset:*": "deny",
+      "git clean:*": "deny",
+      "git checkout -- *": "deny",
+      "git push:*": "deny",
+      "git commit:*": "ask",
+      "mv:*": "ask",
+      "cp:*": "ask"
+    },
+    "external_directory": "ask"
+  }
+}

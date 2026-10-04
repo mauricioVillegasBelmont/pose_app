@@ -75,6 +75,7 @@ REQUIRED_FILES = [
 # Checks
 # ==========================================
 
+
 def check_structure() -> bool:
     print("=" * 60)
     print("🔍 VERIFICACIÓN DE ESTRUCTURA")

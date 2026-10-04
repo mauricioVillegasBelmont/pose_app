@@ -23,11 +23,11 @@ class MockPoseAdapter(PoseEstimatorPort):
         """Crea landmarks en pose de 'T' para testing."""
         # Solo algunos puntos clave para simplicidad
         return [
-            PoseLandmark(0.5, 0.2, 0.0, 1.0, 'nose'),
-            PoseLandmark(0.3, 0.3, 0.0, 1.0, 'left_shoulder'),
-            PoseLandmark(0.7, 0.3, 0.0, 1.0, 'right_shoulder'),
-            PoseLandmark(0.1, 0.5, 0.0, 1.0, 'left_wrist'),
-            PoseLandmark(0.9, 0.5, 0.0, 1.0, 'right_wrist'),
-            PoseLandmark(0.3, 0.7, 0.0, 1.0, 'left_hip'),
-            PoseLandmark(0.7, 0.7, 0.0, 1.0, 'right_hip'),
+            PoseLandmark(0.5, 0.2, 0.0, 1.0, "nose"),
+            PoseLandmark(0.3, 0.3, 0.0, 1.0, "left_shoulder"),
+            PoseLandmark(0.7, 0.3, 0.0, 1.0, "right_shoulder"),
+            PoseLandmark(0.1, 0.5, 0.0, 1.0, "left_wrist"),
+            PoseLandmark(0.9, 0.5, 0.0, 1.0, "right_wrist"),
+            PoseLandmark(0.3, 0.7, 0.0, 1.0, "left_hip"),
+            PoseLandmark(0.7, 0.7, 0.0, 1.0, "right_hip"),
         ]

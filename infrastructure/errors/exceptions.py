@@ -30,6 +30,7 @@ class AppError(Exception):
 # Errores de configuración (fail-fast)
 # ==========================================
 
+
 class ConfigurationError(AppError):
     """Error en la configuración (variables de entorno inválidas, etc.)."""
 
@@ -37,6 +38,7 @@ class ConfigurationError(AppError):
 # ==========================================
 # Errores de infraestructura (adaptadores)
 # ==========================================
+
 
 class InfrastructureError(AppError):
     """Error genérico de infraestructura."""
@@ -61,6 +63,7 @@ class RenderError(InfrastructureError):
 # ==========================================
 # Errores de dominio
 # ==========================================
+
 
 class DomainError(AppError):
     """Error en las reglas de negocio."""

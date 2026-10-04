@@ -21,24 +21,24 @@ logger = get_logger("errors")
 
 class ErrorAction(Enum):
     """Acciones posibles ante un error."""
-    FATAL = "fatal"          # Detener la app
-    RETRY = "retry"          # Reintentar
-    SKIP = "skip"            # Ignorar y continuar
-    DEGRADE = "degrade"      # Modo degradado
+
+    FATAL = "fatal"  # Detener la app
+    RETRY = "retry"  # Reintentar
+    SKIP = "skip"  # Ignorar y continuar
+    DEGRADE = "degrade"  # Modo degradado
 
 
 # Mapeo: tipo de excepción → acción
 ERROR_ACTIONS: dict[type[Exception], ErrorAction] = {
     ConfigurationError: ErrorAction.FATAL,
     CameraError: ErrorAction.FATAL,
-    PoseEstimationError: ErrorAction.SKIP,   # Omite frame y sigue
+    PoseEstimationError: ErrorAction.SKIP,  # Omite frame y sigue
     RenderError: ErrorAction.FATAL,
 }
 
 
 def handle_error(
-    error: Exception,
-    context: dict[str, Any] | None = None
+    error: Exception, context: dict[str, Any] | None = None
 ) -> ErrorAction:
     """
     Maneja un error según su tipo.
@@ -63,17 +63,16 @@ def handle_error(
     if action == ErrorAction.FATAL:
         logger.critical(
             f"Error fatal: {type(error).__name__}: {error}",
-            extra={"extra_data": context}
+            extra={"extra_data": context},
         )
     elif action == ErrorAction.SKIP:
         logger.warning(
             f"Error recuperable (skip): {type(error).__name__}: {error}",
-            extra={"extra_data": context}
+            extra={"extra_data": context},
         )
     else:
         logger.error(
-            f"Error: {type(error).__name__}: {error}",
-            extra={"extra_data": context}
+            f"Error: {type(error).__name__}: {error}", extra={"extra_data": context}
         )
 
     return action
@@ -83,7 +82,7 @@ def safe_execute(
     func: Callable[..., Any],
     *args: Any,
     context: dict[str, Any] | None = None,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> tuple[bool, Any]:
     """
     Ejecuta una función capturando errores de forma segura.

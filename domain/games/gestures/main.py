@@ -71,9 +71,7 @@ class GesturesGame:
         self._frame_count = 0
 
         # Contadores consecutivos por gesto (para activación)
-        self._consecutive_frames: dict[Gesture, int] = {
-            g: 0 for g in Gesture
-        }
+        self._consecutive_frames: dict[Gesture, int] = {g: 0 for g in Gesture}
 
         # Qué gestos están activos AHORA (ya disparados)
         self._active: set[Gesture] = set()
@@ -86,9 +84,7 @@ class GesturesGame:
     # Loop principal
     # ==========================================
 
-    async def run_async(
-        self, should_stop: Callable[[], bool] | None = None
-    ) -> None:
+    async def run_async(self, should_stop: Callable[[], bool] | None = None) -> None:
         should_stop = should_stop or (lambda: False)
 
         await asyncio.to_thread(self._camera.start)
@@ -116,6 +112,7 @@ class GesturesGame:
                 # Render (fondo + esqueleto)
                 try:
                     from domain.entities.color import RGBColor
+
                     await asyncio.to_thread(
                         self._renderer.render_background,
                         RGBColor(20, 20, 30),
@@ -140,9 +137,7 @@ class GesturesGame:
                 await asyncio.to_thread(self._camera.stop)
             except Exception as e:
                 logger.error(f"Error cerrando cámara: {e}")
-            logger.info(
-                f"Juego gestures terminado. Frames: {self._frame_count}"
-            )
+            logger.info(f"Juego gestures terminado. Frames: {self._frame_count}")
 
     # ==========================================
     # Procesamiento por frame
@@ -168,8 +163,7 @@ class GesturesGame:
 
                 # Umbral alcanzado y aún no activado → activar
                 if (
-                    self._consecutive_frames[gesture]
-                    >= self.MIN_FRAMES_TO_ACTIVATE
+                    self._consecutive_frames[gesture] >= self.MIN_FRAMES_TO_ACTIVATE
                     and gesture not in self._active
                 ):
                     self._active.add(gesture)
@@ -301,10 +295,7 @@ class GesturesGame:
         left_extended = left_wrist.x < left_shoulder.x - 0.1
         right_extended = right_wrist.x > right_shoulder.x + 0.1
 
-        return bool(
-            left_aligned and right_aligned
-            and left_extended and right_extended
-        )
+        return bool(left_aligned and right_aligned and left_extended and right_extended)
 
     def _detect_squat(self, landmarks: list[PoseLandmark]) -> bool:
         """
@@ -326,9 +317,7 @@ class GesturesGame:
 
         return False
 
-    def _detect_one_leg_balance(
-        self, landmarks: list[PoseLandmark]
-    ) -> bool:
+    def _detect_one_leg_balance(self, landmarks: list[PoseLandmark]) -> bool:
         """
         Equilibrio en un pie: un tobillo elevado (más arriba que su rodilla),
         el otro en el suelo.
@@ -356,18 +345,14 @@ class GesturesGame:
     # Helpers geométricos
     # ==========================================
 
-    def _find(
-        self, landmarks: list[PoseLandmark], name: str
-    ) -> PoseLandmark | None:
+    def _find(self, landmarks: list[PoseLandmark], name: str) -> PoseLandmark | None:
         for lm in landmarks:
             if lm.name and lm.name.lower() == name.lower():
                 return lm
         return None
 
     @staticmethod
-    def _angle_at(
-        a: PoseLandmark, vertex: PoseLandmark, b: PoseLandmark
-    ) -> float:
+    def _angle_at(a: PoseLandmark, vertex: PoseLandmark, b: PoseLandmark) -> float:
         """
         Ángulo en grados en el vértice `vertex`, formado por a-vertex-b.
         Usa solo coordenadas x,y (ignora z, que suele ser ruidoso).

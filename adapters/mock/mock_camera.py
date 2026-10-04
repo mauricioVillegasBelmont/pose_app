@@ -41,6 +41,7 @@ class MockCameraAdapter(CameraPort):
     def is_running(self) -> bool:
         return self._running
 
+
 # Nota: necesitas importar cv2 para el mock, pero es una dependencia de prueba
 # En producción, este mock solo se usa en tests.
 try:

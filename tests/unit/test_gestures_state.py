@@ -12,9 +12,7 @@ def test_initial_state():
 
     assert snapshot["active_gestures"] == []
     assert snapshot["frame_count"] == 0
-    assert all(
-        count == 0 for count in snapshot["activation_counts"].values()
-    )
+    assert all(count == 0 for count in snapshot["activation_counts"].values())
 
 
 def test_update_active_gestures():

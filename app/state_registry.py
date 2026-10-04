@@ -50,10 +50,7 @@ class StateRegistry:
             states = dict(self._states)
 
         return {
-            "games": {
-                game_id: state.snapshot()
-                for game_id, state in states.items()
-            },
+            "games": {game_id: state.snapshot() for game_id, state in states.items()},
             "active_games": list(states.keys()),
         }
 
@@ -62,10 +59,7 @@ class StateRegistry:
         with self._lock:
             states = dict(self._states)
 
-        return {
-            game_id: state.stats()
-            for game_id, state in states.items()
-        }
+        return {game_id: state.stats() for game_id, state in states.items()}
 
     def clear(self) -> None:
         """Limpia el registro (útil en tests)."""

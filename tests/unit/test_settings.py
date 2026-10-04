@@ -19,5 +19,6 @@ def test_settings_load():
     assert settings.camera.width > 0
     print("✅ Configuración cargada correctamente")
 
+
 if __name__ == "__main__":
     test_settings_load()

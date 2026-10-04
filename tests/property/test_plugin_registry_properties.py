@@ -10,13 +10,14 @@ import pytest
 from hypothesis import given, strategies as st
 
 from app.plugin_registry import PluginRegistry
-from domain.plugins.game_plugin import GamePlugin, GameProtocol
+from domain.plugins.game_plugin import GamePlugin
 from infrastructure.errors.exceptions import ConfigurationError
 
 
 # ==========================================
 # Factory de plugins fake
 # ==========================================
+
 
 def make_fake_plugin(game_id: str) -> GamePlugin:
     """Crea un plugin fake con un game_id específico."""
@@ -38,8 +39,8 @@ game_id_strategy = st.text(
 # Propiedades
 # ==========================================
 
-class TestPluginRegistryInvariants:
 
+class TestPluginRegistryInvariants:
     @given(game_id=game_id_strategy)
     def test_registered_plugin_can_be_retrieved(self, game_id: str):
         """Después de registrar, el plugin se puede recuperar."""
@@ -65,12 +66,14 @@ class TestPluginRegistryInvariants:
         with pytest.raises(ConfigurationError):
             registry.register(make_fake_plugin(game_id))
 
-    @given(game_ids=st.lists(
-        game_id_strategy,
-        min_size=1,
-        max_size=10,
-        unique=True,
-    ))
+    @given(
+        game_ids=st.lists(
+            game_id_strategy,
+            min_size=1,
+            max_size=10,
+            unique=True,
+        )
+    )
     def test_list_ids_matches_registered(self, game_ids: list[str]):
         """list_ids() devuelve exactamente los registrados."""
         registry = PluginRegistry()
@@ -79,12 +82,14 @@ class TestPluginRegistryInvariants:
 
         assert sorted(registry.list_ids()) == sorted(game_ids)
 
-    @given(game_ids=st.lists(
-        game_id_strategy,
-        min_size=1,
-        max_size=10,
-        unique=True,
-    ))
+    @given(
+        game_ids=st.lists(
+            game_id_strategy,
+            min_size=1,
+            max_size=10,
+            unique=True,
+        )
+    )
     def test_all_returns_copy(self, game_ids: list[str]):
         """Modificar el dict devuelto no afecta al registro."""
         registry = PluginRegistry()

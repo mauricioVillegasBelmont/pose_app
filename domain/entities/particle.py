@@ -6,6 +6,7 @@ from dataclasses import dataclass
 @dataclass
 class Particle:
     """Partícula para el sistema de partículas."""
+
     x: float
     y: float
     vx: float = 0.0
@@ -27,7 +28,9 @@ class Particle:
         return self.life > 0.01
 
     @classmethod
-    def create_burst(cls, center_x: float, center_y: float, count: int = 20) -> list['Particle']:
+    def create_burst(
+        cls, center_x: float, center_y: float, count: int = 20
+    ) -> list["Particle"]:
         """Genera una ráfaga de partículas desde un punto (dominio puro)."""
         particles = []
         for _ in range(count):
@@ -36,10 +39,14 @@ class Particle:
             particle = cls(
                 x=center_x + random.uniform(-10, 10),
                 y=center_y + random.uniform(-10, 10),
-                vx=speed * math.cos(angle), # sets the particle angle direction X
-                vy=speed * math.sin(angle), # sets the particle angle direction Y
+                vx=speed * math.cos(angle),  # sets the particle angle direction X
+                vy=speed * math.sin(angle),  # sets the particle angle direction Y
                 size=random.uniform(3, 8),
-                color=(random.randint(100, 255), random.randint(100, 255), random.randint(100, 255))
+                color=(
+                    random.randint(100, 255),
+                    random.randint(100, 255),
+                    random.randint(100, 255),
+                ),
             )
             particles.append(particle)
         return particles

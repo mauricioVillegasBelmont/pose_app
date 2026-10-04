@@ -1,6 +1,6 @@
 # Contrato de Puertos - Pose AR App
 
-> **Versión**: 0.5.1
+> **Versión**: 0.6.0
 > **Última actualización**: [fecha]
 > **Estado**: Vivo (se actualiza con cada fase)
 
@@ -16,13 +16,32 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - [CameraPort](#cameraPort)
 - [PoseEstimatorPort](#poseEstimatorPort)
 
-### Puertos de Salida (el dominio ESCRIBE al exterior)
+### Puertos de Salida — Render (el dominio ESCRIBE al exterior)
+**Estado actual:**
 - [BaseRenderPort](#baseRenderPort)
 - [ParticlesRenderPort](#particlesRenderPort)
 - [ColorRenderPort](#colorRenderPort)
+- [LandmarkAwareRenderPort](#landmarkAwareRenderPort)
 
-### Puertos de Comunicación (estado compartido)
-- [StatePort](#statePort)
+**Estado futuro (refactor pendiente):**
+- [ColorRenderPort (nuevo)](#colorRenderPortNew)
+- [ParticlesRenderPort (nuevo)](#particlesRenderPortNew)
+- [HudRenderPort](#hudRenderPort)
+- [OverlayPort](#overlayPort)
+- [ScenePort](#scenePort)
+
+### Puertos de Estado
+- [GameStatePort](#gameStatePort)
+
+### Puertos de Comunicación
+- [EventBusPort](#eventBusPort)
+
+### Puertos de Autenticación
+- [AuthPort](#authPort)
+
+### Puertos de Repositorio
+- [UserRepositoryPort](#userRepositoryPort)
+- [IdentityRepositoryPort](#identityRepositoryPort)
 
 ---
 
@@ -35,7 +54,7 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 **Ubicación**: `domain/ports/camera_port.py`
 
-**Quién lo usa**: `ParticlesGame`, `ColorGame`, cualquier caso de uso que procese video.
+**Quién lo usa**: `ParticlesGame`, `ColorGame`, `GesturesGame`.
 
 #### Métodos
 
@@ -54,7 +73,7 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - **Precondición**: ninguno (idempotente).
 - **Postcondición**: los recursos (cámara, hilos) están liberados.
 
-##### `get_frame() -> Optional[np.ndarray]`
+##### `get_frame() -> np.ndarray | None`
 
 - **Propósito**: Obtener el último frame disponible.
 - **Formato**: array numpy `(H, W, 3)` en **BGR** (OpenCV estándar).
@@ -67,7 +86,6 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 ##### `is_running() -> bool`
 
 - **Propósito**: Saber si la cámara está activa.
-- **Uso**: el caso de uso puede decidir reintentar si está caída.
 
 #### Adaptadores conocidos
 
@@ -77,7 +95,7 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 | `MockCameraAdapter` | ✅ Implementado | `adapters/mock/mock_camera.py` |
 | `VideoFileAdapter` | ⏳ Planeado | (para replay/testing) |
 | `RTSPAdapter` | ⏳ Futuro | (para streaming IP) |
-| `DeepCameraAdapter` | ⏳ Futuro | (para Camaras de profundidad) `adapters/camera/deepcam_adapter.py`|
+| `DeepCameraAdapter` | ⏳ Futuro | `adapters/camera/deepcam_adapter.py` |
 
 ---
 
@@ -88,11 +106,11 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 **Ubicación**: `domain/ports/pose_estimator_port.py`
 
-**Quién lo usa**: `ParticlesGame`, `ColorGame`.
+**Quién lo usa**: `ParticlesGame`, `ColorGame`, `GesturesGame`.
 
 #### Métodos
 
-##### `estimate(frame: np.ndarray) -> List[PoseLandmark]`
+##### `estimate(frame: np.ndarray) -> list[PoseLandmark]`
 
 - **Propósito**: Estimar landmarks de pose en un frame.
 - **Precondición**: `frame` no vacío, formato BGR `(H, W, 3)`.
@@ -104,10 +122,9 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
   - Los landmarks con `visibility < 0.5` **pueden** ser omitidos por el adaptador.
   - El número de landmarks puede variar entre adaptadores (Mediapipe: 33, YOLO: 17).
 
-##### `get_landmark_names() -> List[str]`
+##### `get_landmark_names() -> list[str]`
 
 - **Propósito**: Saber qué nombres de landmarks soporta el adaptador.
-- **Uso**: para validar reglas de negocio o autocompletar.
 
 ##### `close() -> None`
 
@@ -124,29 +141,29 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 ---
 
-## 🔌 Puertos de Salida
+## 🔌 Puertos de Salida — Render
 
 <a name="baseRenderPort"></a>
 ### 🎨 BaseRenderPort
 
-**Propósito**: Operaciones comunes a **cualquier** renderizador (ventana, ventana emergente, WebSocket, headless).
+> Estado: **actual** (será reemplazado por el refactor de capacidades).
+
+**Propósito**: Operaciones comunes a **cualquier** renderizador.
 
 **Ubicación**: `domain/ports/render_port.py`
 
-**Quién lo usa**: indirectamente los juegos; cada juego usa un puerto específico que hereda de este.
+**Quién lo usa**: indirectamente los juegos.
 
 #### Métodos
 
 ##### `show() -> None`
 
 - **Propósito**: Mantener la visualización activa (bloqueante hasta cerrar).
-- **Uso**: típicamente al final del juego o en un bucle de baja frecuencia.
 
 ##### `close() -> None`
 
 - **Propósito**: Cerrar y liberar recursos.
-- **Precondición**: ninguno (idempotente).
-- **Postcondición**: recursos liberados.
+- **Contrato**: idempotente.
 
 ##### `__enter__() / __exit__()`
 
@@ -156,159 +173,484 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 ---
 
 <a name="particlesRenderPort"></a>
-### ✨ ParticlesRenderPort
+### ✨ ParticlesRenderPort (actual)
 
-**Propósito**: Renderizar específicamente un **sistema de partículas**.
+> Estado: **actual** (será reemplazado por el refactor de capacidades).
+
+**Propósito**: Renderizar un sistema de partículas.
 
 **Herencia**: `BaseRenderPort`
 
 **Quién lo usa**: `ParticlesGame`.
 
-#### Métodos propios
+#### Métodos
 
-##### `render_particles(particles: List[Particle]) -> None`
+##### `render_particles(particles: list[Particle]) -> None`
 
-- **Propósito**: Dibujar las partículas en el canvas/ventana.
-- **Precondición**: `particles` puede estar vacía.
-- **Postcondición**: la visualización está actualizada; **NO bloquea más de lo necesario** (idealmente < 16ms para 60 FPS).
-- **Notas**:
-  - Cada partícula tiene `x, y, life, size, color`.
-  - El adaptador puede **ignorar partículas muertas** (`life <= 0.01`) para optimizar.
+- **Propósito**: Dibujar las partículas en el canvas.
+- **Contrato**: puede ser llamada con lista vacía. No debe bloquear.
+- **Notas**: el adaptador puede omitir partículas muertas (`life <= 0.01`).
 
 #### Adaptadores conocidos
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `PygameParticlesAdapter` | ⏳ A crear en 5.1 | `adapters/render/pygame_particles_adapter.py` |
-| `MockParticlesRenderAdapter` | ⏳ A crear en 5.1 | `adapters/mock/mock_render.py` |
-| `NullParticlesRenderAdapter` | ⏳ Planeado | (para modo headless) |
-| `WebSocketParticlesAdapter` | ⏳ Futuro | (para frontend web) |
+| `PygameParticlesAdapter` | ✅ Implementado | `adapters/render/pygame_particles_adapter.py` |
+| `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `NullParticlesRenderAdapter` | ⏳ Planeado | (headless) |
+| `WebSocketParticlesAdapter` | ⏳ Futuro | (frontend web) |
 
 ---
 
 <a name="colorRenderPort"></a>
-### 🌈 ColorRenderPort
+### 🌈 ColorRenderPort (actual)
 
-**Propósito**: Renderizar un **fondo de color + esqueleto** superpuesto.
+> Estado: **actual** (será reemplazado por el refactor de capacidades).
+
+**Propósito**: Renderizar un fondo de color + esqueleto superpuesto.
 
 **Herencia**: `BaseRenderPort`
 
-**Quién lo usa**: `ColorGame`.
+**Quién lo usa**: `ColorGame`, `GesturesGame`.
 
-#### Métodos propios
+#### Métodos
 
-##### `render_background(color: RGBColor, landmarks: List[PoseLandmark]) -> None`
+##### `render_background(color: RGBColor, landmarks: list[PoseLandmark]) -> None`
 
-- **Propósito**: Pintar todo el canvas con `color` y dibujar el esqueleto si hay landmarks.
-- **Precondición**: `color` es un RGBColor válido; `landmarks` puede estar vacía.
-- **Postcondición**: visualización actualizada.
-- **Notas**:
-  - Los landmarks deben conectarse como esqueleto (hombros, codos, caderas, etc.).
-  - Si un landmark tiene `visibility < 0.5`, **no** dibujarlo ni conectarlo.
+- **Propósito**: Pintar el canvas con `color` y dibujar el esqueleto si hay landmarks.
+- **Contrato**: `landmarks` puede estar vacía.
+- **Notas**: los landmarks con `visibility < 0.5` no se dibujan.
 
 #### Adaptadores conocidos
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `PygameColorAdapter` | ⏳ A crear en 5.1 | `adapters/render/pygame_color_adapter.py` |
-| `MockColorRenderAdapter` | ⏳ A crear en 5.1 | `adapters/mock/mock_render.py` |
+| `PygameColorAdapter` | ✅ Implementado | `adapters/render/pygame_color_adapter.py` |
+| `MockColorRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
 | `NullColorRenderAdapter` | ⏳ Planeado | (headless) |
 | `WebSocketColorAdapter` | ⏳ Futuro | (frontend web) |
 
 ---
 
-## 🔌 Puertos de Comunicación
+<a name="landmarkAwareRenderPort"></a>
+### 🎯 LandmarkAwareRenderPort
 
-<a name="statePort"></a>
-### 🔗 StatePort
+> Estado: **actual** (será reemplazado por el refactor de capacidades).
 
-**Propósito**: Estado compartido entre el juego (productor) y consumidores externos (API, WebSocket, persistencia). Genérico: **no conoce juegos específicos**.
+**Propósito**: Puerto opcional para renderers que quieren recibir landmarks
+además de su input principal (uso: overlay de debug).
 
-**Ubicación**: `domain/ports/state_port.py`
+**Ubicación**: `domain/ports/render_port.py`
 
-**Quién lo usa**: `ParticlesGame`, `ColorGame`, `FastAPIAdapter`.
+**Quién lo usa**: decoradores de debug (`PoseDebugOverlay`).
 
-#### Métodos de lectura (consumidores)
+#### Métodos
 
-##### `get_snapshot() -> dict[str, Any]`
+##### `update_landmarks(landmarks: list[PoseLandmark]) -> None`
 
-- **Propósito**: Snapshot completo serializable.
-- **Contrato**: retorna un dict con al menos las claves `pose`, `game_data`, `stats`.
-- **Garantía**: thread-safe; retorna copia, no referencia.
-
-##### `get_stats() -> dict[str, Any]`
-
-- **Propósito**: Solo estadísticas (más ligero que snapshot).
-- **Contrato**: dict con `frames_processed`, `last_update`.
-
-#### Métodos de publicación (juego)
-
-##### `update_pose(landmarks: List[PoseLandmark]) -> None`
-
-- **Propósito**: Publicar la última pose detectada.
-- **Contrato**: thread-safe; el juego lo llama una vez por frame.
-
-##### `update_game_data(key: str, value: Any) -> None`
-
-- **Propósito**: Publicar cualquier dato específico del juego.
-- **Contrato**: thread-safe; el juego decide qué keys usa.
-- **Convención**:
-  - `ParticlesGame` publica: `"particles"`, `"particles_count"`.
-  - `ColorGame` publica: `"background_color"`, `"current_palette"`.
-
-##### `increment_frames() -> None`
-
-- **Propósito**: Incrementar contador de frames procesados.
-- **Contrato**: thread-safe.
-
-#### Métodos de comando (consumidores → juego)
-
-##### `enqueue_command(action: str, payload: dict[str, Any]) -> None`
-
-- **Propósito**: Encolar un comando para que el juego lo procese.
-- **Contrato**: thread-safe; el juego decide qué comandos entiende.
-- **Convención**:
-  - `ParticlesGame` entiende: `"reset_particles"`.
-  - `ColorGame` entiende: `"change_palette"` (payload: `{"palette": str}`).
-  - **Comandos desconocidos se ignoran silenciosamente**.
-
-##### `drain_commands() -> List[Command]`
-
-- **Propósito**: Consumir todos los comandos pendientes (y vaciar la cola).
-- **Contrato**: thread-safe; el juego llama al inicio de cada frame.
+- **Propósito**: Recibir los landmarks actuales para el próximo render.
 
 #### Adaptadores conocidos
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `AppState` | ✅ Implementado | `app/state.py` |
-| `RedisStateAdapter` | ⏳ Futuro | (para múltiples procesos) |
+| `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `MockColorRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `PoseDebugOverlay` | ✅ Implementado | `adapters/render/decorators/pose_debug_overlay.py` |
+
+---
+
+### 🚧 NUEVA ARQUITECTURA DE RENDER (pendiente de implementación)
+
+> ⚠️ **Estado**: diseño aprobado, implementación pendiente.
+> Los puertos a continuación reemplazarán a `BaseRenderPort`, `ParticlesRenderPort`,
+> `ColorRenderPort` y `LandmarkAwareRenderPort`.
+>
+> **Referencia**: `docs/render_architecture.md`.
+
+La nueva arquitectura sigue el patrón **"capacidades componibles + SceneManager"**:
+
+- **Capacidades**: puertos pequeños, tipados, con **una sola responsabilidad**.
+- **Patrón `set_*` + `render_*`**: separa "declarar qué dibujar" de "dibujar".
+- **SceneManager**: compone capacidades + overlays sobre una misma ventana.
+- **Overlays**: elementos visuales superpuestos (debug, efectos).
+
+<a name="colorRenderPortNew"></a>
+#### 🌈 ColorRenderPort (nuevo)
+
+**Propósito**: Capacidad de pintar un fondo de color sólido.
+
+**Ubicación**: `domain/ports/render/color_render_port.py`
+
+#### Métodos
+
+##### `set_color(color: RGBColor) -> None`
+
+- **Propósito**: Declarar el color actual (sin dibujar).
+
+##### `render_color() -> None`
+
+- **Propósito**: Dibujar el color declarado.
+
+##### `close() -> None`
+
+- **Propósito**: Liberar recursos (idempotente).
+
+---
+
+<a name="particlesRenderPortNew"></a>
+#### ✨ ParticlesRenderPort (nuevo)
+
+**Propósito**: Capacidad de dibujar un sistema de partículas.
+
+**Ubicación**: `domain/ports/render/particles_render_port.py`
+
+#### Métodos
+
+##### `set_particles(particles: list[Particle]) -> None`
+
+- **Propósito**: Declarar las partículas a dibujar (sin dibujar).
+
+##### `render_particles() -> None`
+
+- **Propósito**: Dibujar las partículas declaradas.
+
+##### `close() -> None`
+
+- **Propósito**: Liberar recursos (idempotente).
+
+---
+
+<a name="hudRenderPort"></a>
+#### 📊 HudRenderPort
+
+**Propósito**: Capacidad de dibujar un HUD (puntos, rondas, timer).
+
+**Ubicación**: `domain/ports/render/hud_render_port.py`
+
+#### Métodos
+
+##### `set_hud(score: int, rounds: int, timer: float, extra: dict[str, str] | None = None) -> None`
+
+- **Propósito**: Declarar los valores actuales del HUD.
+- **Contrato**: `extra` permite campos adicionales específicos del juego.
+
+##### `render_hud() -> None`
+
+- **Propósito**: Dibujar el HUD.
+
+##### `close() -> None`
+
+- **Propósito**: Liberar recursos (idempotente).
+
+---
+
+<a name="overlayPort"></a>
+#### 🖼️ OverlayPort
+
+**Propósito**: Elemento visual superpuesto (debug, efectos).
+
+**Ubicación**: `domain/ports/render/overlay_port.py`
+
+**Nota**: a diferencia de las capacidades, los overlays **reciben** la superficie
+y los landmarks en `draw`. Esto permite reutilizarlos en cualquier juego.
+
+#### Métodos
+
+##### `draw(surface: Any, landmarks: list[PoseLandmark]) -> None`
+
+- **Propósito**: Dibujar el overlay sobre la superficie.
+
+##### `close() -> None`
+
+- **Propósito**: Liberar recursos (idempotente).
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `PoseOverlay` | ⏳ Pendiente | `adapters/render/overlays/pose_overlay.py` |
+| `FpsOverlay` | ⏳ Pendiente | `adapters/render/overlays/fps_overlay.py` |
+
+---
+
+<a name="scenePort"></a>
+#### 🎬 ScenePort
+
+**Propósito**: Composición de capacidades + overlays sobre una ventana.
+
+**Ubicación**: `domain/ports/render/scene_port.py`
+
+#### Métodos
+
+##### `add_capability(capability: object) -> None`
+
+- **Propósito**: Registrar una capacidad (color, particles, hud, ...).
+
+##### `add_overlay(overlay: OverlayPort) -> None`
+
+- **Propósito**: Registrar un overlay.
+
+##### `render_frame(landmarks: list[PoseLandmark]) -> None`
+
+- **Propósito**: Renderizar un frame completo.
+- **Contrato**:
+  - Llama a `render_*` de cada capacidad **en orden de registro**.
+  - Llama a `draw(surface, landmarks)` de cada overlay.
+  - Hace flush final.
+
+##### `close() -> None`
+
+- **Propósito**: Cerrar todas las capacidades y overlays (idempotente).
+
+---
+
+## 🔌 Puertos de Estado
+
+<a name="gameStatePort"></a>
+### 🔗 GameStatePort
+
+**Propósito**: Estado consultable de un juego (para la API, WebSocket, persistencia).
+Cada juego implementa **su propio** estado.
+
+**Ubicación**: `domain/state/game_state_port.py`
+
+**Quién lo usa**: `ParticlesState`, `ColorState`, `GesturesState`, la API.
+
+#### Métodos
+
+##### `game_id -> str` (property)
+
+- **Propósito**: Identificador único del juego.
+- **Convención**: snake_case, sin espacios.
+
+##### `snapshot() -> dict[str, Any]`
+
+- **Propósito**: Snapshot completo serializable (JSON-friendly).
+- **Contrato**:
+  - Retorna una COPIA, no referencias mutables.
+  - No incluye datos no serializables.
+  - Debe ser rápido (<1ms).
+
+##### `stats() -> dict[str, Any]`
+
+- **Propósito**: Solo estadísticas (más ligero que snapshot).
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `ParticlesState` | ✅ Implementado | `domain/games/particles/state.py` |
+| `ColorState` | ✅ Implementado | `domain/games/color/state.py` |
+| `GesturesState` | ✅ Implementado | `domain/games/gestures/state.py` |
+
+---
+
+## 🔌 Puertos de Comunicación
+
+<a name="eventBusPort"></a>
+### 📡 EventBusPort
+
+**Propósito**: Bus de eventos async para comunicación desacoplada entre
+componentes (juegos, API, sistema).
+
+**Ubicación**: `domain/ports/event_bus_port.py`
+
+**Quién lo usa**: `ParticlesGame`, `ColorGame`, `GesturesGame`, `FastAPIAdapter`.
+
+#### Métodos
+
+##### `subscribe(event_type: type[DomainEvent], handler: EventHandler) -> None`
+
+- **Propósito**: Suscribir un handler async a un tipo de evento.
+- **Contrato**: si el mismo handler se suscribe dos veces, no se duplica.
+
+##### `unsubscribe(event_type: type[DomainEvent], handler: EventHandler) -> None`
+
+- **Propósito**: Desuscribir un handler.
+
+##### `async publish(event: DomainEvent) -> None`
+
+- **Propósito**: Publicar un evento a todos los suscriptores.
+- **Contrato**:
+  - Los handlers se ejecutan en orden de suscripción.
+  - Si un handler falla, se loggea y se continúa con el siguiente.
+  - Thread-safe.
+
+##### `clear() -> None`
+
+- **Propósito**: Eliminar todos los suscriptores (útil en tests).
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `AsyncEventBus` | ✅ Implementado | `infrastructure/events/async_event_bus.py` |
+| `SyncEventBus` | ⏳ Deprecado | `infrastructure/events/sync_event_bus.py` |
+
+---
+
+## 🔌 Puertos de Autenticación
+
+<a name="authPort"></a>
+### 🔐 AuthPort
+
+**Propósito**: Autenticar credenciales y devolver el `User` correspondiente.
+
+**Ubicación**: `domain/ports/auth_port.py`
+
+**Quién lo usa**: `adapters/api/auth_routes.py`.
+
+#### Métodos
+
+##### `authenticate(username: str, password: str) -> User | None`
+
+- **Propósito**: Validar credenciales.
+- **Contrato**: devuelve `User` si son válidas, `None` si no.
+
+##### `get_user(username: str) -> User | None`
+
+- **Propósito**: Obtener un `User` sin validar password.
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `CredentialsAuthProvider` | ✅ Implementado | `adapters/auth/credentials_auth_provider.py` |
+| `GoogleAuthProvider` | ⏳ Futuro | (OAuth) |
+
+---
+
+## 🔌 Puertos de Repositorio
+
+<a name="userRepositoryPort"></a>
+### 👤 UserRepositoryPort
+
+**Propósito**: CRUD de usuarios (perfiles). **NO** maneja credenciales
+(eso es `IdentityRepositoryPort`).
+
+**Ubicación**: `domain/ports/user_repository_port.py`
+
+**Quién lo usa**: endpoints de usuarios (`/users`), bootstrap de usuarios.
+
+#### Métodos
+
+##### `get_by_id(user_id: str) -> User | None`
+
+- **Propósito**: Obtener un usuario por id.
+
+##### `get_by_username(username: str) -> User | None`
+
+- **Propósito**: Obtener un usuario por username.
+
+##### `create(user: User) -> User`
+
+- **Propósito**: Crear un usuario.
+- **Errores**: `ValueError` si el username ya existe.
+
+##### `update(user: User) -> User`
+
+- **Propósito**: Actualizar un usuario.
+- **Errores**: `ValueError` si el usuario no existe.
+
+##### `delete(user_id: str) -> None`
+
+- **Propósito**: Eliminar un usuario (idempotente).
+
+##### `list_all() -> list[User]`
+
+- **Propósito**: Listar todos los usuarios.
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `InMemoryUserRepository` | ✅ Implementado | `adapters/auth/in_memory_user_repository.py` |
+| `SqliteUserRepository` | ⏳ Futuro | (persistencia) |
+
+---
+
+<a name="identityRepositoryPort"></a>
+### 🔑 IdentityRepositoryPort
+
+**Propósito**: Credenciales (password hashes, tokens OAuth).
+
+**Ubicación**: `domain/ports/identity_repository_port.py`
+
+**Quién lo usa**: `CredentialsAuthProvider`, endpoints de cambio de password.
+
+#### Métodos
+
+##### `get_by_provider(provider: str, provider_user_id: str) -> Identity | None`
+
+- **Propósito**: Obtener identidad por (provider, provider_user_id).
+- **Ejemplo**: `get_by_provider("password", "admin")`.
+
+##### `get_by_user_id(user_id: str) -> list[Identity]`
+
+- **Propósito**: Listar todas las identidades de un usuario.
+
+##### `create(identity: Identity) -> Identity`
+
+- **Propósito**: Crear una identidad.
+- **Errores**: `ValueError` si ya existe.
+
+##### `update(identity: Identity) -> Identity`
+
+- **Propósito**: Actualizar una identidad.
+
+##### `delete(user_id: str, provider: str) -> None`
+
+- **Propósito**: Eliminar una identidad (idempotente).
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `InMemoryIdentityRepository` | ✅ Implementado | `adapters/auth/in_memory_identity_repository.py` |
+| `SqliteIdentityRepository` | ⏳ Futuro | |
 
 ---
 
 ## 🧩 Contrato de Datos Publicados por Cada Juego
 
-> Esta sección documenta **qué keys específicas** publica cada juego en `state.game_data`.
+> Esta sección documenta **qué keys específicas** publica cada juego en su `GameStatePort.snapshot()`.
 
 ### ParticlesGame
 
 | Key | Tipo | Descripción |
 |-----|------|-------------|
-| `particles` | `List[Particle]` | Partículas activas (máximo 100 en snapshot) |
 | `particles_count` | `int` | Número total de partículas activas |
+| `particles_sample` | `list[dict]` | Muestra de partículas (máx 10) |
+| `landmarks_count` | `int` | Número de landmarks visibles |
+| `frame_count` | `int` | Frames procesados |
 
-**Comandos que entiende**:
-- `reset_particles` (payload vacío) → vacía la lista de partículas.
+**Eventos que publica**:
+- `PoseUpdated`, `PoseLost`.
+- `GameResetRequested` (recibe).
+
+**Comandos que entiende (vía eventos)**:
+- `GameResetRequested` → vacía las partículas.
 
 ### ColorGame
 
 | Key | Tipo | Descripción |
 |-----|------|-------------|
-| `background_color` | `RGBColor` | Color actual del fondo |
-| `current_palette` | `str` | Nombre de la paleta activa (`"fire"`, `"ocean"`, ...) |
+| `background_color` | `str` | Color de fondo (hex) |
+| `current_palette` | `str` | Nombre de la paleta (`"fire"`, `"ocean"`, ...) |
+| `landmarks_count` | `int` | Landmarks visibles |
+| `frame_count` | `int` | Frames procesados |
 
-**Comandos que entiende**:
-- `change_palette` (payload: `{"palette": str}`) → cambia la paleta activa.
+**Eventos que recibe**:
+- `PaletteChangeRequested` (payload: `{"palette": str}`).
+
+### GesturesGame
+
+| Key | Tipo | Descripción |
+|-----|------|-------------|
+| `active_gestures` | `list[str]` | Gestos activos en el frame actual |
+| `activation_counts` | `dict[str, int]` | Cuenta de activaciones por gesto |
+| `frame_count` | `int` | Frames procesados |
 
 ---
 
@@ -318,7 +660,8 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 2. **Los puertos no conocen implementaciones**. `CameraPort` no menciona OpenCV.
 3. **Los puertos usan tipos del dominio** (`PoseLandmark`, `Particle`, `RGBColor`), no tipos HTTP ni de framework.
 4. **Idempotencia**: `start()`, `stop()`, `close()` deben poder llamarse sin efectos adversos.
-5. **Thread-safety**: todo puerto que sea accedido desde varios threads debe ser thread-safe (ej: `StatePort`).
+5. **Thread-safety**: todo puerto accedido desde varios threads debe ser thread-safe (ej: `GameStatePort`, `EventBusPort`).
+6. **Patrón `set_*` + `render_*`** (nueva arquitectura de render): separa declaración de ejecución.
 
 ---
 
@@ -326,8 +669,9 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 | Versión | Fecha | Cambios |
 |---------|-------|---------|
-| 0.4 | [fecha] | Fase 4: StatePort genérico |
-| 0.5.1 | [fecha] | Fase 5.1: Separación de RenderPort en Particles/Color |
+| 0.4 | [fecha] | StatePort genérico (posteriormente eliminado) |
+| 0.5.1 | [fecha] | Separación de `RenderPort` en `ParticlesRenderPort` y `ColorRenderPort` |
+| 0.6.0 | [fecha] | 1) `StatePort` → `GameStatePort`. 2) Añadido `EventBusPort`. 3) Añadidos `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort`. 4) Añadido `LandmarkAwareRenderPort`. 5) Nueva arquitectura de render (pendiente). |
 
 ---
 
@@ -336,3 +680,13 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - **Cuando agregues un juego nuevo**: añade una sección en "Contrato de Datos Publicados".
 - **Cuando refactorices un puerto**: incrementa versión y anota en changelog.
 - **Si un adaptador necesita un método extra**: considera si es un nuevo puerto.
+- **Nueva arquitectura de render**: los puertos `*RenderPort (actual)` serán reemplazados.
+  El refactor se documenta en `docs/render_architecture.md`.
+
+---
+
+## 📚 Referencias Cruzadas
+
+- `docs/render_architecture.md` — Diseño detallado de la nueva arquitectura de render.
+- `docs/adding_a_game_plugin.md` — Guía para añadir juegos como plugin.
+- `AGENTS.md` — Reglas del proyecto para herramientas automatizadas.

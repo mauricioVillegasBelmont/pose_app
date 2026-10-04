@@ -14,6 +14,7 @@ from infrastructure.errors.exceptions import ConfigurationError
 # Fakes para testing
 # ==========================================
 
+
 class _FakeState(GameStatePort):
     @property
     def game_id(self) -> str:
@@ -45,6 +46,7 @@ class _FakePlugin(GamePlugin):
 # ==========================================
 # Tests
 # ==========================================
+
 
 def test_register_and_get():
     registry = PluginRegistry()

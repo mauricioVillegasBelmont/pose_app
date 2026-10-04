@@ -26,8 +26,8 @@ particle = st.builds(
 # Propiedades
 # ==========================================
 
-class TestParticleInvariants:
 
+class TestParticleInvariants:
     @given(p=particle)
     def test_update_decreases_life(self, p: Particle):
         """Después de update, life es estrictamente menor (o igual a 0)."""
@@ -46,21 +46,13 @@ class TestParticleInvariants:
         if abs(p.vx) > 1e-6 or abs(p.vy) > 1e-6:
             assert p.x != original_x or p.y != original_y
 
-    @given(
-        life=st.floats(
-            min_value=0.02, max_value=1.0, allow_nan=False
-        )
-    )
+    @given(life=st.floats(min_value=0.02, max_value=1.0, allow_nan=False))
     def test_alive_when_life_above_threshold(self, life: float):
         """life > 0.01 → is_alive() == True."""
         p = Particle(x=0, y=0, life=life)
         assert p.is_alive() is True
 
-    @given(
-        life=st.floats(
-            min_value=0.0, max_value=0.01, allow_nan=False
-        )
-    )
+    @given(life=st.floats(min_value=0.0, max_value=0.01, allow_nan=False))
     def test_dead_when_life_at_or_below_threshold(self, life: float):
         """life <= 0.01 → is_alive() == False."""
         p = Particle(x=0, y=0, life=life)

@@ -9,10 +9,11 @@ Contrato:
 
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from domain.events.base import DomainEvent
 
-EventHandler = Callable[[DomainEvent], Awaitable[None]]
+EventHandler = Callable[[Any], Awaitable[None]]
 
 
 class EventBusPort(ABC):

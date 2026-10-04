@@ -1,7 +1,9 @@
-![CI](https://github.com/TU_USER/TU_REPO/actions/workflows/ci.yml/badge.svg)
-![Coverage](https://img.shields.io/badge/coverage-68.91%25-yellow)
+# Pose AR App
 
-# pose_App sinstructions
+[![CI](https://github.com/TU_USUARIO/TU_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/TU_USUARIO/TU_REPO/actions/workflows/ci.yml)
+[![Slow Tests](https://github.com/TU_USUARIO/TU_REPO/actions/workflows/slow-tests.yml/badge.svg)](https://github.com/TU_USUARIO/TU_REPO/actions/workflows/slow-tests.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
 ## open for wsl
 
@@ -73,9 +75,12 @@ uv run pytest -v
 
 ### Testing demo Games
 ```bash
-GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock python -m app.main
-GAME_TYPE=color POSE_PROVIDER=mock RENDER_PROVIDER=mock python -m app.main
-GAME_TYPE=gestures POSE_PROVIDER=mock RENDER_PROVIDER=mock python -m app.main
+# run a game
+GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app.main
+# run a game
+GAME_TYPE=color POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app.main
+# run a game
+GAME_TYPE=gestures POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app.main
 ```
 **then:**
 ```bash

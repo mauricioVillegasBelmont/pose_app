@@ -21,19 +21,19 @@ from pathlib import Path
 # Mapeo: prefijo de ruta → umbral mínimo (%)
 COVERAGE_THRESHOLDS: dict[str, float] = {
     "domain/entities": 90.0,
-    "domain/games": 70.0,        # ← 74% real, sobra margen
-    "domain/ports": 70.0,        # ← 80% real, sobra margen
-    "domain/events": 60.0,       # ← 63% real, poco margen
-    "domain/plugins": 70.0,      # ← 88% real, sobra margen
+    "domain/games": 70.0,  # ← 74% real, sobra margen
+    "domain/ports": 70.0,  # ← 80% real, sobra margen
+    "domain/events": 60.0,  # ← 63% real, poco margen
+    "domain/plugins": 70.0,  # ← 88% real, sobra margen
     "domain/state": 90.0,
-    "app": 55.0,                 # ← 60% real, poco margen
-    "adapters/mock": 75.0,       # ← 80% real, sobra margen
-    "adapters/render": 40.0,     # ← 42% real, MUY POCO margen
-    "adapters/camera": 55.0,     # ← 80% real, sobra margen
-    "adapters/pose": 55.0,       # ← 82% real, sobra margen
-    "adapters/api": 55.0,        # ← 59% real, MUY POCO margen
-    "infrastructure": 45.0,      # ← 50% real, poco margen
-    "config": 90.0,              # ← 98% real, sobra margen
+    "app": 55.0,  # ← 60% real, poco margen
+    "adapters/mock": 75.0,  # ← 80% real, sobra margen
+    "adapters/render": 40.0,  # ← 42% real, MUY POCO margen
+    "adapters/camera": 55.0,  # ← 80% real, sobra margen
+    "adapters/pose": 55.0,  # ← 82% real, sobra margen
+    "adapters/api": 55.0,  # ← 59% real, MUY POCO margen
+    "infrastructure": 45.0,  # ← 50% real, poco margen
+    "config": 90.0,  # ← 98% real, sobra margen
 }
 
 # Umbral global (aplica a todo el proyecto)
@@ -43,6 +43,7 @@ GLOBAL_THRESHOLD = 60.0
 # ==========================================
 # Parseo del reporte XML
 # ==========================================
+
 
 def parse_coverage_xml(xml_path: Path) -> dict[str, dict[str, float]]:
     """
@@ -89,6 +90,7 @@ def parse_coverage_xml(xml_path: Path) -> dict[str, dict[str, float]]:
 # Verificación
 # ==========================================
 
+
 def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
     """
     Verifica umbrales por carpeta y global.
@@ -125,15 +127,10 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
         checks.append((prefix, rate, threshold, ok))
 
         status = "✅" if ok else "❌"
-        print(
-            f"  {status} {prefix:30s} "
-            f"{rate:6.2f}% (min {threshold:5.1f}%)"
-        )
+        print(f"  {status} {prefix:30s} " f"{rate:6.2f}% (min {threshold:5.1f}%)")
 
         if not ok:
-            failures.append(
-                f"{prefix}: {rate:.2f}% < {threshold:.1f}%"
-            )
+            failures.append(f"{prefix}: {rate:.2f}% < {threshold:.1f}%")
 
     # ---------------------------------------------
     # Verificación global
@@ -154,9 +151,7 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
     )
 
     if not global_ok:
-        failures.append(
-            f"GLOBAL: {global_rate:.2f}% < {GLOBAL_THRESHOLD:.1f}%"
-        )
+        failures.append(f"GLOBAL: {global_rate:.2f}% < {GLOBAL_THRESHOLD:.1f}%")
 
     # ---------------------------------------------
     # Resumen
@@ -170,7 +165,7 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
         print("=" * 70)
         return 1
 
-    print(f"🎉 Todas las capas alcanzan sus umbrales.")
+    print("🎉 Todas las capas alcanzan sus umbrales.")
     print("=" * 70)
     return 0
 
@@ -178,6 +173,7 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
 # ==========================================
 # Main
 # ==========================================
+
 
 def main() -> int:
     coverage_xml = Path("coverage.xml")

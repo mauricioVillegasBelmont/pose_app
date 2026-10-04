@@ -35,8 +35,8 @@ interpolation_factor = st.floats(
 # Propiedades
 # ==========================================
 
-class TestRGBColorInvariants:
 
+class TestRGBColorInvariants:
     @given(r=color_channel, g=color_channel, b=color_channel)
     def test_any_valid_channel_accepted(self, r: int, g: int, b: int):
         """Cualquier canal válido [0, 255] se acepta sin error."""
@@ -74,7 +74,6 @@ class TestRGBColorInvariants:
 
 
 class TestRGBColorInterpolation:
-
     @given(c1=rgb_color, c2=rgb_color)
     def test_interpolate_at_0_returns_c1(self, c1: RGBColor, c2: RGBColor):
         """t=0 devuelve el primer color."""

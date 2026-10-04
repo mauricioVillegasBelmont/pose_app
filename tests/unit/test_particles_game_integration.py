@@ -4,7 +4,6 @@ Tests de integración del loop run_async de ParticlesGame.
 Usa mocks puros (sin cámara, sin pygame real).
 """
 
-import asyncio
 from unittest.mock import Mock
 
 import numpy as np

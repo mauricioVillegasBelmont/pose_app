@@ -6,16 +6,15 @@ Cada endpoint es un adaptador de entrada: traduce HTTP → dominio
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, status
 
+from adapters.api.dependencies import CurrentUser
 from adapters.api.schemas import (
     ChangePaletteRequest,
     CommandResponse,
     HealthSchema,
-    StateSnapshotSchema,
-    StatsSchema,
 )
 from app.state_registry import StateRegistry
 from domain.events.game_events import (
@@ -25,7 +24,7 @@ from domain.events.game_events import (
 from domain.ports.event_bus_port import EventBusPort
 
 APP_VERSION = "0.5.0"
-_start_time = datetime.now(timezone.utc)
+_start_time = datetime.now(UTC)
 
 
 def create_router(
@@ -41,12 +40,12 @@ def create_router(
 
     @router.get("/health", response_model=HealthSchema)
     async def health() -> HealthSchema:
-        uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
+        uptime = (datetime.now(UTC) - _start_time).total_seconds()
         return HealthSchema(
             status="ok",
             version=APP_VERSION,
             uptime_seconds=uptime,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
     # ==========================================
@@ -54,7 +53,9 @@ def create_router(
     # ==========================================
 
     @router.get("/state")
-    async def get_state() -> dict:
+    async def get_state(
+        current_user: CurrentUser,
+    ) -> dict:
         """Snapshot agregado de todos los juegos activos."""
         return registry.snapshot_all()
 
@@ -89,9 +90,7 @@ def create_router(
     @router.post("/commands/change-palette", response_model=CommandResponse)
     async def change_palette(request: ChangePaletteRequest) -> CommandResponse:
         command_id = str(uuid.uuid4())
-        await event_bus.publish(
-            PaletteChangeRequested(palette_name=request.palette)
-        )
+        await event_bus.publish(PaletteChangeRequested(palette_name=request.palette))
         return CommandResponse(
             accepted=True,
             message=f"Evento PaletteChangeRequested publicado: '{request.palette}'",

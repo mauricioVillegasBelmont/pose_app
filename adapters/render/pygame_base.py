@@ -111,9 +111,7 @@ class PygameBaseAdapter:
             RuntimeError: si se llama antes de `_initialize()`.
         """
         if self._screen is None:
-            raise RuntimeError(
-                "Pygame no inicializado. Llama a _initialize() primero."
-            )
+            raise RuntimeError("Pygame no inicializado. Llama a _initialize() primero.")
         return self._screen
 
     @property
@@ -163,9 +161,7 @@ class PygameBaseAdapter:
         """
         self._width, self._height = new_size
         if self._screen is not None:
-            self._screen = pygame.display.set_mode(
-                new_size, pygame.RESIZABLE
-            )
+            self._screen = pygame.display.set_mode(new_size, pygame.RESIZABLE)
         logger.debug(f"Ventana redimensionada: {new_size}")
 
     # ==========================================

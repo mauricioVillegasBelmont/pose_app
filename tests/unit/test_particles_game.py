@@ -6,7 +6,6 @@ Estos tests NO inicializan adaptadores reales.
 
 from unittest.mock import Mock
 
-import numpy as np
 import pytest
 
 from domain.entities.pose_landmark import PoseLandmark
@@ -28,12 +27,11 @@ def game() -> ParticlesGame:
 
 
 class TestParticlesGame:
-
     def test_particle_spawning(self, game: ParticlesGame):
         """Verifica que se generen partículas desde landmarks visibles."""
         landmarks = [
-            PoseLandmark(0.5, 0.5, 0.0, 1.0, "nose"),          # Visible
-            PoseLandmark(0.3, 0.3, 0.0, 0.0, "left_shoulder"), # No visible
+            PoseLandmark(0.5, 0.5, 0.0, 1.0, "nose"),  # Visible
+            PoseLandmark(0.3, 0.3, 0.0, 0.0, "left_shoulder"),  # No visible
         ]
 
         game._spawn_particles_from_landmarks(landmarks)

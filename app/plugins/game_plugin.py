@@ -35,9 +35,7 @@ class GameProtocol(Protocol):
         """Estado consultable del juego (para el StateRegistry)."""
         ...
 
-    async def run_async(
-        self, should_stop: "Callable[[], bool] | None" = None
-    ) -> None:
+    async def run_async(self, should_stop: "Callable[[], bool] | None" = None) -> None:
         """Loop principal del juego."""
         ...
 

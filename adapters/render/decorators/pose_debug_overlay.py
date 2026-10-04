@@ -16,8 +16,11 @@ Uso:
     decorated.render_particles(particles)  # del puerto ParticlesRender
 """
 
+from typing import Protocol
+
+import pygame
+
 from adapters.render.overlays.pose_overlay import PoseOverlayRenderer
-from adapters.render.pygame_base import PygameBaseAdapter
 from domain.entities.color import RGBColor
 from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
@@ -29,6 +32,30 @@ from domain.ports.render_port import (
 from infrastructure.logging.logger import get_logger
 
 logger = get_logger("adapters.render.pose_debug_overlay")
+
+
+class PygameRenderable(Protocol):
+    """
+    Protocolo que describe lo que el decorator necesita
+    de un wrapped renderer.
+
+    No es herencia: cualquier objeto que "tenga la forma" sirve.
+    """
+
+    @property
+    def screen(self) -> pygame.Surface: ...
+    @property
+    def width(self) -> int: ...
+    @property
+    def height(self) -> int: ...
+
+    def render_particles(self, particles: list[Particle]) -> None: ...
+    def render_background(
+        self, color: RGBColor, landmarks: list[PoseLandmark]
+    ) -> None: ...
+    def show(self) -> None: ...
+    def close(self) -> None: ...
+    def flush(self) -> None: ...
 
 
 class PoseDebugOverlay(
@@ -48,7 +75,7 @@ class PoseDebugOverlay(
 
     def __init__(
         self,
-        wrapped: PygameBaseAdapter,
+        wrapped: PygameRenderable,
         pose_overlay: PoseOverlayRenderer | None = None,
     ):
         self._wrapped = wrapped

@@ -14,8 +14,10 @@ from pydantic import BaseModel, Field
 # Response Models
 # ==========================================
 
+
 class LandmarkSchema(BaseModel):
     """Landmark en respuesta JSON."""
+
     name: str | None = None
     x: float
     y: float
@@ -25,6 +27,7 @@ class LandmarkSchema(BaseModel):
 
 class ParticleSchema(BaseModel):
     """Partícula en respuesta JSON."""
+
     x: float
     y: float
     life: float
@@ -34,6 +37,7 @@ class ParticleSchema(BaseModel):
 
 class StatsSchema(BaseModel):
     """Estadísticas del juego."""
+
     frames_processed: int
     particles_active: int
     last_update: str | None = None
@@ -42,6 +46,7 @@ class StatsSchema(BaseModel):
 
 class PoseSchema(BaseModel):
     """Pose actual."""
+
     landmarks_count: int
     visible_landmarks: int
     landmarks: list[LandmarkSchema]
@@ -49,12 +54,14 @@ class PoseSchema(BaseModel):
 
 class ParticlesSchema(BaseModel):
     """Estado de partículas."""
+
     count: int
     sample: list[ParticleSchema]
 
 
 class StateSnapshotSchema(BaseModel):
     """Snapshot completo del estado."""
+
     pose: PoseSchema
     particles: ParticlesSchema
     background_color: str
@@ -64,6 +71,7 @@ class StateSnapshotSchema(BaseModel):
 
 class HealthSchema(BaseModel):
     """Respuesta de health check."""
+
     status: Literal["ok", "degraded", "error"]
     version: str
     uptime_seconds: float
@@ -74,8 +82,10 @@ class HealthSchema(BaseModel):
 # Request Models
 # ==========================================
 
+
 class ChangePaletteRequest(BaseModel):
     """Request para cambiar paleta."""
+
     palette: Literal["fire", "ocean", "forest", "neon"] = Field(
         ..., description="Nombre de la paleta"
     )
@@ -83,6 +93,7 @@ class ChangePaletteRequest(BaseModel):
 
 class CommandResponse(BaseModel):
     """Respuesta al enviar un comando."""
+
     accepted: bool
     message: str
     command_id: str

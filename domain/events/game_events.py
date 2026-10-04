@@ -9,6 +9,7 @@ from domain.events.base import DomainEvent
 @dataclass(frozen=True, kw_only=True)
 class GameCommand(DomainEvent):
     """Comando genérico enviado por la API."""
+
     action: str
     payload: dict[str, Any] = field(default_factory=dict)
 
@@ -21,4 +22,5 @@ class GameResetRequested(DomainEvent):
 @dataclass(frozen=True, kw_only=True)
 class PaletteChangeRequested(DomainEvent):
     """Solicitud de cambio de paleta."""
+
     palette_name: str

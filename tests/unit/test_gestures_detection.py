@@ -6,7 +6,6 @@ Cada test crea landmarks sintéticos y verifica el detector.
 
 import pytest
 
-from domain.entities.gesture import Gesture
 from domain.entities.pose_landmark import PoseLandmark
 from domain.games.gestures.main import GesturesGame
 
@@ -14,6 +13,7 @@ from domain.games.gestures.main import GesturesGame
 # ==========================================
 # Helper para crear landmarks
 # ==========================================
+
 
 def lm(name: str, x: float, y: float, vis: float = 1.0) -> PoseLandmark:
     return PoseLandmark(x=x, y=y, z=0.0, visibility=vis, name=name)
@@ -23,17 +23,18 @@ def lm(name: str, x: float, y: float, vis: float = 1.0) -> PoseLandmark:
 def game() -> GesturesGame:
     """Instancia sin dependencias reales (solo para probar detectores)."""
     return GesturesGame(
-        camera=None,           # type: ignore
-        pose_estimator=None,   # type: ignore
-        renderer=None,         # type: ignore
-        state=None,            # type: ignore
-        event_bus=None,        # type: ignore
+        camera=None,  # type: ignore
+        pose_estimator=None,  # type: ignore
+        renderer=None,  # type: ignore
+        state=None,  # type: ignore
+        event_bus=None,  # type: ignore
     )
 
 
 # ==========================================
 # HAND_UP
 # ==========================================
+
 
 def test_hand_up_left_wrist_above_shoulder(game: GesturesGame):
     landmarks = [
@@ -69,6 +70,7 @@ def test_hand_up_ignores_invisible_wrist(game: GesturesGame):
 # GREETING
 # ==========================================
 
+
 def test_greeting_wrist_near_nose(game: GesturesGame):
     landmarks = [
         lm("nose", 0.5, 0.3),
@@ -89,11 +91,12 @@ def test_greeting_wrist_far(game: GesturesGame):
 # ARMS_CROSSED
 # ==========================================
 
+
 def test_arms_crossed_valid(game: GesturesGame):
     landmarks = [
         lm("left_shoulder", 0.3, 0.5),
         lm("right_shoulder", 0.7, 0.5),
-        lm("left_wrist", 0.65, 0.55),   # cerca del hombro derecho
+        lm("left_wrist", 0.65, 0.55),  # cerca del hombro derecho
         lm("right_wrist", 0.35, 0.55),  # cerca del hombro izquierdo
     ]
     assert game._detect_arms_crossed(landmarks) is True
@@ -103,7 +106,7 @@ def test_arms_crossed_not_valid(game: GesturesGame):
     landmarks = [
         lm("left_shoulder", 0.3, 0.5),
         lm("right_shoulder", 0.7, 0.5),
-        lm("left_wrist", 0.2, 0.6),   # lejos
+        lm("left_wrist", 0.2, 0.6),  # lejos
         lm("right_wrist", 0.8, 0.6),
     ]
     assert game._detect_arms_crossed(landmarks) is False
@@ -113,11 +116,12 @@ def test_arms_crossed_not_valid(game: GesturesGame):
 # T_POSE
 # ==========================================
 
+
 def test_t_pose_valid(game: GesturesGame):
     landmarks = [
         lm("left_shoulder", 0.4, 0.5),
         lm("right_shoulder", 0.6, 0.5),
-        lm("left_wrist", 0.2, 0.5),   # extendido horizontal
+        lm("left_wrist", 0.2, 0.5),  # extendido horizontal
         lm("right_wrist", 0.8, 0.5),
     ]
     assert game._detect_t_pose(landmarks) is True
@@ -127,7 +131,7 @@ def test_t_pose_wrists_down(game: GesturesGame):
     landmarks = [
         lm("left_shoulder", 0.4, 0.5),
         lm("right_shoulder", 0.6, 0.5),
-        lm("left_wrist", 0.2, 0.8),   # abajo
+        lm("left_wrist", 0.2, 0.8),  # abajo
         lm("right_wrist", 0.8, 0.8),
     ]
     assert game._detect_t_pose(landmarks) is False
@@ -137,6 +141,7 @@ def test_t_pose_wrists_down(game: GesturesGame):
 # SQUAT
 # ==========================================
 
+
 def test_squat_deep_knee_bend(game: GesturesGame):
     """
     Rodilla doblada en ángulo agudo.
@@ -145,7 +150,7 @@ def test_squat_deep_knee_bend(game: GesturesGame):
     landmarks = [
         lm("left_hip", 0.5, 0.4),
         lm("left_knee", 0.55, 0.55),
-        lm("left_ankle", 0.45, 0.7),   # pie "hacia atrás" respecto a rodilla
+        lm("left_ankle", 0.45, 0.7),  # pie "hacia atrás" respecto a rodilla
     ]
     # Calculamos: la rodilla está "adelante", el tobillo detrás
     # El ángulo hip-knee-ankle debería ser agudo
@@ -169,11 +174,12 @@ def test_squat_standing_straight(game: GesturesGame):
 # ONE_LEG_BALANCE
 # ==========================================
 
+
 def test_one_leg_balance_left_up(game: GesturesGame):
     """Rodilla izquierda elevada (y menor), la derecha normal."""
     landmarks = [
         lm("left_knee", 0.4, 0.5),
-        lm("left_ankle", 0.4, 0.4),    # tobillo arriba de rodilla
+        lm("left_ankle", 0.4, 0.4),  # tobillo arriba de rodilla
         lm("right_knee", 0.6, 0.55),
         lm("right_ankle", 0.6, 0.75),  # tobillo abajo
     ]
@@ -194,6 +200,7 @@ def test_one_leg_balance_both_down(game: GesturesGame):
 # Activación por frames consecutivos
 # ==========================================
 
+
 def test_gesture_activates_after_min_frames(game: GesturesGame):
     """
     Verifica que el gesto requiera MIN_FRAMES_TO_ACTIVATE frames
@@ -205,7 +212,7 @@ def test_gesture_activates_after_min_frames(game: GesturesGame):
 
     landmarks = [
         lm("left_shoulder", 0.3, 0.5),
-        lm("left_wrist", 0.3, 0.2),   # mano arriba
+        lm("left_wrist", 0.3, 0.2),  # mano arriba
         lm("right_shoulder", 0.7, 0.5),
         lm("right_wrist", 0.7, 0.6),
     ]

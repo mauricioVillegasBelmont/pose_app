@@ -2,6 +2,7 @@
 """
 Reproduce el segfault fuera de pytest para ver dónde ocurre.
 """
+
 import numpy as np
 
 from adapters.pose.mediapipe_adapter import MediapipeAdapter

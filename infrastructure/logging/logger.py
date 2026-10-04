@@ -24,6 +24,7 @@ from config.settings import LoggingSettings
 # Formatters
 # ==========================================
 
+
 class JSONFormatter(logging.Formatter):
     """Formatea logs como JSON (útil para producción)."""
 
@@ -70,6 +71,7 @@ class ConsoleFormatter(logging.Formatter):
 # Filtros
 # ==========================================
 
+
 class MaxLevelFilter(logging.Filter):
     """Solo permite registros con nivel <= max_level."""
 
@@ -95,6 +97,7 @@ class MinLevelFilter(logging.Filter):
 # ==========================================
 # Setup
 # ==========================================
+
 
 def setup_logger(settings: LoggingSettings) -> logging.Logger:
     """
@@ -124,21 +127,15 @@ def setup_logger(settings: LoggingSettings) -> logging.Logger:
 
         # --- app.log: TODO ---
         app_log_path = log_dir / "app.log"
-        app_handler = logging.FileHandler(
-            app_log_path, encoding="utf-8"
-        )
+        app_handler = logging.FileHandler(app_log_path, encoding="utf-8")
         app_handler.setFormatter(JSONFormatter())  # archivo en JSON
         logger.addHandler(app_handler)
 
         # --- errors.log: solo ERROR y CRITICAL ---
         errors_log_path = log_dir / "errors.log"
-        errors_handler = logging.FileHandler(
-            errors_log_path, encoding="utf-8"
-        )
+        errors_handler = logging.FileHandler(errors_log_path, encoding="utf-8")
         errors_handler.setFormatter(JSONFormatter())
-        errors_handler.addFilter(
-            MinLevelFilter(logging.ERROR)
-        )
+        errors_handler.addFilter(MinLevelFilter(logging.ERROR))
         logger.addHandler(errors_handler)
 
     return logger

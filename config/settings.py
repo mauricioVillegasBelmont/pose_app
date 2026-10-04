@@ -40,20 +40,19 @@ class PoseSettings(BaseSettings):
     )
 
     provider: Literal["mediapipe", "mock"] = Field(
-        default="mediapipe",
-        description="Adaptador de estimación a usar"
+        default="mediapipe", description="Adaptador de estimación a usar"
     )
     model_complexity: int = Field(
-        default=1, ge=0, le=2,
-        description="Complejidad del modelo Mediapipe (0=rápido, 2=preciso)"
+        default=1,
+        ge=0,
+        le=2,
+        description="Complejidad del modelo Mediapipe (0=rápido, 2=preciso)",
     )
     min_detection_confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0,
-        description="Confianza mínima para detección"
+        default=0.5, ge=0.0, le=1.0, description="Confianza mínima para detección"
     )
     min_tracking_confidence: float = Field(
-        default=0.5, ge=0.0, le=1.0,
-        description="Confianza mínima para tracking"
+        default=0.5, ge=0.0, le=1.0, description="Confianza mínima para tracking"
     )
 
 
@@ -68,8 +67,7 @@ class RenderSettings(BaseSettings):
     )
 
     provider: Literal["pygame", "mock"] = Field(
-        default="pygame",
-        description="Adaptador de render a usar"
+        default="pygame", description="Adaptador de render a usar"
     )
 
     debug_overlay: bool = Field(
@@ -96,7 +94,7 @@ class GameSettings(BaseSettings):
         min_length=1,
         max_length=50,
         pattern=r"^[a-z][a-z0-9_]*$",  # snake_case
-        description="ID del plugin de juego (validado por PluginRegistry)"
+        description="ID del plugin de juego (validado por PluginRegistry)",
     )
     gravity: float = Field(default=0.08, ge=0.0, le=1.0)
     burst_count: int = Field(default=5, ge=1, le=50)
@@ -106,7 +104,7 @@ class GameSettings(BaseSettings):
         min_length=1,
         max_length=50,
         pattern=r"^[a-z][a-z0-9_]*$",
-        description="Nombre de la paleta (validado por ColorGame)"
+        description="Nombre de la paleta (validado por ColorGame)",
     )
 
 
@@ -133,6 +131,7 @@ class LoggingSettings(BaseSettings):
         description="Directorio donde guardar los archivos de log",
     )
 
+
 class APISettings(BaseSettings):
     """Configuración de la API REST."""
 
@@ -143,16 +142,40 @@ class APISettings(BaseSettings):
         extra="ignore",
     )
 
-    enabled: bool = Field(
-        default=True,
-        description="Si la API debe iniciarse"
-    )
+    enabled: bool = Field(default=True, description="Si la API debe iniciarse")
     host: str = Field(default="0.0.0.0", description="Host de la API")
     port: int = Field(default=8000, ge=1024, le=65535, description="Puerto")
     cors_origins: list[str] = Field(
-        default=["*"],
-        description="Orígenes permitidos para CORS"
+        default=["*"], description="Orígenes permitidos para CORS"
     )
+
+
+class JWTSettings(BaseSettings):
+    """Configuración de autenticación JWT."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="JWT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    secret_key: str = Field(
+        ...,
+        min_length=32,
+        description="Clave secreta para firmar tokens (mín 32 chars)",
+    )
+    algorithm: str = Field(
+        default="HS256",
+        description="Algoritmo de firma (HS256, RS256, etc.)",
+    )
+    access_token_expire_minutes: int = Field(
+        default=60,
+        ge=1,
+        le=1440,  # máx 24h
+        description="Duración del token en minutos",
+    )
+
 
 class Settings(BaseSettings):
     """
@@ -179,6 +202,11 @@ class Settings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
 
     api: APISettings = Field(default_factory=APISettings)
+    jwt: JWTSettings = Field(
+        default_factory=lambda: JWTSettings(
+            secret_key="placeholder-32-chars-minimum-value"
+        )
+    )
 
     @field_validator("environment")
     @classmethod

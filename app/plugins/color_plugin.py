@@ -3,10 +3,11 @@ Plugin del juego de color.
 """
 
 from app.game_context import GameContext
+from domain.games.color.main import ColorGame
 from domain.games.color.state import ColorState
 from domain.plugins.game_plugin import GamePlugin, GameProtocol
+from domain.ports.render_port import ColorRenderPort
 from domain.state.game_state_port import GameStatePort
-from domain.games.color.main import ColorGame
 from infrastructure.errors.exceptions import ConfigurationError
 from infrastructure.logging.logger import get_logger
 
@@ -51,13 +52,17 @@ class ColorPlugin(GamePlugin):
 
     def _create_renderer(self, context: GameContext):
         from adapters.render.pygame_base import PygameBaseAdapter
+
         cfg = context.settings.render
 
+        base: ColorRenderPort
         if cfg.provider == "mock":
             from adapters.mock.mock_render import MockColorRenderAdapter
+
             base = MockColorRenderAdapter()
         elif cfg.provider == "pygame":
             from adapters.render.pygame_color_adapter import PygameColorAdapter
+
             base = PygameColorAdapter(
                 width=cfg.width,
                 height=cfg.height,
@@ -74,7 +79,9 @@ class ColorPlugin(GamePlugin):
             from adapters.render.decorators.pose_debug_overlay import (
                 PoseDebugOverlay,
             )
+
             logger.info("Activando PoseDebugOverlay sobre Color")
-            return PoseDebugOverlay(base)
+            # TODO(refactor-render): ver nota en particles_plugin.py.
+            return PoseDebugOverlay(base)  # type: ignore[arg-type]
 
         return base

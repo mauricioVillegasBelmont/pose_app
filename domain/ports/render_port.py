@@ -56,11 +56,7 @@ class ColorRenderPort(BaseRenderPort):
     """Puerto específico para renderizar fondo de color."""
 
     @abstractmethod
-    def render_background(
-        self,
-        color: RGBColor,
-        landmarks: list[PoseLandmark]
-    ) -> None:
+    def render_background(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None:
         """
         Renderiza un fondo sólido + esqueleto superpuesto.
         """

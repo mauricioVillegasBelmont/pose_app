@@ -27,9 +27,7 @@ class GesturesState(GameStatePort):
         self._active_gestures: set[Gesture] = set()
 
         # Contador acumulado por gesto (cuántas veces se activó)
-        self._activation_counts: dict[Gesture, int] = {
-            g: 0 for g in Gesture
-        }
+        self._activation_counts: dict[Gesture, int] = {g: 0 for g in Gesture}
 
         # Frames procesados
         self._frame_count: int = 0
@@ -65,12 +63,9 @@ class GesturesState(GameStatePort):
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {
-                "active_gestures": sorted(
-                    g.value for g in self._active_gestures
-                ),
+                "active_gestures": sorted(g.value for g in self._active_gestures),
                 "activation_counts": {
-                    g.value: count
-                    for g, count in self._activation_counts.items()
+                    g.value: count for g, count in self._activation_counts.items()
                 },
                 "frame_count": self._frame_count,
             }

@@ -80,8 +80,7 @@ def main():
         output_path = target_path / output_filename
 
         tree_generator = DirectoryTreeGenerator(
-            root_dir=target_path,
-            output_file=str(output_path)
+            root_dir=target_path, output_file=str(output_path)
         )
         tree_generator.generate_tree()
         print(f"\nDirectory structure has been saved to '{output_path}'")

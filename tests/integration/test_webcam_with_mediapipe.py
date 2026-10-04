@@ -1,9 +1,3 @@
-import sys
-from pathlib import Path
-
-# Agrega la raíz del proyecto a sys.path
-project_root = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(project_root))
 import time
 
 import cv2
@@ -22,7 +16,7 @@ def test_webcam_with_mediapipe():
     pose_estimator = MediapipeAdapter(
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5,
-        model_complexity=1  # Balance entre velocidad y precisión
+        model_complexity=1,  # Balance entre velocidad y precisión
     )
 
     # Act: captura y estima por 10 segundos
@@ -48,14 +42,19 @@ def test_webcam_with_mediapipe():
             if frame_count % 10 == 0:
                 fps = camera.get_fps()
                 cv2.putText(
-                    debug_frame, f"FPS: {fps:.1f} | Landmarks: {len(landmarks)}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2
+                    debug_frame,
+                    f"FPS: {fps:.1f} | Landmarks: {len(landmarks)}",
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 255),
+                    2,
                 )
 
             # Muestra el frame
             cv2.imshow("Webcam + Mediapipe", debug_frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
     except KeyboardInterrupt:

@@ -9,13 +9,14 @@ Juego de partículas (async).
 
 import asyncio
 from collections.abc import Callable
+from typing import cast
 
 from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
 from domain.events.game_events import GameResetRequested
 from domain.games.particles.state import ParticlesState
 from domain.ports.camera_port import CameraPort
-from domain.ports.event_bus_port import EventBusPort
+from domain.ports.event_bus_port import EventBusPort, EventHandler
 from domain.ports.pose_estimator_port import PoseEstimatorPort
 from domain.ports.render_port import (
     LandmarkAwareRenderPort,
@@ -54,8 +55,9 @@ class ParticlesGame:
         self._reset_requested = False
 
         # Suscripción a eventos
-        event_bus.subscribe(GameResetRequested, self._on_reset_requested)
-
+        event_bus.subscribe(
+            GameResetRequested, cast(EventHandler, self._on_reset_requested)
+        )
 
     # ==========================================
     # Estado
@@ -156,9 +158,7 @@ class ParticlesGame:
                 await asyncio.to_thread(self._camera.stop)
             except Exception as e:
                 logger.error(f"Error cerrando cámara: {e}")
-            logger.info(
-                f"Juego particles terminado. Frames: {self._frame_count}"
-            )
+            logger.info(f"Juego particles terminado. Frames: {self._frame_count}")
 
     def reset(self) -> None:
         """
@@ -173,22 +173,16 @@ class ParticlesGame:
     # Lógica interna
     # ==========================================
 
-    def _spawn_particles_from_landmarks(
-        self, landmarks: list[PoseLandmark]
-    ) -> None:
+    def _spawn_particles_from_landmarks(self, landmarks: list[PoseLandmark]) -> None:
         for landmark in landmarks:
             if landmark.is_visible():
                 px = landmark.x * 640
                 py = landmark.y * 480
-                new_particles = Particle.create_burst(
-                    px, py, count=self._burst_count
-                )
+                new_particles = Particle.create_burst(px, py, count=self._burst_count)
                 self._particles.extend(new_particles)
 
         if len(self._particles) > self._max_particles:
-            self._particles = self._particles[
-                -int(self._max_particles * 0.75):
-            ]
+            self._particles = self._particles[-int(self._max_particles * 0.75) :]
 
     def _update_particles(self) -> None:
         for particle in self._particles:

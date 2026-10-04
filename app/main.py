@@ -24,9 +24,7 @@ async def main_async() -> int:
     logger.info(f"=== {settings.app_name} ===")
     logger.info(f"Entorno: {settings.environment}")
     logger.info(f"Juego: {settings.game.type}")
-    logger.info(
-        f"API: {'habilitada' if settings.api.enabled else 'deshabilitada'}"
-    )
+    logger.info(f"API: {'habilitada' if settings.api.enabled else 'deshabilitada'}")
 
     container = Container(settings)
     stop_event = asyncio.Event()
@@ -68,13 +66,9 @@ async def main_async() -> int:
         waiter_tasks: list[asyncio.Task] = [game_task]
         if api_task is not None:
             waiter_tasks.append(api_task)
-        waiter_tasks.append(
-            asyncio.create_task(stop_event.wait(), name="stop")
-        )
+        waiter_tasks.append(asyncio.create_task(stop_event.wait(), name="stop"))
 
-        done, _ = await asyncio.wait(
-            waiter_tasks, return_when=asyncio.FIRST_COMPLETED
-        )
+        done, _ = await asyncio.wait(waiter_tasks, return_when=asyncio.FIRST_COMPLETED)
 
         # ==========================================
         # Shutdown ordenado
@@ -84,18 +78,12 @@ async def main_async() -> int:
         if api is not None:
             await api.shutdown()
 
-        pending = [
-            t for t in [game_task, api_task]
-            if t is not None and not t.done()
-        ]
+        pending = [t for t in [game_task, api_task] if t is not None and not t.done()]
         if pending:
-            _, still_pending = await asyncio.wait(
-                pending, timeout=SHUTDOWN_TIMEOUT
-            )
+            _, still_pending = await asyncio.wait(pending, timeout=SHUTDOWN_TIMEOUT)
             for task in still_pending:
                 logger.warning(
-                    f"Task {task.get_name()} no terminó a tiempo, "
-                    f"cancelando"
+                    f"Task {task.get_name()} no terminó a tiempo, " f"cancelando"
                 )
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

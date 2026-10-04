@@ -86,7 +86,7 @@ class Container:
             return None
         if self._api is None:
             self._api = FastAPIAdapter(
-                settings=self._settings.api,
+                settings=self._settings,  # ← Settings completo
                 event_bus=self.event_bus,
                 registry=self.state_registry,
             )
@@ -125,9 +125,7 @@ class Container:
             return MockPoseAdapter()
 
         if cfg.provider == "mediapipe":
-            logger.info(
-                f"Usando MediapipeAdapter (complexity={cfg.model_complexity})"
-            )
+            logger.info(f"Usando MediapipeAdapter (complexity={cfg.model_complexity})")
             return MediapipeAdapter(
                 min_detection_confidence=cfg.min_detection_confidence,
                 min_tracking_confidence=cfg.min_tracking_confidence,
@@ -169,9 +167,7 @@ class Container:
 
         # Registra el estado del juego en el StateRegistry
         self.state_registry.register(game.state)
-        logger.info(
-            f"Estado del juego '{game.state.game_id}' registrado"
-        )
+        logger.info(f"Estado del juego '{game.state.game_id}' registrado")
 
         return game
 

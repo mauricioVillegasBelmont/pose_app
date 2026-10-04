@@ -50,7 +50,6 @@ class ColorGame:
 
         event_bus.subscribe(PaletteChangeRequested, self._on_palette_change)
 
-
     # ==========================================
     # Estado
     # ==========================================
@@ -59,7 +58,6 @@ class ColorGame:
     def state(self) -> ColorState:
         """Estado consultable del juego (para el StateRegistry)."""
         return self._state
-
 
     async def _on_palette_change(self, event: PaletteChangeRequested) -> None:
         """Marca cambio de paleta pendiente."""
@@ -129,9 +127,7 @@ class ColorGame:
                 await asyncio.to_thread(self._camera.stop)
             except Exception as e:
                 logger.error(f"Error cerrando cámara: {e}")
-            logger.info(
-                f"Juego color terminado. Frames: {self._frame_count}"
-            )
+            logger.info(f"Juego color terminado. Frames: {self._frame_count}")
 
     def _calculate_color(self, landmarks: list[PoseLandmark]) -> RGBColor:
         if not landmarks:
@@ -161,9 +157,7 @@ class ColorGame:
         else:
             return RGBColor.interpolate(self._palette[2], self._palette[0], b)
 
-    def _find(
-        self, landmarks: list[PoseLandmark], name: str
-    ) -> PoseLandmark | None:
+    def _find(self, landmarks: list[PoseLandmark], name: str) -> PoseLandmark | None:
         for lm in landmarks:
             if lm.name and lm.name.lower() == name.lower():
                 return lm

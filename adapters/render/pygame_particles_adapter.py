@@ -51,13 +51,15 @@ class PygameParticlesAdapter(PygameBaseAdapter, ParticlesRenderPort):
         self.screen.fill(self._background_color.to_rgb_tuple())
 
         # 2. Capa de partículas (con transparencia)
-        self._ensure_particle_surface()
-        self._particle_surface.fill((0, 0, 0, 0))
+        # self._ensure_particle_surface()
+        # assert self._particle_surface is not None
+        surface = self._ensure_particle_surface()
+        surface.fill((0, 0, 0, 0))
 
         self._draw_particles(particles)
 
         # 3. Mezcla sobre el fondo
-        self.screen.blit(self._particle_surface, (0, 0))
+        self.screen.blit(surface, (0, 0))
 
         # 4. Actualiza pantalla + FPS
         self.flush()
@@ -74,16 +76,18 @@ class PygameParticlesAdapter(PygameBaseAdapter, ParticlesRenderPort):
     # Helpers privados
     # ==========================================
 
-    def _ensure_particle_surface(self) -> None:
-        """Crea o recrea el buffer de partículas si es necesario."""
-        if (
-            self._particle_surface is None
-            or self._particle_surface.get_size() != (self.width, self.height)
+    def _ensure_particle_surface(self) -> pygame.Surface:
+        """Crea o recrea el buffer de partículas si es necesario.
+        Devuelve SIEMPRE un Surface válido."""
+        if self._particle_surface is None or self._particle_surface.get_size() != (
+            self.width,
+            self.height,
         ):
             self._particle_surface = pygame.Surface(
                 (self.width, self.height),
                 pygame.SRCALPHA,
             )
+        return self._particle_surface
 
     def _draw_particles(self, particles: list[Particle]) -> None:
         """Dibuja cada partícula en el buffer de partículas."""

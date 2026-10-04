@@ -3,10 +3,11 @@ Plugin del juego de partículas.
 """
 
 from app.game_context import GameContext
+from domain.games.particles.main import ParticlesGame
 from domain.games.particles.state import ParticlesState
 from domain.plugins.game_plugin import GamePlugin, GameProtocol
+from domain.ports.render_port import ParticlesRenderPort
 from domain.state.game_state_port import GameStatePort
-from domain.games.particles.main import ParticlesGame
 from infrastructure.errors.exceptions import ConfigurationError
 from infrastructure.logging.logger import get_logger
 
@@ -54,16 +55,20 @@ class ParticlesPlugin(GamePlugin):
     def _create_renderer(self, context: GameContext):
         """Crea el renderer específico del juego de partículas."""
         from adapters.render.pygame_base import PygameBaseAdapter
+
         cfg = context.settings.render
+        base: ParticlesRenderPort
 
         if cfg.provider == "mock":
             from adapters.mock.mock_render import MockParticlesRenderAdapter
+
             base = MockParticlesRenderAdapter()
         elif cfg.provider == "pygame":
             from adapters.render.pygame_particles_adapter import (
                 PygameParticlesAdapter,
             )
             from domain.entities.color import RGBColor
+
             base = PygameParticlesAdapter(
                 width=cfg.width,
                 height=cfg.height,
@@ -82,7 +87,12 @@ class ParticlesPlugin(GamePlugin):
             from adapters.render.decorators.pose_debug_overlay import (
                 PoseDebugOverlay,
             )
+
             logger.info("Activando PoseDebugOverlay sobre Particles")
-            return PoseDebugOverlay(base)
+            # TODO(refactor-render): PoseDebugOverlay será reemplazado por
+            # PoseOverlay (no-decorador). Ignoramos el error de tipo hasta
+            # entonces porque PygameParticlesAdapter no implementa
+            # render_background (que el Protocol actual exige).
+            return PoseDebugOverlay(base)  # type: ignore[arg-type]
 
         return base

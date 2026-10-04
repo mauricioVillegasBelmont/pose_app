@@ -1,4 +1,3 @@
-
 from adapters.render.overlays.pose_overlay import PoseOverlayRenderer
 from adapters.render.pygame_base import PygameBaseAdapter
 from domain.entities.color import RGBColor

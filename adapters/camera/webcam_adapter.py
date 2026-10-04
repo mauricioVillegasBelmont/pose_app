@@ -21,11 +21,7 @@ class WebcamAdapter(CameraPort):
     """
 
     def __init__(
-        self,
-        camera_id: int = 0,
-        width: int = 640,
-        height: int = 480,
-        fps: int = 30
+        self, camera_id: int = 0, width: int = 640, height: int = 480, fps: int = 30
     ):
         """
         Args:
@@ -71,10 +67,11 @@ class WebcamAdapter(CameraPort):
         actual_fps = self._cap.get(cv2.CAP_PROP_FPS)
 
         logger.info(
-            f"Cámara iniciada: {actual_width}x{actual_height} "
-            f"@ {self._fps} FPS"
+            f"Cámara iniciada: {actual_width}x{actual_height} " f"@ {self._fps} FPS"
         )
-        print(f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS")
+        print(
+            f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS"
+        )
 
         self._running = True
         self._frame_count = 0

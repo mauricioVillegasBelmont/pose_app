@@ -9,8 +9,6 @@ Verifica:
 
 import pytest
 
-from app.plugin_registry import PluginRegistry
-from app.plugins import register_builtin_plugins
 from config.settings import Settings, reset_settings
 from infrastructure.di.container import Container
 

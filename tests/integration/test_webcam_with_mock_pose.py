@@ -46,9 +46,8 @@ def test_webcam_with_mock_pose_and_render():
 
     def run_game():
         import asyncio
-        asyncio.run(
-            game.run_async(should_stop=lambda: stop_flag["stop"])
-        )
+
+        asyncio.run(game.run_async(should_stop=lambda: stop_flag["stop"]))
 
     thread = threading.Thread(target=run_game, daemon=True)
     thread.start()

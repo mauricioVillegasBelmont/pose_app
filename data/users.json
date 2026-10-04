@@ -1,0 +1,22 @@
+{
+  "users": [
+    {
+      "id": "admin-uuid-0001",
+      "username": "admin",
+      "email": "admin@example.com",
+      "full_name": "Administrator",
+      "roles": ["admin", "user"],
+      "disabled": false,
+      "password": "admin123"
+    },
+    {
+      "id": "user-uuid-0002",
+      "username": "user",
+      "email": "user@example.com",
+      "full_name": "Regular User",
+      "roles": ["user"],
+      "disabled": false,
+      "password": "user123"
+    }
+  ]
+}

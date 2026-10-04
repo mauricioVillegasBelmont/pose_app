@@ -23,6 +23,9 @@ class GameProtocol(Protocol):
     por el núcleo. No es una ABC (structural typing, no nominal).
     """
 
+    @property
+    def state(self) -> GameStatePort: ...
+
     async def run_async(self, should_stop=None) -> None: ...
 
 

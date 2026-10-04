@@ -25,6 +25,7 @@ from domain.ports.render_port import (
 # MockParticlesRenderAdapter
 # ==========================================
 
+
 def test_mock_particles_implements_ports():
     """Verifica que implemente los puertos correctos."""
     adapter = MockParticlesRenderAdapter()
@@ -110,6 +111,7 @@ def test_mock_particles_reset():
 # ==========================================
 # MockColorRenderAdapter
 # ==========================================
+
 
 def test_mock_color_implements_ports():
     """Verifica que implemente los puertos correctos."""
