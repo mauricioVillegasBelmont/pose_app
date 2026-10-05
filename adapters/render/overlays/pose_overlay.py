@@ -5,9 +5,12 @@ Es una utilidad reutilizable, NO un puerto ni un adaptador completo.
 Se usa por composición desde el decorador PoseDebugOverlay.
 """
 
+from typing import Any
+
 import pygame
 
 from domain.entities.pose_landmark import PoseLandmark
+from domain.ports.render.overlay_port import OverlayPort
 from infrastructure.logging.logger import get_logger
 
 logger = get_logger("adapters.render.pose_overlay")
@@ -123,3 +126,45 @@ class PoseOverlayRenderer:
     ) -> tuple[int, int]:
         """Convierte coordenadas normalizadas (0-1) a píxeles."""
         return (int(landmark.x * width), int(landmark.y * height))
+
+
+class PoseOverlay(OverlayPort):
+    """Overlay que dibuja el esqueleto de pose."""
+
+    def __init__(
+        self,
+        connections: tuple[tuple[str, str], ...] | None = None,
+        line_color: tuple[int, int, int] = (255, 255, 255),
+        line_width: int = 3,
+        joint_color: tuple[int, int, int] = (0, 255, 0),
+        joint_radius: int = 6,
+        min_visibility: float = 0.5,
+    ) -> None:
+        self._renderer = PoseOverlayRenderer(
+            connections=connections,
+            line_color=line_color,
+            line_width=line_width,
+            joint_color=joint_color,
+            joint_radius=joint_radius,
+            min_visibility=min_visibility,
+        )
+
+    def draw(
+        self,
+        surface: Any,
+        landmarks: list[PoseLandmark] | None = None,
+    ) -> None:
+        """
+        Dibuja el esqueleto sobre la superficie.
+
+        Args:
+            surface: Superficie Pygame.
+            landmarks: Landmarks de pose (None o vacío).
+        """
+        if landmarks is None or not landmarks:
+            return
+        width, height = surface.get_size()
+        self._renderer.draw(surface, landmarks, (width, height))
+
+    def close(self) -> None:
+        """Libera recursos. No hay recursos que liberar."""
