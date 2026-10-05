@@ -15,13 +15,12 @@ from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
 from domain.events.game_events import GameResetRequested
 from domain.games.particles.state import ParticlesState
+from domain.ports import render_port as legacy_render
 from domain.ports.camera_port import CameraPort
 from domain.ports.event_bus_port import EventBusPort, EventHandler
 from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render_port import (
-    LandmarkAwareRenderPort,
-    ParticlesRenderPort,
-)
+from domain.ports.render import particles_render_port as new_render
+from domain.ports.render.scene_port import ScenePort
 from infrastructure.logging.logger import get_logger
 
 logger = get_logger("use_cases.particles")
@@ -34,23 +33,30 @@ class ParticlesGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
-        renderer: ParticlesRenderPort,
         state: ParticlesState,
         event_bus: EventBusPort,
+        renderer: legacy_render.ParticlesRenderPort | None = None,
+        scene: ScenePort | None = None,
+        particles_capability: new_render.ParticlesRenderPort | None = None,
         gravity: float = 0.1,
         burst_count: int = 5,
         max_particles: int = 2000,
     ):
         self._camera = camera
         self._pose_estimator = pose_estimator
-        self._renderer = renderer
+        self._renderer: legacy_render.ParticlesRenderPort | None = renderer
         self._state = state
         self._event_bus = event_bus
+        self._scene = scene
+        self._particles_capability = particles_capability
         self._gravity = gravity
         self._burst_count = burst_count
         self._max_particles = max_particles
 
         self._particles: list[Particle] = []
+        self._frame_count = 0
+        self._use_new_render = self._scene is not None
+
         self._frame_count = 0
         self._reset_requested = False
 
@@ -95,7 +101,7 @@ class ParticlesGame:
                 # Aplica reset si fue solicitado
                 if self._reset_requested:
                     self._reset_particles()
-                    self._reset_requested = False
+                    self._use_new_render = self._scene is not None
 
                 # Frame (bloqueante → executor)
                 frame = await asyncio.to_thread(self._camera.get_frame)
@@ -116,22 +122,16 @@ class ParticlesGame:
                 self._state.update_pose(landmarks)
                 self._state.increment_frames()
 
-                # Notifica landmarks al renderer si aplica
-                if isinstance(self._renderer, LandmarkAwareRenderPort):
-                    self._renderer.update_landmarks(landmarks)
-
                 # Partículas
                 self._spawn_particles_from_landmarks(landmarks)
                 self._update_particles()
 
-                # Render (bloqueante → executor)
-                try:
-                    await asyncio.to_thread(
-                        self._renderer.render_particles, self._particles
-                    )
-                except Exception as e:
-                    logger.error(f"Error renderizando: {e}")
-                    break
+                if self._use_new_render:
+                    if not await self._render_new(landmarks):
+                        break
+                else:
+                    if not await self._render_legacy(landmarks):
+                        break
 
                 # Publica al estado
                 self._state.update_particles(self._particles)
@@ -151,7 +151,10 @@ class ParticlesGame:
             raise
         finally:
             try:
-                self._renderer.close()
+                if self._use_new_render and self._scene is not None:
+                    self._scene.close()
+                elif self._renderer is not None:
+                    self._renderer.close()
             except Exception as e:
                 logger.error(f"Error cerrando renderer: {e}")
             try:
@@ -168,6 +171,40 @@ class ParticlesGame:
         Internamente llama a `_reset_particles()`.
         """
         self._reset_particles()
+
+    async def _render_new(self, landmarks: list[PoseLandmark]) -> bool:
+        """
+        Path nuevo: set_particles + scene.render_frame.
+
+        Returns:
+            True si el render fue exitoso, False si falló.
+        """
+        assert self._scene is not None
+        if isinstance(self._particles_capability, new_render.ParticlesRenderPort):
+            self._particles_capability.set_particles(self._particles)
+        try:
+            await asyncio.to_thread(self._scene.render_frame, landmarks)
+            return True
+        except Exception as e:
+            logger.error(f"Error renderizando (nuevo): {e}")
+            return False
+
+    async def _render_legacy(self, landmarks: list[PoseLandmark]) -> bool:
+        """
+        Path legacy: renderer.render_particles.
+
+        Returns:
+            True si el render fue exitoso, False si falló.
+        """
+        assert self._renderer is not None
+        if isinstance(self._renderer, legacy_render.LandmarkAwareRenderPort):
+            self._renderer.update_landmarks(landmarks)
+        try:
+            await asyncio.to_thread(self._renderer.render_particles, self._particles)
+            return True
+        except Exception as e:
+            logger.error(f"Error renderizando: {e}")
+            return False
 
     # ==========================================
     # Lógica interna
