@@ -751,8 +751,8 @@ Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(cont
 ### `app/state_contract.py`
 Documento vivo (sin código ejecutable) que lista qué keys publica cada juego y qué comandos soporta. Referencia, no se importa.
 
-### `app/plugins/game_plugin.py`
-Duplica en `app/` los contratos `GameProtocol` (Protocol) y `GamePlugin` (ABC) — mismo contenido que `domain/plugins/game_plugin.py`, pero **con `GameContext` de `app/`**. Los plugins importan este. `create_game(context: GameContext) -> GameProtocol` es invocado por `Container.create_game()`.
+### `app/plugins/game_plugin.py` — eliminado (nota histórica)
+Los plugins importan de `domain/plugins/game_plugin.py`, que es la **única fuente del contrato**. La copia `app/plugins/game_plugin.py` fue eliminada por ser huérfana (0 imports).
 
 ### `app/plugins/__init__.py`
 `register_builtin_plugins(registry: PluginRegistry) -> None`: registra `ColorPlugin`, `GesturesPlugin`, `ParticlesPlugin` (imports locales para evitar ciclos). Invocado por `Container.plugin_registry` (lazy, primera vez).

@@ -9,6 +9,7 @@ Container. El núcleo de la aplicación NO conoce plugins concretos.
 """
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
 
 from domain.state.game_state_port import GameStatePort
@@ -19,14 +20,22 @@ if TYPE_CHECKING:
 
 class GameProtocol(Protocol):
     """
-    Protocolo mínimo que debe cumplir un juego para ser gestionado
-    por el núcleo. No es una ABC (structural typing, no nominal).
+    Protocolo estructural mínimo que debe cumplir un juego.
+
+    No es ABC: usamos structural typing (duck typing tipado).
+    Cualquier objeto con estos métodos satisface el protocolo.
+
+    Ventaja: los juegos NO heredan de nada, solo implementan la forma.
     """
 
     @property
-    def state(self) -> GameStatePort: ...
+    def state(self) -> GameStatePort:
+        """Estado consultable del juego (para el StateRegistry)."""
+        ...
 
-    async def run_async(self, should_stop=None) -> None: ...
+    async def run_async(self, should_stop: "Callable[[], bool] | None" = None) -> None:
+        """Loop principal del juego."""
+        ...
 
 
 class GamePlugin(ABC):
@@ -52,7 +61,7 @@ class GamePlugin(ABC):
 
     @property
     def description(self) -> str:
-        """Descripción corta opcional."""
+        """Descripción corta opcional (default: vacío)."""
         return ""
 
     @abstractmethod
@@ -60,8 +69,8 @@ class GamePlugin(ABC):
         """
         Crea el estado inicial del juego.
 
-        El Container lo registra en el StateRegistry para que la API
-        pueda consultarlo.
+        Nota: el Container obtiene el estado vía `game.state` (el plugin
+        no necesita exponerlo por separado).
         """
 
     @abstractmethod
