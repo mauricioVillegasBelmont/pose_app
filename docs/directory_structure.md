@@ -86,7 +86,6 @@ pose_app/
 │   ├── game_context.py
 │   ├── main.py
 │   ├── plugin_registry.py
-│   ├── state_contract.py
 │   └── state_registry.py
 ├── config/
 │
@@ -103,6 +102,7 @@ pose_app/
 │   ├── directory_structure.md
 │   ├── ports_contract.md
 │   ├── render_architecture.md
+│   ├── state_contract.md
 │   └── system_learning.md
 ├── domain/
 │

@@ -1,5 +1,8 @@
-# app/state_contract.py
-"""
+# Contrato de Estado por Juego
+
+> Documento vivo. Actualizar cuando un juego cambie sus keys
+> en `GameStatePort.snapshot()`.
+
 Contrato de datos publicados por cada juego.
 
 Este archivo NO es código ejecutable, es documentación viva.
@@ -21,4 +24,3 @@ ColorGame:
     - "change_palette" {"palette": str} → Cambia la paleta activa
 
 Comandos desconocidos son ignorados silenciosamente por cada juego.
-"""

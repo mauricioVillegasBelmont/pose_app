@@ -748,7 +748,7 @@ Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(cont
 | `stats_all` | `(self) -> dict[str, Any]` | `id → stats()` | 🟢 `GET /api/v1/stats` |
 | `clear` | `(self) -> None` | Tests | 🟡 |
 
-### `app/state_contract.py`
+### `docs/state_contract.md`
 Documento vivo (sin código ejecutable) que lista qué keys publica cada juego y qué comandos soporta. Referencia, no se importa.
 
 ### `app/plugins/game_plugin.py` — eliminado (nota histórica)
