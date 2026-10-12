@@ -20,10 +20,15 @@ class DirectoryTreeGenerator:
         self.last_prefix = "└── "
         self.ignore_dirs = {
             ".git",
+            ".hypothesis",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".ruff_cache",
             ".vscode",
             "__pycache__",
             "node_modules",
             "dist",
+            "htmlcov",
             "build",
             ".venv",
             "env",

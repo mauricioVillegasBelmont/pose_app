@@ -1,11 +1,13 @@
 import time
 
 import cv2
+import pytest
 
 from adapters.camera.webcam_adapter import WebcamAdapter
 from adapters.pose.mediapipe_adapter import MediapipeAdapter
 
 
+@pytest.mark.skip(reason="Requiere cámara física, correr manualmente")
 def test_webcam_with_mediapipe():
     """
     Prueba de integración: cámara real + Mediapipe real.
