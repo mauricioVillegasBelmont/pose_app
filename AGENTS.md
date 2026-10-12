@@ -29,7 +29,7 @@ Si algo contradice estos documentos, **detente y pregunta**.
 - `logs/` — Archivos de log generados.
 - `htmlcov/`, `coverage.xml`, `.coverage` — Artefactos de cobertura.
 - `uv.lock` — Lockfile de dependencias (solo `uv add/remove` lo modifica).
-- `*.back` — Aerchivos de respaldo para el usuario (se encuentran ignorados en .gitignore).
+- `*.back` — Aerchivos de respaldo para el usuario y son solo de uso humano (se encuentran ignorados en .gitignore).
 - Cualquier carpeta `.venv/` o `__pycache__/`.
 
 **Si crees que necesitas tocar algo de esta lista, DETENTE y pregunta.**

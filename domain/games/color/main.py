@@ -4,6 +4,7 @@ Juego de color (async).
 
 import asyncio
 from collections.abc import Callable
+from typing import ClassVar
 
 from domain.entities.color import RGBColor
 from domain.entities.pose_landmark import PoseLandmark
@@ -21,7 +22,7 @@ logger = get_logger("use_cases.color")
 class ColorGame:
     """Juego que cambia el color de fondo según la pose (async)."""
 
-    PALETTES = {
+    PALETTES: ClassVar[dict[str, list[RGBColor]]] = {
         "fire": [RGBColor(255, 0, 0), RGBColor(255, 165, 0), RGBColor(255, 255, 0)],
         "ocean": [RGBColor(0, 0, 255), RGBColor(0, 128, 255), RGBColor(0, 255, 255)],
         "forest": [RGBColor(0, 100, 0), RGBColor(34, 139, 34), RGBColor(0, 255, 127)],

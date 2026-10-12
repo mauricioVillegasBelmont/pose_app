@@ -101,7 +101,7 @@ class GesturesGame:
                     landmarks = await asyncio.to_thread(
                         self._pose_estimator.estimate, frame
                     )
-                except Exception as e:
+                except (ValueError, AttributeError) as e:
                     logger.warning(f"Error estimando pose: {e}")
                     continue
 
@@ -118,7 +118,7 @@ class GesturesGame:
                         RGBColor(20, 20, 30),
                         landmarks,
                     )
-                except Exception as e:
+                except (ValueError, AttributeError) as e:
                     logger.error(f"Error renderizando: {e}")
                     break
 
@@ -131,11 +131,11 @@ class GesturesGame:
         finally:
             try:
                 self._renderer.close()
-            except Exception as e:
+            except (ValueError, AttributeError) as e:
                 logger.error(f"Error cerrando renderer: {e}")
             try:
                 await asyncio.to_thread(self._camera.stop)
-            except Exception as e:
+            except (ValueError, AttributeError) as e:
                 logger.error(f"Error cerrando cámara: {e}")
             logger.info(f"Juego gestures terminado. Frames: {self._frame_count}")
 
@@ -151,7 +151,7 @@ class GesturesGame:
             try:
                 if detector(landmarks):
                     detected.add(gesture)
-            except Exception as e:
+            except (ValueError, AttributeError) as e:
                 logger.debug(f"Error detectando {gesture.value}: {e}")
 
         # 2. Actualiza contadores consecutivos y detecta activaciones nuevas
@@ -239,9 +239,12 @@ class GesturesGame:
 
         for side in ("left", "right"):
             wrist = self._find(landmarks, f"{side}_wrist")
-            if wrist and wrist.is_visible():
-                if wrist.distance_to(nose) < self.GREETING_MAX_DISTANCE:
-                    return True
+            if (
+                wrist
+                and wrist.is_visible()
+                and wrist.distance_to(nose) < self.GREETING_MAX_DISTANCE
+            ):
+                return True
         return False
 
     def _detect_arms_crossed(self, landmarks: list[PoseLandmark]) -> bool:

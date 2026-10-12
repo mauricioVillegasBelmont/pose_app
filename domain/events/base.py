@@ -6,7 +6,7 @@ Convención: nombres en pasado (PoseUpdated, no UpdatePose).
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -18,7 +18,7 @@ class DomainEvent:
     sin conflictos de orden (los eventos se instancian por keyword).
     """
 
-    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def event_name(self) -> str:

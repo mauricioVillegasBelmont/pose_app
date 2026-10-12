@@ -5,7 +5,7 @@ Es un DTO simple. La API lo usa para responder a GET /state.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -15,7 +15,7 @@ class AppSnapshot:
 
     games: dict[str, dict[str, Any]] = field(default_factory=dict)
     active_games: list[str] = field(default_factory=list)
-    captured_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    captured_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def to_dict(self) -> dict[str, Any]:
         """Serializa a dict JSON-friendly."""
