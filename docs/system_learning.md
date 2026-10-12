@@ -414,7 +414,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 - `directory_tree_generator.py`: regenera `docs/directory_structure.md`.
 - `debug_mediapipe_tasks.py`: repro de crashes de Mediapipe fuera de pytest.
 - `AGENST.md`: reglas del proyecto (**obligatorio**). Ojo: el archivo real se llama `AGENST.md`.
-- `docs/`: `ports_contract.md` (contratos), `render_architecture.md` (nueva arquitectura), `adding_a_game_plugin.md` (tutorial de juegos), `Guia_de_estilos.md` (estilo), `directory_structure.md` (árbol), `coverage_baseline.md`, y este `system_learning.md`.
+- `docs/`: `ports_contract.md` (contratos), `render_architecture.md` (nueva arquitectura), `adding_a_game_plugin.md` (tutorial de juegos), `code_style.md` (estilo), `directory_structure.md` (árbol), `coverage_baseline.md`, y este `system_learning.md`.
 
 ---
 

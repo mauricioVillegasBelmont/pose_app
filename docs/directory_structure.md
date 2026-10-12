@@ -97,7 +97,7 @@ pose_app/
 │   └── users.json
 ├── docs/
 │
-│   ├── Guia_de_estilos.md
+│   ├── code_style.md
 │   ├── adding_a_game_plugin.md
 │   ├── coverage_baseline.md
 │   ├── directory_structure.md
