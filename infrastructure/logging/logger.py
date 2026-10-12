@@ -13,12 +13,11 @@ Separación de archivos:
 import json
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from config.settings import LoggingSettings
-
 
 # ==========================================
 # Formatters
@@ -30,7 +29,7 @@ class JSONFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_data: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -46,9 +45,9 @@ class JSONFormatter(logging.Formatter):
 
 
 class ConsoleFormatter(logging.Formatter):
-    """Formato legible con colores para consola."""
+    """Formato legible con colores SOLO si stdout es TTY."""
 
-    COLORS = {
+    COLORS: ClassVar[dict[str, str]] = {
         "DEBUG": "\033[36m",
         "INFO": "\033[32m",
         "WARNING": "\033[33m",
@@ -57,13 +56,23 @@ class ConsoleFormatter(logging.Formatter):
     }
     RESET = "\033[0m"
 
-    def format(self, record: logging.LogRecord) -> str:
-        color = self.COLORS.get(record.levelname, "")
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    def __init__(self, use_colors: bool | None = None) -> None:
+        super().__init__()
+        if use_colors is None:
+            use_colors = sys.stdout.isatty()
+        self._use_colors = use_colors
 
+    def format(self, record: logging.LogRecord) -> str:
+        timestamp = datetime.now(UTC).strftime("%H:%M:%S.%f")[:-3]
+        if self._use_colors:
+            color = self.COLORS.get(record.levelname, "")
+            return (
+                f"{color}[{timestamp}] {record.levelname:8s} "
+                f"{record.name:20s} | {record.getMessage()}{self.RESET}"
+            )
         return (
-            f"{color}[{timestamp}] {record.levelname:8s} "
-            f"{record.name:20s} | {record.getMessage()}{self.RESET}"
+            f"[{timestamp}] {record.levelname:8s} "
+            f"{record.name:20s} | {record.getMessage()}"
         )
 
 
