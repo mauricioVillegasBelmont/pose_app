@@ -9,7 +9,6 @@ import pytest
 from domain.entities.pose_landmark import PoseLandmark
 from domain.games.gestures.main import GesturesGame
 
-
 # ==========================================
 # Helper para crear landmarks
 # ==========================================

@@ -49,7 +49,7 @@ REQUIRED_FILES = [
     "app/plugin_registry.py",
     "app/state_registry.py",
     "app/plugins/__init__.py",
-    "app/plugins/particles.py",
+    "app/plugins/particles_plugin.py",
     "app/plugins/color_plugin.py",
     "app/plugins/gestures_plugin.py",
     # Adaptadores

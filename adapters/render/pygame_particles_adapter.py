@@ -28,8 +28,11 @@ class PygameParticlesAdapter(PygameBaseAdapter, ParticlesRenderPort):
         height: int = 600,
         title: str = "Particles",
         target_fps: int = 60,
-        background_color: RGBColor = RGBColor(20, 20, 30),
+        background_color: RGBColor | None = None,
     ):
+        if background_color is None:
+            background_color = RGBColor(20, 20, 30)
+
         PygameBaseAdapter.__init__(
             self,
             width=width,

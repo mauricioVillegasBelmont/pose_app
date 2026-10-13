@@ -1,5 +1,6 @@
 import urllib.request
 from pathlib import Path
+from typing import ClassVar
 
 import cv2
 import mediapipe as mp
@@ -24,7 +25,7 @@ class MediapipeAdapter(PoseEstimatorPort):
         "pose_landmarker_full/float16/latest/pose_landmarker_full.task"
     )
 
-    LANDMARK_NAMES: dict[int, str] = {
+    LANDMARK_NAMES: ClassVar[dict[int, str]] = {
         0: "nose",
         1: "left_eye_inner",
         2: "left_eye",
@@ -60,7 +61,7 @@ class MediapipeAdapter(PoseEstimatorPort):
         32: "right_foot_index",
     }
 
-    KEY_LANDMARKS = [
+    KEY_LANDMARKS: ClassVar[list[str]] = [
         "left_shoulder",
         "right_shoulder",
         "left_elbow",

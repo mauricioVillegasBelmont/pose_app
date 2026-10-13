@@ -2,7 +2,10 @@
 Tests del GameContext (dataclass).
 """
 
+from dataclasses import FrozenInstanceError
 from unittest.mock import Mock
+
+import pytest
 
 from app.game_context import GameContext
 
@@ -16,11 +19,8 @@ def test_game_context_is_frozen():
         settings=Mock(),
     )
 
-    try:
-        ctx.camera = Mock()  # type: ignore
-        assert False, "Debió lanzar FrozenInstanceError"
-    except Exception:
-        pass
+    with pytest.raises(FrozenInstanceError):
+        ctx.camera = Mock()
 
 
 def test_game_context_stores_fields():

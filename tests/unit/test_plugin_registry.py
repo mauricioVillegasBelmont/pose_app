@@ -9,7 +9,6 @@ from domain.plugins.game_plugin import GamePlugin, GameProtocol
 from domain.state.game_state_port import GameStatePort
 from infrastructure.errors.exceptions import ConfigurationError
 
-
 # ==========================================
 # Fakes para testing
 # ==========================================

@@ -606,7 +606,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `particles_render_port.py` | `ParticlesRenderPort` | `set_particles(particles: list[Particle])`, `render_particles()`, `close()` | `set_particles` por `ParticlesGame._render_new`; `render_particles` por el SceneManager |
 | `hud_render_port.py` | `HudRenderPort` | `set_hud(score:int, rounds:int, timer:float, extra:dict[str,str]\|None)`, `render_hud()`, `close()` | `render_hud` por SceneManager; `set_hud` 🟡 (juegos futuros) |
 | `overlay_port.py` | `OverlayPort` | `draw(surface: Any, landmarks: list[PoseLandmark]\|None)`, `close()` | `PygameSceneManager.render_frame`; implementado por `PoseOverlay`, `FpsOverlay` |
-| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_new`; registros en `app/plugins/particles.py` |
+| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_new`; registros en `app/plugins/particles_plugin.py` |
 | `__init__.py` | reexports | `__all__` con los 5 | `from domain.ports.render import ...` |
 
 **Patrones comunes**: puerto (ABC), capacidad componible, patrón declarar→ejecutar (`set_*` + `render_*`), Composite (SceneManager).
@@ -757,7 +757,7 @@ Los plugins importan de `domain/plugins/game_plugin.py`, que es la **única fuen
 ### `app/plugins/__init__.py`
 `register_builtin_plugins(registry: PluginRegistry) -> None`: registra `ColorPlugin`, `GesturesPlugin`, `ParticlesPlugin` (imports locales para evitar ciclos). Invocado por `Container.plugin_registry` (lazy, primera vez).
 
-### `app/plugins/particles.py` — `ParticlesPlugin` 🟢 nueva arquitectura
+### `app/plugins/particles_plugin.py` — `ParticlesPlugin` 🟢 nueva arquitectura
 **Patrones**: Plugin, Factory Method, Composition (capacidades + overlays).
 
 | Método | Firma | Responsabilidad | Proveniencia |

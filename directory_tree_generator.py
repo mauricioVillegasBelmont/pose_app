@@ -90,7 +90,7 @@ def main():
         tree_generator.generate_tree()
         print(f"\nDirectory structure has been saved to '{output_path}'")
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"An error occurred: {e!s}")
 
 
 if __name__ == "__main__":

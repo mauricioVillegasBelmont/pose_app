@@ -7,12 +7,12 @@ Verifican invariantes del registro de plugins.
 from unittest.mock import MagicMock
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from app.plugin_registry import PluginRegistry
 from domain.plugins.game_plugin import GamePlugin
 from infrastructure.errors.exceptions import ConfigurationError
-
 
 # ==========================================
 # Factory de plugins fake

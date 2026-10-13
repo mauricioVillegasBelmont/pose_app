@@ -56,8 +56,8 @@ class ParticlesPlugin(GamePlugin):
         # Initialize to access screen safely in non-interactive contexts if needed
         try:
             particles_capability._initialize()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Error inicializando plugin renderer: {e}")
 
         overlays: list[OverlayPort] = []
         if getattr(render_cfg, "debug_overlay", False):

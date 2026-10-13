@@ -70,13 +70,10 @@ class AsyncEventBus(EventBusPort):
         for handler in handlers:
             try:
                 await handler(event)
-            except Exception as e:
-                logger.error(
-                    f"Error en handler {handler.__name__} para "
-                    f"{event.event_name}: {e}",
-                    exc_info=True,
+            except Exception:
+                logger.exception(
+                    f"Error en handler {handler.__name__} para {event.event_name}"
                 )
-                # Continúa con el siguiente handler
 
     def clear(self) -> None:
         with self._lock:

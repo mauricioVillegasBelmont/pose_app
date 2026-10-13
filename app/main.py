@@ -68,7 +68,7 @@ async def main_async() -> int:
             waiter_tasks.append(api_task)
         waiter_tasks.append(asyncio.create_task(stop_event.wait(), name="stop"))
 
-        done, _ = await asyncio.wait(waiter_tasks, return_when=asyncio.FIRST_COMPLETED)
+        _done, _ = await asyncio.wait(waiter_tasks, return_when=asyncio.FIRST_COMPLETED)
 
         # ==========================================
         # Shutdown ordenado
