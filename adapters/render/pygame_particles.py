@@ -8,7 +8,6 @@ Reutiliza lógica de dibujo con alpha blending y manejo de resize.
 import pygame
 
 from adapters.render.pygame_base import PygameBaseAdapter
-from domain.entities.color import RGBColor
 from domain.entities.particle import Particle
 from domain.ports.render.particles_render_port import ParticlesRenderPort
 from infrastructure.logging.logger import get_logger
@@ -25,7 +24,6 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         height: int = 600,
         title: str = "Particles",
         target_fps: int = 60,
-        background_color: RGBColor | None = None,
     ) -> None:
         PygameBaseAdapter.__init__(
             self,
@@ -34,9 +32,7 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
             title=title,
             target_fps=target_fps,
         )
-        self._background_color = (
-            background_color if background_color is not None else RGBColor(20, 20, 30)
-        )
+
         self._particle_surface: pygame.Surface | None = None
         self._particles: list[Particle] = []
 
@@ -56,16 +52,13 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         if not self.is_running:
             return
 
-        # 1. Fondo
-        self.screen.fill(self._background_color.to_rgb_tuple())
-
-        # 2. Capa de partículas (con transparencia)
+        # 1. Capa de partículas (con transparencia)
         surface = self._ensure_particle_surface()
         surface.fill((0, 0, 0, 0))
 
         self._draw_particles(self._particles)
 
-        # 3. Mezcla sobre el fondo
+        # 2. Mezcla sobre el fondo
         self.screen.blit(surface, (0, 0))
 
     def close(self) -> None:

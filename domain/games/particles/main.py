@@ -1,25 +1,39 @@
 """
-Juego de partículas (async).
+Juego de partículas con lógica real.
 
-- Corre en su propio asyncio.Task.
-- Se suscribe a eventos del bus.
-- Publica estado al ParticlesState.
-- La cámara y el render corren en un thread separado via run_in_executor.
+Mecánica:
+- Aparecen N partículas al azar en el workspace.
+- El usuario las toca con las manos (landmarks de pose).
+- +1 punto por ronda completada.
+- Si el timer se agota → nueva ronda (sin punto).
+- Color de fondo cambia según puntuación.
+- Victoria al alcanzar max_score.
 """
 
 import asyncio
+import random
+import time
 from collections.abc import Callable
-from typing import cast
 
 from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
-from domain.events.game_events import GameResetRequested
+from domain.games.particles.geometry import (
+    Workspace,
+    detect_collisions,
+)
+from domain.games.particles.scoring import (
+    color_for_score,
+    is_winner,
+    particles_per_round,
+)
+from domain.games.particles.spawn import spawn_particles
 from domain.games.particles.state import ParticlesState
-from domain.ports import render_port as legacy_render
 from domain.ports.camera_port import CameraPort
-from domain.ports.event_bus_port import EventBusPort, EventHandler
+from domain.ports.event_bus_port import EventBusPort
 from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render import particles_render_port as new_render
+from domain.ports.render.color_render_port import ColorRenderPort
+from domain.ports.render.hud_render_port import HudRenderPort
+from domain.ports.render.particles_render_port import ParticlesRenderPort
 from domain.ports.render.scene_port import ScenePort
 from infrastructure.logging.logger import get_logger
 
@@ -27,89 +41,108 @@ logger = get_logger("use_cases.particles")
 
 
 class ParticlesGame:
-    """Juego de partículas que reacciona a la pose (async)."""
+    """Juego de tocar partículas."""
 
     def __init__(
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
+        scene: ScenePort,
+        particles_capability: ParticlesRenderPort,
+        color_capability: ColorRenderPort,
+        hud_capability: HudRenderPort,
         state: ParticlesState,
         event_bus: EventBusPort,
-        renderer: legacy_render.ParticlesRenderPort | None = None,
-        scene: ScenePort | None = None,
-        particles_capability: new_render.ParticlesRenderPort | None = None,
-        gravity: float = 0.1,
-        burst_count: int = 5,
-        max_particles: int = 2000,
-    ):
+        screen_width: int = 800,
+        screen_height: int = 600,
+        rng: random.Random | None = None,
+        max_score: int = 10,
+        time_per_round: float = 10.0,
+        hit_radius: float = 30.0,
+        workspace: Workspace | None = None,
+        particle_min_distance: float = 0.15,
+        particle_size: float = 20.0,
+        particle_color: tuple[int, int, int] = (255, 200, 50),
+    ) -> None:
+        """
+        Inicializa el juego.
+
+        Args:
+            camera: puerto de cámara.
+            pose_estimator: puerto de estimación de pose.
+            scene: compositor de render.
+            particles_capability: capacidad de render de partículas.
+            color_capability: capacidad de render de fondo.
+            hud_capability: capacidad de render de HUD.
+            state: estado del juego (consultable).
+            event_bus: bus de eventos.
+            screen_width: ancho de pantalla en píxeles.
+            screen_height: alto de pantalla en píxeles.
+            rng: generador aleatorio (inyectable para tests).
+            max_score: puntuación objetivo para ganar.
+            time_per_round: segundos por ronda.
+            hit_radius: radio de colisión en píxeles.
+            workspace: zona de spawn (default: Workspace por defecto).
+            particle_min_distance: distancia mínima normalizada entre partículas.
+            particle_size: tamaño base de partícula en píxeles.
+            particle_color: color RGB base de partícula.
+        """
         self._camera = camera
         self._pose_estimator = pose_estimator
-        self._renderer: legacy_render.ParticlesRenderPort | None = renderer
-        self._state = state
-        self._event_bus = event_bus
         self._scene = scene
         self._particles_capability = particles_capability
-        self._gravity = gravity
-        self._burst_count = burst_count
-        self._max_particles = max_particles
+        self._color_capability = color_capability
+        self._hud_capability = hud_capability
+        self._state = state
+        self._event_bus = event_bus
+
+        self._screen_width = screen_width
+        self._screen_height = screen_height
+        self._rng = rng or random.Random()
+        self._max_score = max_score
+        self._time_per_round = time_per_round
+        self._hit_radius = hit_radius
+        self._workspace = workspace or Workspace()
+        self._particle_min_distance = particle_min_distance
+        self._particle_size = particle_size
+        self._particle_color = particle_color
 
         self._particles: list[Particle] = []
-        self._frame_count = 0
-        self._use_new_render = self._scene is not None
-
-        self._frame_count = 0
-        self._reset_requested = False
-
-        # Suscripción a eventos
-        event_bus.subscribe(
-            GameResetRequested, cast(EventHandler, self._on_reset_requested)
-        )
-
-    # ==========================================
-    # Estado
-    # ==========================================
+        self._current_round: int = 1
+        self._time_remaining: float = time_per_round
+        self._frame_count: int = 0
 
     @property
     def state(self) -> ParticlesState:
-        """Estado consultable del juego (para el StateRegistry)."""
+        """Estado consultable del juego."""
         return self._state
-
-    # ==========================================
-    # Handler de eventos
-    # ==========================================
-
-    async def _on_reset_requested(self, event: GameResetRequested) -> None:
-        """Marca bandera; el loop aplica el reset."""
-        self._reset_requested = True
-        logger.info("Reset de partículas solicitado")
 
     # ==========================================
     # Loop principal
     # ==========================================
 
-    async def run_async(
-        self,
-        should_stop: Callable[[], bool] | None = None,
-    ) -> None:
+    async def run_async(self, should_stop: Callable[[], bool] | None = None) -> None:
+        """Loop principal del juego."""
         should_stop = should_stop or (lambda: False)
 
         await asyncio.to_thread(self._camera.start)
-        logger.info("Juego de partículas iniciado (async)")
+        logger.info("Juego de partículas iniciado")
+
+        self._start_new_round()
+
+        last_time = time.monotonic()
 
         try:
             while not should_stop():
-                # Aplica reset si fue solicitado
-                if self._reset_requested:
-                    self._reset_particles()
-                    self._use_new_render = self._scene is not None
+                if self._state.is_game_over():
+                    logger.info("Game over alcanzado")
+                    break
 
-                # Frame (bloqueante → executor)
                 frame = await asyncio.to_thread(self._camera.get_frame)
                 if frame is None:
                     await asyncio.sleep(0.001)
                     continue
 
-                # Pose (bloqueante → executor)
                 try:
                     landmarks = await asyncio.to_thread(
                         self._pose_estimator.estimate, frame
@@ -118,114 +151,129 @@ class ParticlesGame:
                     logger.warning(f"Error estimando pose: {e}")
                     continue
 
-                # Actualiza estado del juego
-                self._state.update_pose(landmarks)
-                self._state.increment_frames()
+                # Delta time
+                now = time.monotonic()
+                dt = now - last_time
+                last_time = now
 
-                # Partículas
-                self._spawn_particles_from_landmarks(landmarks)
-                self._update_particles()
+                # Lógica
+                self._update_logic(landmarks, dt)
 
-                if self._use_new_render:
-                    if not await self._render_new(landmarks):
-                        break
-                else:
-                    if not await self._render_legacy(landmarks):
-                        break
-
-                # Publica al estado
-                self._state.update_particles(self._particles)
+                # Render
+                try:
+                    await self._render_frame(landmarks)
+                except Exception as e:
+                    logger.error(f"Error renderizando: {e}")
+                    break
 
                 self._frame_count += 1
-                if self._frame_count % 100 == 0:
-                    logger.debug(
-                        f"Frame {self._frame_count}, "
-                        f"partículas activas: {len(self._particles)}"
-                    )
-
-                # Cede control al loop
                 await asyncio.sleep(0)
 
         except asyncio.CancelledError:
-            logger.info("Juego de partículas cancelado")
+            logger.info("Juego cancelado")
             raise
         finally:
             try:
-                if self._use_new_render and self._scene is not None:
-                    self._scene.close()
-                elif self._renderer is not None:
-                    self._renderer.close()
+                self._scene.close()
             except Exception as e:
-                logger.error(f"Error cerrando renderer: {e}")
+                logger.error(f"Error cerrando scene: {e}")
             try:
                 await asyncio.to_thread(self._camera.stop)
             except Exception as e:
                 logger.error(f"Error cerrando cámara: {e}")
-            logger.info(f"Juego particles terminado. Frames: {self._frame_count}")
-
-    def reset(self) -> None:
-        """
-        Reinicia el sistema de partículas.
-
-        Método público para uso externo (ej: comandos, tests).
-        Internamente llama a `_reset_particles()`.
-        """
-        self._reset_particles()
-
-    async def _render_new(self, landmarks: list[PoseLandmark]) -> bool:
-        """
-        Path nuevo: set_particles + scene.render_frame.
-
-        Returns:
-            True si el render fue exitoso, False si falló.
-        """
-        assert self._scene is not None
-        if isinstance(self._particles_capability, new_render.ParticlesRenderPort):
-            self._particles_capability.set_particles(self._particles)
-        try:
-            await asyncio.to_thread(self._scene.render_frame, landmarks)
-            return True
-        except Exception as e:
-            logger.error(f"Error renderizando (nuevo): {e}")
-            return False
-
-    async def _render_legacy(self, landmarks: list[PoseLandmark]) -> bool:
-        """
-        Path legacy: renderer.render_particles.
-
-        Returns:
-            True si el render fue exitoso, False si falló.
-        """
-        assert self._renderer is not None
-        if isinstance(self._renderer, legacy_render.LandmarkAwareRenderPort):
-            self._renderer.update_landmarks(landmarks)
-        try:
-            await asyncio.to_thread(self._renderer.render_particles, self._particles)
-            return True
-        except Exception as e:
-            logger.error(f"Error renderizando: {e}")
-            return False
+            logger.info(f"Juego terminado. Frames: {self._frame_count}")
 
     # ==========================================
-    # Lógica interna
+    # Lógica de negocio
     # ==========================================
 
-    def _spawn_particles_from_landmarks(self, landmarks: list[PoseLandmark]) -> None:
-        for landmark in landmarks:
-            if landmark.is_visible():
-                px = landmark.x * 640
-                py = landmark.y * 480
-                new_particles = Particle.create_burst(px, py, count=self._burst_count)
-                self._particles.extend(new_particles)
+    def _start_new_round(self) -> None:
+        """Genera partículas nuevas al inicio de una ronda."""
+        num_particles = particles_per_round(self._current_round)
 
-        if len(self._particles) > self._max_particles:
-            self._particles = self._particles[-int(self._max_particles * 0.75) :]
+        self._particles = spawn_particles(
+            count=num_particles,
+            workspace=self._workspace,
+            screen_width=self._screen_width,
+            screen_height=self._screen_height,
+            rng=self._rng,
+            min_distance=self._particle_min_distance,
+            particle_size=self._particle_size,
+            particle_color=self._particle_color,
+        )
 
-    def _update_particles(self) -> None:
-        for particle in self._particles:
-            particle.update(gravity=self._gravity)
-        self._particles = [p for p in self._particles if p.is_alive()]
+        self._time_remaining = self._time_per_round
 
-    def _reset_particles(self) -> None:
-        self._particles.clear()
-        logger.info("Sistema de partículas reiniciado")
+        self._state.set_particles_count(len(self._particles))
+        self._state.set_time_remaining(self._time_remaining)
+        self._state.set_round_number(self._current_round)
+
+        logger.info(f"Ronda {self._current_round}: {len(self._particles)} partículas")
+
+    def _update_logic(self, landmarks: list[PoseLandmark], dt: float) -> None:
+        """Actualiza la lógica del juego para este frame."""
+        # 1. Detectar colisiones
+        remaining, hits = detect_collisions(
+            particles=self._particles,
+            landmarks=landmarks,
+            screen_width=self._screen_width,
+            screen_height=self._screen_height,
+            hit_radius=self._hit_radius,
+        )
+
+        self._particles = remaining
+        self._state.set_particles_count(len(self._particles))
+
+        if hits > 0:
+            logger.debug(f"¡{hits} partícula(s) tocada(s)!")
+
+        # 2. ¿Ronda completada?
+        if not self._particles:
+            self._complete_round()
+            return
+
+        # 3. Actualizar timer
+        self._time_remaining = max(0.0, self._time_remaining - dt)
+        self._state.set_time_remaining(self._time_remaining)
+
+        # 4. ¿Timer agotado?
+        if self._time_remaining <= 0.0:
+            logger.info(f"Timer agotado. Reiniciando ronda {self._current_round}")
+            self._start_new_round()
+
+    def _complete_round(self) -> None:
+        """El usuario tocó todas las partículas."""
+        self._state.increment_score()
+        new_score = self._state.get_score()
+        logger.info(f"¡Ronda completada! Puntos: {new_score}")
+
+        if is_winner(new_score, self._max_score):
+            self._state.set_game_over(winner=True)
+            logger.info("¡VICTORIA!")
+            return
+
+        self._current_round += 1
+        self._start_new_round()
+
+    # ==========================================
+    # Render
+    # ==========================================
+
+    async def _render_frame(self, landmarks: list[PoseLandmark]) -> None:
+        """Actualiza capacidades y renderiza el frame."""
+        # Fondo
+        color = color_for_score(self._state.get_score())
+        self._color_capability.set_color(color)
+
+        # Partículas
+        self._particles_capability.set_particles(self._particles)
+
+        # HUD
+        self._hud_capability.set_hud(
+            score=self._state.get_score(),
+            rounds=self._current_round,
+            timer=self._time_remaining,
+        )
+
+        # Render
+        await asyncio.to_thread(self._scene.render_frame, landmarks)

@@ -1,49 +1,99 @@
 """
-Estado del juego de partículas.
-
-Implementa GameStatePort. Thread-safe.
+Estado consultable del juego de partículas (para la API).
 """
 
+from dataclasses import dataclass
 from threading import Lock
 from typing import Any
 
-from domain.entities.particle import Particle
-from domain.entities.pose_landmark import PoseLandmark
 from domain.state.game_state_port import GameStatePort
+
+
+@dataclass
+class _InternalState:
+    """Estado interno mutable del juego."""
+
+    score: int = 0
+    round_number: int = 1
+    max_score: int = 10
+    time_remaining: float = 30.0
+    time_per_round: float = 10.0
+    particles_count: int = 0
+    is_game_over: bool = False
+    is_winner: bool = False
 
 
 class ParticlesState(GameStatePort):
     """
-    Estado consultable del juego de partículas.
+    Estado consultable del juego, thread-safe.
 
-    El juego (ParticlesGame) escribe; la API lee.
+    Mantiene:
+    - Estado interno (mutable, para la lógica).
+    - Exposición pública (snapshot, stats).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = Lock()
-        self._particles: list[Particle] = []
-        self._last_pose: list[PoseLandmark] = []
-        self._frame_count: int = 0
+        self._internal = _InternalState()
 
     @property
     def game_id(self) -> str:
         return "particles"
 
     # ==========================================
-    # API de escritura (usada por ParticlesGame)
+    # API interna (usada por el juego)
     # ==========================================
 
-    def update_particles(self, particles: list[Particle]) -> None:
+    def increment_score(self) -> None:
         with self._lock:
-            self._particles = list(particles)
+            self._internal.score += 1
 
-    def update_pose(self, landmarks: list[PoseLandmark]) -> None:
+    def decrement_score(self) -> None:
         with self._lock:
-            self._last_pose = list(landmarks)
+            self._internal.score = max(0, self._internal.score - 1)
 
-    def increment_frames(self) -> None:
+    def set_particles_count(self, count: int) -> None:
         with self._lock:
-            self._frame_count += 1
+            self._internal.particles_count = count
+
+    def set_round_number(self, round_number: int) -> None:
+        """Actualiza el número de ronda actual."""
+        with self._lock:
+            self._internal.round_number = round_number
+
+    def set_time_remaining(self, seconds: float) -> None:
+        with self._lock:
+            self._internal.time_remaining = max(0.0, seconds)
+
+    def next_round(self) -> None:
+        with self._lock:
+            self._internal.round_number += 1
+            self._internal.time_remaining = self._internal.time_per_round
+
+    def set_game_over(self, winner: bool) -> None:
+        with self._lock:
+            self._internal.is_game_over = True
+            self._internal.is_winner = winner
+
+    def get_score(self) -> int:
+        with self._lock:
+            return self._internal.score
+
+    def get_time_remaining(self) -> float:
+        with self._lock:
+            return self._internal.time_remaining
+
+    def is_game_over(self) -> bool:
+        with self._lock:
+            return self._internal.is_game_over
+
+    def is_winner(self) -> bool:
+        with self._lock:
+            return self._internal.is_winner
+
+    def get_max_score(self) -> int:
+        with self._lock:
+            return self._internal.max_score
 
     # ==========================================
     # GameStatePort
@@ -51,26 +101,20 @@ class ParticlesState(GameStatePort):
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
-            particles_sample = [
-                {
-                    "x": round(p.x, 2),
-                    "y": round(p.y, 2),
-                    "life": round(p.life, 3),
-                    "size": round(p.size, 2),
-                    "color": list(p.color),
-                }
-                for p in self._particles[:10]
-            ]
             return {
-                "particles_count": len(self._particles),
-                "particles_sample": particles_sample,
-                "frame_count": self._frame_count,
-                "landmarks_count": len(self._last_pose),
+                "score": self._internal.score,
+                "max_score": self._internal.max_score,
+                "round_number": self._internal.round_number,
+                "time_remaining": round(self._internal.time_remaining, 2),
+                "particles_count": self._internal.particles_count,
+                "is_game_over": self._internal.is_game_over,
+                "is_winner": self._internal.is_winner,
             }
 
     def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
-                "particles_active": len(self._particles),
-                "frames_processed": self._frame_count,
+                "score": self._internal.score,
+                "rounds_played": self._internal.round_number - 1,
+                "game_over": self._internal.is_game_over,
             }

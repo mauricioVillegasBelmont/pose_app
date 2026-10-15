@@ -56,6 +56,9 @@ class MockParticlesRenderAdapter(ParticlesRenderPort, LandmarkAwareRenderPort):
     # ParticlesRenderPort
     # ==========================================
 
+    def set_particles(self, particles: list[Particle]) -> None:
+        self._particles = list(particles)
+
     def render_particles(self, particles: list[Particle]) -> None:
         """Registra las partículas para inspección. No dibuja nada."""
         self.last_particles = list(particles)  # Copia defensiva
