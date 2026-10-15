@@ -141,7 +141,7 @@ def check_imports() -> bool:
             module = __import__(module_name, fromlist=[class_name])
             getattr(module, class_name)
             print(f"   ✅ {module_name}.{class_name}")
-        except (ImportError, AttributeError) as e:
+        except Exception as e:  # noqa: BLE001:
             print(f"   ❌ {module_name}.{class_name}: {e}")
             all_ok = False
 

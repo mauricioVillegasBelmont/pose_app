@@ -70,7 +70,16 @@ Así, tu CI/CD puede seguir usando requirements.txt mientras tú desarrollas con
 
 ```bash
 uv run pytest -v
+uv run mypy .
+uv run ruff check .
 ```
+
+### Ruff fix
+```bash
+uv run ruff format .
+uv run ruff check --fix .
+```
+
 
 
 ### Testing demo Games

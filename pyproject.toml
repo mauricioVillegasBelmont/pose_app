@@ -117,6 +117,10 @@ exclude = [
     "logs",
 ]
 
+# Configuracion de ruff.lint
+[tool.ruff.lint]
+ignore = ["BLE001"]
+
 # Configuracion para pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -125,6 +129,10 @@ norecursedirs = [
     ".venv",
     "node_modules",
     ".git",
+    ".hypothesis",
+    "htmlcov",
+    "data",
+    "logs"
 ]
 pythonpath = ["."]
 asyncio_mode = "auto"
