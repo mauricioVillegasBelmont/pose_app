@@ -76,6 +76,7 @@ class RenderPort(ABC):
     @abstractmethod
     def render(self) -> None: ...
 
+
 # Protocol (solo dice "la forma")
 class PygameRenderable(Protocol):
     @property
@@ -180,12 +181,10 @@ DEFAULT_GRAVITY = 0.1
 
 
 @dataclass
-class MyData:
-    ...
+class MyData: ...
 
 
-def my_function(x: int) -> str:
-    ...
+def my_function(x: int) -> str: ...
 ```
 
 ### Clases
@@ -407,8 +406,7 @@ def test_to_hex_always_7_chars(color: RGBColor) -> None:
 
 ```python
 @pytest.mark.asyncio
-async def test_game_runs() -> None:
-    ...
+async def test_game_runs() -> None: ...
 ```
 
 **O** con `asyncio_mode = auto`, solo `async def test_...`.
@@ -481,10 +479,14 @@ uv run pytest -v
 ```python
 # ❌ typing.List
 from typing import List
+
+
 def f() -> List[int]: ...
+
 
 # ❌ Optional
 def f() -> Optional[int]: ...
+
 
 # ❌ Sin tipos
 def f(x, y): ...
@@ -505,15 +507,20 @@ x = do_something()  # ← corre al importar
 
 ```python
 # ❌ Bare except
-try: ...
-except: pass
+try:
+    ...
+except:
+    pass
 
 # ❌ Silenciar sin log
-try: ...
-except Exception: return None
+try:
+    ...
+except Exception:
+    return None
 
 # ❌ Re-lanzar sin contexto
-except ValueError: raise ConfigError("error")
+except ValueError:
+    raise ConfigError("error")
 ```
 
 ### Tests
@@ -521,6 +528,7 @@ except ValueError: raise ConfigError("error")
 ```python
 # ❌ Test sin nombre descriptivo
 def test_1(): ...
+
 
 # ❌ Múltiples asserts sin relación
 def test_all():

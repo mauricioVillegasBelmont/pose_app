@@ -44,8 +44,7 @@ class InMemoryIdentityRepository(IdentityRepositoryPort):
             self._by_user_id.setdefault(identity.user_id, []).append(identity)
 
             logger.debug(
-                f"Identidad creada: {identity.provider}"
-                f" → user_id={identity.user_id}"
+                f"Identidad creada: {identity.provider} → user_id={identity.user_id}"
             )
             return identity
 

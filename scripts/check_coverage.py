@@ -126,7 +126,7 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
         checks.append((prefix, rate, threshold, ok))
 
         status = "✅" if ok else "❌"
-        print(f"  {status} {prefix:30s} " f"{rate:6.2f}% (min {threshold:5.1f}%)")
+        print(f"  {status} {prefix:30s} {rate:6.2f}% (min {threshold:5.1f}%)")
 
         if not ok:
             failures.append(f"{prefix}: {rate:.2f}% < {threshold:.1f}%")
@@ -145,8 +145,7 @@ def check_thresholds(folder_stats: dict[str, dict[str, float]]) -> int:
 
     status = "✅" if global_ok else "❌"
     print(
-        f"  {status} {'GLOBAL':30s} "
-        f"{global_rate:6.2f}% (min {GLOBAL_THRESHOLD:5.1f}%)"
+        f"  {status} {'GLOBAL':30s} {global_rate:6.2f}% (min {GLOBAL_THRESHOLD:5.1f}%)"
     )
 
     if not global_ok:

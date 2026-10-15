@@ -83,7 +83,7 @@ async def main_async() -> int:
             _, still_pending = await asyncio.wait(pending, timeout=SHUTDOWN_TIMEOUT)
             for task in still_pending:
                 logger.warning(
-                    f"Task {task.get_name()} no terminó a tiempo, " f"cancelando"
+                    f"Task {task.get_name()} no terminó a tiempo, cancelando"
                 )
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):

@@ -108,9 +108,7 @@ def create_user_router() -> APIRouter:
         if identity is None or identity.password_hash is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "El usuario no tiene método de autenticación " "por contraseña"
-                ),
+                detail=("El usuario no tiene método de autenticación por contraseña"),
             )
 
         # Verifica la contraseña actual

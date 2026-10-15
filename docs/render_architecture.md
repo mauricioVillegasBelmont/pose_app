@@ -216,6 +216,7 @@ Vamos a mostrar cómo se vería el juego de "tocar N partículas" con esta arqui
 ```python
 # domain/games/touching/state.py
 
+
 @dataclass
 class TouchingState:
     particles: list[Particle] = field(default_factory=list)
@@ -227,18 +228,19 @@ class TouchingState:
     def background_for_score(self) -> RGBColor:
         """Regla de negocio: color según puntos."""
         if self.score <= 0:
-            return RGBColor(0, 0, 0)       # negro
+            return RGBColor(0, 0, 0)  # negro
         if self.score == 1:
-            return RGBColor(128, 128, 128) # gris
+            return RGBColor(128, 128, 128)  # gris
         if self.score == 2:
-            return RGBColor(0, 0, 255)     # azul
-        return RGBColor(255, 100, 0)       # cálido
+            return RGBColor(0, 0, 255)  # azul
+        return RGBColor(255, 100, 0)  # cálido
 ```
 
 ### El juego
 
 ```python
 # domain/games/touching/main.py
+
 
 class TouchingGame:
     def __init__(
@@ -282,6 +284,7 @@ class TouchingGame:
 
 ```python
 # domain/games/touching/plugin.py
+
 
 class TouchingPlugin(GamePlugin):
     @property

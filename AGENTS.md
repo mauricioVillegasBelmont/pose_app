@@ -156,6 +156,7 @@ Esta sección resume las reglas **obligatorias**. Cualquier código nuevo debe c
 # ✅ BIEN
 from collections.abc import Callable
 
+
 class ParticlesGame:
     def __init__(
         self,
@@ -178,12 +179,14 @@ class ParticlesGame:
 # ❌ MAL
 from typing import Optional, List
 
+
 class ParticlesGame:
     def __init__(self, camera, renderer, state, event_bus, gravity=0.1):  # sin tipos
         ...
 
-    def _find(self, landmarks: List[PoseLandmark], name: str) -> Optional[PoseLandmark]:
-        ...
+    def _find(
+        self, landmarks: List[PoseLandmark], name: str
+    ) -> Optional[PoseLandmark]: ...
 ```
 
 ### Docstrings
@@ -258,7 +261,7 @@ Módulo que hace X.
 Explicación breve (2-3 líneas máximo).
 """
 
-from __future__ import annotations   # opcional, solo si hay ciclos de tipos
+from __future__ import annotations  # opcional, solo si hay ciclos de tipos
 
 from dataclasses import dataclass
 
@@ -273,8 +276,7 @@ DEFAULT_GRAVITY = 0.1
 
 
 @dataclass
-class MiClase:
-    ...
+class MiClase: ...
 ```
 
 ### Nombres
@@ -400,10 +402,11 @@ class User:
 class State:
     particles: list[Particle] = field(default_factory=list)
 
+
 # ❌ MAL
 @dataclass
 class State:
-    particles: list[Particle] = []   # mutable default, bug clásico
+    particles: list[Particle] = []  # mutable default, bug clásico
 ```
 
 ### Async

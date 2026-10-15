@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 # ==========================================
 from domain.entities.particle import Particle
 from domain.entities.pose_landmark import PoseLandmark
-from domain.games.particles.rules import (
+from domain.games.particles.geometry import (
     Workspace,
     detect_collisions,
 )

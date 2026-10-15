@@ -307,9 +307,7 @@ class SaludoGame:
     def state(self) -> SaludoState:
         return self._state
 
-    async def run_async(
-        self, should_stop: Callable[[], bool] | None = None
-    ) -> None:
+    async def run_async(self, should_stop: Callable[[], bool] | None = None) -> None:
         should_stop = should_stop or (lambda: False)
 
         await asyncio.to_thread(self._camera.start)
@@ -382,9 +380,7 @@ class SaludoGame:
         distance = right_wrist.distance_to(nose)
         return distance < self.MAX_DISTANCE_TO_HEAD
 
-    def _find(
-        self, landmarks: list[PoseLandmark], name: str
-    ) -> PoseLandmark | None:
+    def _find(self, landmarks: list[PoseLandmark], name: str) -> PoseLandmark | None:
         for lm in landmarks:
             if lm.name and lm.name.lower() == name.lower():
                 return lm
@@ -446,10 +442,12 @@ class SaludoPlugin(GamePlugin):
 
         if cfg.provider == "mock":
             from adapters.mock.mock_render import MockColorRenderAdapter
+
             return MockColorRenderAdapter()
 
         if cfg.provider == "pygame":
             from adapters.render.pygame_color_adapter import PygameColorAdapter
+
             return PygameColorAdapter(
                 width=cfg.width,
                 height=cfg.height,
@@ -564,6 +562,7 @@ async def run_async(self, should_stop=None):
         # 3. IO
         await self._render(result)
 
+
 def _apply_rules(self, landmarks: list[PoseLandmark]) -> Result:
     """Función pura, testeable sin mocks."""
     ...
@@ -633,8 +632,10 @@ Los handlers de eventos pueden correr en otro thread. **No muten estado comparti
 def __init__(self):
     self._reset_requested = False
 
+
 async def _on_reset(self, event):
     self._reset_requested = True  # Bandera
+
 
 async def run_async(self, should_stop=None):
     while not should_stop():
@@ -682,6 +683,7 @@ def test_no_greeting_when_hand_far():
 ```python
 # tests/integration/test_saludo_plugin_e2e.py
 
+
 def test_saludo_plugin_loads(monkeypatch):
     monkeypatch.setenv("GAME_TYPE", "saludo")
     monkeypatch.setenv("ENVIRONMENT", "testing")
@@ -726,9 +728,11 @@ Antes de considerar tu plugin terminado:
 ```python
 from domain.events.base import DomainEvent
 
+
 @dataclass(frozen=True, kw_only=True)
 class TuEvento(DomainEvent):
     payload: str
+
 
 # En el juego:
 await self._event_bus.publish(TuEvento(payload="hola"))

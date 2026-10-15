@@ -44,9 +44,7 @@ class PluginRegistry:
                     context={"game_id": plugin.game_id},
                 )
             self._plugins[plugin.game_id] = plugin
-            logger.info(
-                f"Plugin registrado: {plugin.game_id} " f"({plugin.display_name})"
-            )
+            logger.info(f"Plugin registrado: {plugin.game_id} ({plugin.display_name})")
 
     def get(self, game_id: str) -> GamePlugin | None:
         """Devuelve un plugin o None si no está registrado."""
@@ -64,7 +62,7 @@ class PluginRegistry:
         if plugin is None:
             available = self.list_ids()
             raise ConfigurationError(
-                f"Plugin desconocido: '{game_id}'. " f"Disponibles: {available}",
+                f"Plugin desconocido: '{game_id}'. Disponibles: {available}",
                 context={"requested": game_id, "available": available},
             )
         return plugin

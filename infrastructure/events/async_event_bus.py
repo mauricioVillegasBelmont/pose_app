@@ -43,9 +43,7 @@ class AsyncEventBus(EventBusPort):
                 )
                 return
             handlers.append(handler)
-            logger.debug(
-                f"Handler {handler.__name__} suscrito a " f"{event_type.__name__}"
-            )
+            logger.debug(f"Handler {handler.__name__} suscrito a {event_type.__name__}")
 
     def unsubscribe(
         self,

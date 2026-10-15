@@ -2,7 +2,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from domain.entities.color import RGBColor
-from domain.games.particles.rules import (
+from domain.games.particles.scoring import (
     BACKGROUND_COLORS,
     color_for_score,
     is_winner,

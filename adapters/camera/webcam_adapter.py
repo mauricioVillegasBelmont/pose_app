@@ -67,7 +67,7 @@ class WebcamAdapter(CameraPort):
         actual_fps = self._cap.get(cv2.CAP_PROP_FPS)
 
         logger.info(
-            f"Cámara iniciada: {actual_width}x{actual_height} " f"@ {self._fps} FPS"
+            f"Cámara iniciada: {actual_width}x{actual_height} @ {self._fps} FPS"
         )
         print(
             f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS"
