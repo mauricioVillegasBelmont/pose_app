@@ -1,7 +1,7 @@
 # test_webcam.py
 import cv2
 
-from adapters.camera.webcam_adapter import WebcamAdapter
+from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
 
 cam = WebcamAdapter()
 cam.start()

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from app.game_context import GameContext
+from pose_app.app.game_context import GameContext
 
 
 def test_game_context_is_frozen():

@@ -8,14 +8,14 @@ Verifican:
 4. Que close() sea idempotente.
 """
 
-from adapters.mock.mock_render import (
+from pose_app.adapters.mock.mock_render import (
     MockColorRenderAdapter,
     MockParticlesRenderAdapter,
 )
-from domain.entities.color import RGBColor
-from domain.entities.particle import Particle
-from domain.entities.pose_landmark import PoseLandmark
-from domain.ports.render_port import (
+from pose_app.domain.entities.color import RGBColor
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.ports.render_port import (
     ColorRenderPort,
     LandmarkAwareRenderPort,
     ParticlesRenderPort,

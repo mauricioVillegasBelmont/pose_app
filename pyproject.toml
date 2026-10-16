@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "pose-app"
 version = "0.5.0"
@@ -58,6 +62,9 @@ dependencies = [
     "uvicorn==0.53.0",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/pose_app"]
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -88,6 +95,7 @@ exclude = [
     "^htmlcov",
     "^data",
     "^tests",
+    "^src/pose_app/tests",
     "^scripts",
     "^check_structure\\.py$",
     "^directory_tree_generator\\.py$",
@@ -134,7 +142,6 @@ norecursedirs = [
     "data",
     "logs"
 ]
-pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-m 'not slow' --strict-markers --strict-config -ra"
 markers = [

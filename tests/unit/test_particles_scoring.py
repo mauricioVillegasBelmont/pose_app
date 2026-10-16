@@ -1,8 +1,8 @@
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.entities.color import RGBColor
-from domain.games.particles.scoring import (
+from pose_app.domain.entities.color import RGBColor
+from pose_app.domain.games.particles.scoring import (
     BACKGROUND_COLORS,
     color_for_score,
     is_winner,

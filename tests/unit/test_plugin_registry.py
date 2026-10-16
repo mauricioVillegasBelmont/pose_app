@@ -4,10 +4,10 @@ Tests del PluginRegistry.
 
 import pytest
 
-from app.plugin_registry import PluginRegistry
-from domain.plugins.game_plugin import GamePlugin, GameProtocol
-from domain.state.game_state_port import GameStatePort
-from infrastructure.errors.exceptions import ConfigurationError
+from pose_app.app.plugin_registry import PluginRegistry
+from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.state.game_state_port import GameStatePort
+from pose_app.infrastructure.errors.exceptions import ConfigurationError
 
 # ==========================================
 # Fakes para testing

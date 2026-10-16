@@ -2,8 +2,8 @@
 Tests de los plugins builtin.
 """
 
-from app.plugin_registry import PluginRegistry
-from app.plugins import register_builtin_plugins
+from pose_app.app.plugin_registry import PluginRegistry
+from pose_app.app.plugins import register_builtin_plugins
 
 
 def test_builtin_plugins_register():

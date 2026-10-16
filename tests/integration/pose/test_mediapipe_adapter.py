@@ -15,8 +15,8 @@ Para correrlos en subprocesos aislados (evita segfaults que maten pytest):
 import numpy as np
 import pytest
 
-from adapters.pose.mediapipe_adapter import MediapipeAdapter
-from domain.entities.pose_landmark import PoseLandmark
+from pose_app.adapters.pose.mediapipe_adapter import MediapipeAdapter
+from pose_app.domain.entities.pose_landmark import PoseLandmark
 
 
 @pytest.mark.slow

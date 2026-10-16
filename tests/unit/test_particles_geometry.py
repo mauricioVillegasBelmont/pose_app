@@ -7,9 +7,9 @@ from hypothesis import strategies as st
 # ==========================================
 # detect_collisions
 # ==========================================
-from domain.entities.particle import Particle
-from domain.entities.pose_landmark import PoseLandmark
-from domain.games.particles.geometry import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.games.particles.geometry import (
     Workspace,
     detect_collisions,
 )

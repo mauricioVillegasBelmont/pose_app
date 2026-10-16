@@ -8,7 +8,7 @@ Bajar `max_examples` para velocidad.
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from adapters.auth.password_hasher import (
+from pose_app.adapters.auth.password_hasher import (
     hash_password,
     verify_dummy_password,
     verify_password,

@@ -7,7 +7,7 @@ from datetime import datetime
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.entities.identity import Identity
+from pose_app.domain.entities.identity import Identity
 
 # ==========================================
 # Strategies

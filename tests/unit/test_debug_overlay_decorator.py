@@ -7,9 +7,9 @@ se prueba en tests/integration con Pygame real.
 
 from unittest.mock import Mock
 
-from adapters.render.decorators.pose_debug_overlay import PoseDebugOverlay
-from domain.entities.particle import Particle
-from domain.entities.pose_landmark import PoseLandmark
+from pose_app.adapters.render.decorators.pose_debug_overlay import PoseDebugOverlay
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.pose_landmark import PoseLandmark
 
 
 def test_decorator_delegates_render_to_wrapped():

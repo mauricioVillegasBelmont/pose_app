@@ -4,10 +4,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from domain.entities.color import RGBColor
-from domain.entities.pose_landmark import PoseLandmark
-from domain.games.color.main import ColorGame
-from domain.games.color.state import ColorState
+from pose_app.domain.entities.color import RGBColor
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.games.color.main import ColorGame
+from pose_app.domain.games.color.state import ColorState
 
 
 @pytest.fixture

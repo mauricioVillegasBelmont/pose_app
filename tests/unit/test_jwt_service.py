@@ -4,9 +4,9 @@ from datetime import timedelta
 
 import pytest
 
-from config.settings import JWTSettings
-from domain.entities.user import User
-from infrastructure.auth.jwt_service import JWTService, TokenError
+from pose_app.config.settings import JWTSettings
+from pose_app.domain.entities.user import User
+from pose_app.infrastructure.auth.jwt_service import JWTService, TokenError
 
 
 @pytest.fixture

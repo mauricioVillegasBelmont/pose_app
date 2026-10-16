@@ -4,10 +4,10 @@ Tests unitarios de InMemoryIdentityRepository.
 
 import pytest
 
-from adapters.auth.in_memory_identity_repository import (
+from pose_app.adapters.auth.in_memory_identity_repository import (
     InMemoryIdentityRepository,
 )
-from domain.entities.identity import Identity
+from pose_app.domain.entities.identity import Identity
 
 
 @pytest.fixture

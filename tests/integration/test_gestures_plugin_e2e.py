@@ -4,8 +4,8 @@ Test end-to-end del plugin de gestures.
 
 import pytest
 
-from config.settings import Settings, reset_settings
-from infrastructure.di.container import Container
+from pose_app.config.settings import Settings, reset_settings
+from pose_app.infrastructure.di.container import Container
 
 
 @pytest.fixture
@@ -19,8 +19,8 @@ def mock_settings(monkeypatch):
 
 
 def test_gestures_plugin_registered():
-    from app.plugin_registry import PluginRegistry
-    from app.plugins import register_builtin_plugins
+    from pose_app.app.plugin_registry import PluginRegistry
+    from pose_app.app.plugins import register_builtin_plugins
 
     registry = PluginRegistry()
     register_builtin_plugins(registry)

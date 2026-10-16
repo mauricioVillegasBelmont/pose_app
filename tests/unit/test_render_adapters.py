@@ -5,10 +5,10 @@ Nota: no verifican el render visual (eso requiere pygame.display),
 solo que se pueden instanciar y que implementan correctamente.
 """
 
-from adapters.render.pygame_color_adapter import PygameColorAdapter
-from adapters.render.pygame_particles_adapter import PygameParticlesAdapter
-from domain.entities.pose_landmark import PoseLandmark
-from domain.ports.render_port import ColorRenderPort, ParticlesRenderPort
+from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
+from pose_app.adapters.render.pygame_particles_adapter import PygameParticlesAdapter
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.ports.render_port import ColorRenderPort, ParticlesRenderPort
 
 
 def test_pygame_particles_adapter_implements_port():
@@ -35,7 +35,7 @@ def test_pygame_color_adapter_implements_port():
 
 def test_pose_overlay_converts_normalized_to_pixels():
     """El overlay convierte coords normalizadas a píxeles."""
-    from adapters.render.overlays.pose_overlay import PoseOverlayRenderer
+    from pose_app.adapters.render.overlays.pose_overlay import PoseOverlayRenderer
 
     lm = PoseLandmark(x=0.5, y=0.5, z=0.0, visibility=1.0, name="nose")
     px, py = PoseOverlayRenderer._to_pixels(lm, width=800, height=600)

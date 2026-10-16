@@ -7,7 +7,7 @@ Verifican invariantes de roles, inmutabilidad y métodos with_*.
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.entities.user import User
+from pose_app.domain.entities.user import User
 
 # ==========================================
 # Strategies

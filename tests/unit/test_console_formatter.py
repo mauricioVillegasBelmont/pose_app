@@ -2,7 +2,7 @@
 
 import logging
 
-from infrastructure.logging.logger import ConsoleFormatter
+from pose_app.infrastructure.logging.logger import ConsoleFormatter
 
 
 def _make_record(level: int = logging.INFO) -> logging.LogRecord:

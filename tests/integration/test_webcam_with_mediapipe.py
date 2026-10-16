@@ -3,8 +3,8 @@ import time
 import cv2
 import pytest
 
-from adapters.camera.webcam_adapter import WebcamAdapter
-from adapters.pose.mediapipe_adapter import MediapipeAdapter
+from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
+from pose_app.adapters.pose.mediapipe_adapter import MediapipeAdapter
 
 
 @pytest.mark.skip(reason="Requiere cámara física, correr manualmente")

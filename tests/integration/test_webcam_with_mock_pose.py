@@ -10,12 +10,12 @@ import time
 
 import pytest
 
-from adapters.camera.webcam_adapter import WebcamAdapter
-from adapters.mock.mock_pose import MockPoseAdapter
-from adapters.mock.mock_render import MockParticlesRenderAdapter
-from domain.games.particles.main import ParticlesGame  # ← ruta nueva
-from domain.games.particles.state import ParticlesState
-from infrastructure.events.async_event_bus import AsyncEventBus
+from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
+from pose_app.adapters.mock.mock_pose import MockPoseAdapter
+from pose_app.adapters.mock.mock_render import MockParticlesRenderAdapter
+from pose_app.domain.games.particles.main import ParticlesGame  # ← ruta nueva
+from pose_app.domain.games.particles.state import ParticlesState
+from pose_app.infrastructure.events.async_event_bus import AsyncEventBus
 
 
 @pytest.mark.skip(reason="Requiere cámara física, correr manualmente")

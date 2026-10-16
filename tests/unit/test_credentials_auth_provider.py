@@ -6,16 +6,16 @@ Prueba la lógica de autenticación sin HTTP ni FastAPI.
 
 import pytest
 
-from adapters.auth.credentials_auth_provider import (
+from pose_app.adapters.auth.credentials_auth_provider import (
     CredentialsAuthProvider,
 )
-from adapters.auth.in_memory_identity_repository import (
+from pose_app.adapters.auth.in_memory_identity_repository import (
     InMemoryIdentityRepository,
 )
-from adapters.auth.in_memory_user_repository import InMemoryUserRepository
-from adapters.auth.password_hasher import hash_password
-from domain.entities.identity import Identity
-from domain.entities.user import User
+from pose_app.adapters.auth.in_memory_user_repository import InMemoryUserRepository
+from pose_app.adapters.auth.password_hasher import hash_password
+from pose_app.domain.entities.identity import Identity
+from pose_app.domain.entities.user import User
 
 
 @pytest.fixture

@@ -5,7 +5,7 @@ Property-based tests para PoseLandmark.
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.entities.pose_landmark import PoseLandmark
 
 # ==========================================
 # Strategies

@@ -1,5 +1,5 @@
 # test_settings.py
-from config.settings import get_settings, reset_settings
+from pose_app.config.settings import get_settings, reset_settings
 
 
 def test_settings_load():

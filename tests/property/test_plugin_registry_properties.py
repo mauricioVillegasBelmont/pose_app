@@ -10,9 +10,9 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from app.plugin_registry import PluginRegistry
-from domain.plugins.game_plugin import GamePlugin
-from infrastructure.errors.exceptions import ConfigurationError
+from pose_app.app.plugin_registry import PluginRegistry
+from pose_app.domain.plugins.game_plugin import GamePlugin
+from pose_app.infrastructure.errors.exceptions import ConfigurationError
 
 # ==========================================
 # Factory de plugins fake

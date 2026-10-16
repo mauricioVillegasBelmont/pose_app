@@ -9,12 +9,12 @@ from unittest.mock import Mock
 
 import pytest
 
-from domain.games.particles.main import ParticlesGame
-from domain.games.particles.state import ParticlesState
-from domain.ports.render.color_render_port import ColorRenderPort
-from domain.ports.render.hud_render_port import HudRenderPort
-from domain.ports.render.particles_render_port import ParticlesRenderPort
-from infrastructure.events.async_event_bus import AsyncEventBus
+from pose_app.domain.games.particles.main import ParticlesGame
+from pose_app.domain.games.particles.state import ParticlesState
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.hud_render_port import HudRenderPort
+from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
+from pose_app.infrastructure.events.async_event_bus import AsyncEventBus
 
 
 class MockScene:
@@ -108,8 +108,8 @@ class TestParticlesGameCompleteRound:
 class TestParticlesGameLogic:
     def test_landmarks_hit_particles(self, game: ParticlesGame):
         """Un landmark visible toca partículas cercanas."""
-        from domain.entities.particle import Particle
-        from domain.entities.pose_landmark import PoseLandmark
+        from pose_app.domain.entities.particle import Particle
+        from pose_app.domain.entities.pose_landmark import PoseLandmark
 
         game._start_new_round()
         initial_score = game.state.get_score()

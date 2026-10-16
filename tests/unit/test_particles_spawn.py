@@ -4,8 +4,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.games.particles.geometry import Workspace
-from domain.games.particles.spawn import spawn_particles
+from pose_app.domain.games.particles.geometry import Workspace
+from pose_app.domain.games.particles.spawn import spawn_particles
 
 # ==========================================
 # spawn_particles

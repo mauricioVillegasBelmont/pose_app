@@ -3,10 +3,10 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from adapters.api.fastapi_adapter import FastAPIAdapter
-from app.state_registry import StateRegistry
-from config.settings import JWTSettings, Settings, reset_settings
-from infrastructure.events.async_event_bus import AsyncEventBus
+from pose_app.adapters.api.fastapi_adapter import FastAPIAdapter
+from pose_app.app.state_registry import StateRegistry
+from pose_app.config.settings import JWTSettings, Settings, reset_settings
+from pose_app.infrastructure.events.async_event_bus import AsyncEventBus
 
 
 @pytest.fixture

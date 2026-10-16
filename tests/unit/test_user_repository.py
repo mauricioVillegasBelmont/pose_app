@@ -4,8 +4,8 @@ Tests unitarios de InMemoryUserRepository.
 
 import pytest
 
-from adapters.auth.in_memory_user_repository import InMemoryUserRepository
-from domain.entities.user import User
+from pose_app.adapters.auth.in_memory_user_repository import InMemoryUserRepository
+from pose_app.domain.entities.user import User
 
 
 @pytest.fixture

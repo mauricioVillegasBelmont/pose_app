@@ -5,7 +5,7 @@ Property-based tests para Particle.
 from hypothesis import given
 from hypothesis import strategies as st
 
-from domain.entities.particle import Particle
+from pose_app.domain.entities.particle import Particle
 
 # ==========================================
 # Strategies

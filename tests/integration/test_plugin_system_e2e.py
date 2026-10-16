@@ -9,8 +9,8 @@ Verifica:
 
 import pytest
 
-from config.settings import Settings, reset_settings
-from infrastructure.di.container import Container
+from pose_app.config.settings import Settings, reset_settings
+from pose_app.infrastructure.di.container import Container
 
 
 @pytest.fixture
@@ -55,7 +55,7 @@ def test_container_raises_on_unknown_game(monkeypatch):
     reset_settings()
     settings = Settings()
 
-    from infrastructure.errors.exceptions import ConfigurationError
+    from pose_app.infrastructure.errors.exceptions import ConfigurationError
 
     container = Container(settings)
     with pytest.raises(ConfigurationError):

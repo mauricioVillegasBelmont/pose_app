@@ -6,8 +6,8 @@ Cada test crea landmarks sintéticos y verifica el detector.
 
 import pytest
 
-from domain.entities.pose_landmark import PoseLandmark
-from domain.games.gestures.main import GesturesGame
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.games.gestures.main import GesturesGame
 
 # ==========================================
 # Helper para crear landmarks
@@ -205,7 +205,7 @@ def test_gesture_activates_after_min_frames(game: GesturesGame):
     Verifica que el gesto requiera MIN_FRAMES_TO_ACTIVATE frames
     para activarse.
     """
-    from domain.games.gestures.state import GesturesState
+    from pose_app.domain.games.gestures.state import GesturesState
 
     game._state = GesturesState()
 
@@ -231,7 +231,7 @@ def test_gesture_activates_after_min_frames(game: GesturesGame):
 
 def test_gesture_does_not_reactivate_while_held(game: GesturesGame):
     """Mientras el gesto se mantiene, no debe re-contar."""
-    from domain.games.gestures.state import GesturesState
+    from pose_app.domain.games.gestures.state import GesturesState
 
     game._state = GesturesState()
 
@@ -252,7 +252,7 @@ def test_gesture_does_not_reactivate_while_held(game: GesturesGame):
 
 def test_gesture_reactivates_after_release(game: GesturesGame):
     """Si se suelta y se vuelve a hacer, cuenta de nuevo."""
-    from domain.games.gestures.state import GesturesState
+    from pose_app.domain.games.gestures.state import GesturesState
 
     game._state = GesturesState()
 

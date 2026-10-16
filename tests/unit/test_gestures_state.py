@@ -2,8 +2,8 @@
 Tests del GesturesState.
 """
 
-from domain.entities.gesture import Gesture
-from domain.games.gestures.state import GesturesState
+from pose_app.domain.entities.gesture import Gesture
+from pose_app.domain.games.gestures.state import GesturesState
 
 
 def test_initial_state():
