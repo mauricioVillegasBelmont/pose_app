@@ -139,6 +139,7 @@ class PoseOverlay(OverlayPort):
         joint_color: tuple[int, int, int] = (0, 255, 0),
         joint_radius: int = 6,
         min_visibility: float = 0.5,
+        mirror: bool = False,
     ) -> None:
         self._renderer = PoseOverlayRenderer(
             connections=connections,
@@ -148,6 +149,8 @@ class PoseOverlay(OverlayPort):
             joint_radius=joint_radius,
             min_visibility=min_visibility,
         )
+
+        self._mirror = mirror
 
     def draw(
         self,
@@ -163,8 +166,29 @@ class PoseOverlay(OverlayPort):
         """
         if landmarks is None or not landmarks:
             return
+
+        if self._mirror:
+            landmarks = self._mirror_landmarks(landmarks)
+
         width, height = surface.get_size()
         self._renderer.draw(surface, landmarks, (width, height))
+
+    @staticmethod
+    def _mirror_landmarks(landmarks: list[PoseLandmark]) -> list[PoseLandmark]:
+        """
+        Devuelve copias espejadas (x → 1-x).
+        No muta los landmarks originales.
+        """
+        return [
+            PoseLandmark(
+                x=1.0 - lm.x,
+                y=lm.y,
+                z=lm.z,
+                visibility=lm.visibility,
+                name=lm.name,
+            )
+            for lm in landmarks
+        ]
 
     def close(self) -> None:
         """Libera recursos. No hay recursos que liberar."""
