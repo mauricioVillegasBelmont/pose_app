@@ -75,14 +75,19 @@ def main():
         if not target_path.exists():
             print(f"Error: El directorio '{target_dir}' no existe.")
             return
-
         if not target_path.is_dir():
             print(f"Error: '{target_dir}' no es un directorio.")
             return
 
-        # Nombre base del directorio para el archivo de salida
-        output_filename = f"{target_path.name}_directory_structure.md"
-        output_path = target_path / output_filename
+        # 1. Definir la carpeta .docs dentro del directorio objetivo
+        docs_dir = target_path / "docs"
+        docs_dir.mkdir(
+            parents=True, exist_ok=True
+        )  # Crea la carpeta .docs si no existe
+
+        # 2. Nombre fijo del archivo de salida (sin el prefijo del directorio)
+        output_filename = "directory_structure.md"
+        output_path = docs_dir / output_filename
 
         tree_generator = DirectoryTreeGenerator(
             root_dir=target_path, output_file=str(output_path)

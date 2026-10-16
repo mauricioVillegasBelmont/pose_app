@@ -150,7 +150,7 @@ markers = [
 ]
 # Configuracion para pytest-cov
 [tool.coverage.run]
-source = ["."]
+source = ["src/pose_app"]
 omit = [
     "*/tests/*",
     "*/test_*.py",

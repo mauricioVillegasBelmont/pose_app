@@ -1,8 +1,8 @@
 # Guía de Aprendizaje del Sistema — `system_learning.md`
 
 > **Audiencia**: desarrollador nuevo integrado al proyecto.
-> **Tono**: educativo. Este documento no sustituye a `AGENST.md` ni a `docs/ports_contract.md`: los **complementa** explicando *qué hace cada cosa y por qué*.
-> **Regla de oro**: antes de escribir código, lee `AGENST.md` + `docs/ports_contract.md`. Si este documento contradice esos dos, **manda la documentación normativa** y avisa.
+> **Tono**: educativo. Este documento no sustituye a `AGENTS.md` ni a `docs/ports_contract.md`: los **complementa** explicando *qué hace cada cosa y por qué*.
+> **Regla de oro**: antes de escribir código, lee `AGENTS.md` + `docs/ports_contract.md`. Si este documento contradice esos dos, **manda la documentación normativa** y avisa.
 
 ---
 
@@ -33,21 +33,21 @@ Está construida con **arquitectura hexagonal** (puertos y adaptadores) + **sist
 ### 1.1 Las cinco capas
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  config/            Settings (pydantic-settings, .env)         │
-├─────────────────────────────────────────────────────────────────┤
-│  app/               Composition root: main, Container,         │
-│                     registries, plugins concretos              │
-├─────────────────────────────────────────────────────────────────┤
-│  adapters/          Detalles: FastAPI, pygame, OpenCV,          │
-│                     Mediapipe, mocks, bcrypt, JWT               │
-├─────────────────────────────────────────────────────────────────┤
-│  infrastructure/    Servicios transversales: DI, event bus,     │
-│                     logging, errores, JWT                       │
-├─────────────────────────────────────────────────────────────────┤
-│  domain/            Corazón: entidades, puertos, eventos,       │
-│                     juegos, estados. NO importa frameworks.     │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  src/pose_app/config/            Settings (pydantic-settings, .env)          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  src/pose_app/app/               Composition root: main, Container,          │
+│                     registries, plugins concretos                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  src/pose_app/adapters/          Detalles: FastAPI, pygame, OpenCV,          │
+│                     Mediapipe, mocks, bcrypt, JWT                            │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  src/pose_app/infrastructure/    Servicios transversales: DI, event bus,     │
+│                     logging, errores, JWT                                    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  src/pose_app/domain/            Corazón: entidades, puertos, eventos,       │
+│                     juegos, estados. NO importa frameworks.                  │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Regla de dependencias** (la flecha "importa" apunta hacia abajo):
@@ -59,10 +59,10 @@ app ──► adapters ──► domain ◄── infrastructure
  └──► config
 ```
 
-- `domain/` **jamás** importa `adapters/`, `app/`, pygame, cv2, fastapi (solo `numpy` en tipos y `abc`).
-- `adapters/` implementa los puertos de `domain/`.
-- `app/` es el *composition root*: es el único que sabe juntarlo todo.
-- `infrastructure/` da servicios usados por todas las capas (logging, errores, bus, DI).
+- `src/pose_app/domain/` **jamás** importa `src/pose_app/adapters/`, `src/pose_app/app/`, pygame, cv2, fastapi (solo `numpy` en tipos y `abc`).
+- `src/pose_app/adapters/` implementa los puertos de `src/pose_app/domain/`.
+- `src/pose_app/app/` es el *composition root*: es el único que sabe juntarlo todo.
+- `src/pose_app/infrastructure/` da servicios usados por todas las capas (logging, errores, bus, DI).
 
 ### 1.2 Vocabulario (sufijos del proyecto)
 
@@ -157,11 +157,11 @@ flowchart LR
 
 # 3. Diagramas de flujo por módulo
 
-## 3.1 Módulo: construcción / DI (`infrastructure/di/`, `app/`)
+## 3.1 Módulo: construcción / DI (`src/pose_app/infrastructure/di/`, `src/pose_app/app/`)
 
 ```mermaid
 flowchart TD
-    S["Settings (config/settings.py)"] --> C["Container"]
+    S["Settings (src/pose_app/config/settings.py)"] --> C["Container"]
     C -->|"property lazy"| CAM["_create_camera()<br/>testing → MockCameraAdapter<br/>otro → WebcamAdapter"]
     C -->|"property lazy"| POSE["_create_pose_estimator()<br/>POSE_PROVIDER: mock o mediapipe"]
     C -->|"property lazy"| BUS["AsyncEventBus()"]
@@ -180,7 +180,7 @@ flowchart TD
 
 **Punto educativo**: el `Container` **no conoce juegos concretos**. Solo conoce adaptadores compartidos. Quien sabe construir un juego es el plugin. Así, añadir un juego no toca el Container.
 
-## 3.2 Módulo: plugins (`app/plugins/`)
+## 3.2 Módulo: plugins (`src/pose_app/app/plugins/`)
 
 ```mermaid
 flowchart LR
@@ -194,7 +194,7 @@ flowchart LR
 
 **Decisión de diseño**: el registro es **explícito y central** (no hay auto-discovery mágico). Añadir un juego = 1 carpeta nueva + 1 línea en `register_builtin_plugins`.
 
-## 3.3 Módulo: bucle de juego (`domain/games/*/main.py`)
+## 3.3 Módulo: bucle de juego (`src/pose_app/domain/games/*/main.py`)
 
 ```mermaid
 flowchart TD
@@ -220,7 +220,7 @@ Los tres juegos comparten este esqueleto (**Template Method** implícito); cambi
 
 ```mermaid
 flowchart TD
-    subgraph LEGACY["🔴 LEGACY (domain/ports/render_port.py)"]
+    subgraph LEGACY["🔴 LEGACY (src/pose_app/domain/ports/render_port.py)"]
         direction TB
         L1["ColorGame / GesturesGame"] --> L2["ColorRenderPort.render_background(color, landmarks)"]
         L2 --> L3["PygameColorAdapter"]
@@ -230,7 +230,7 @@ flowchart TD
         DBG["PoseDebugOverlay (Decorator)"] -. envuelve .-> L3
     end
 
-    subgraph NUEVA["🟢 NUEVA (domain/ports/render/)"]
+    subgraph NUEVA["🟢 NUEVA (src/pose_app/domain/ports/render/)"]
         direction TB
         N1["ParticlesGame"] -->|"set_particles(list)"| CAP["Capability"]
         N1 -->|"render_frame(landmarks)"| SC["PygameSceneManager"]
@@ -242,9 +242,9 @@ flowchart TD
     end
 ```
 
-**Estado real hoy**: `ParticlesGame` usa la **nueva** arquitectura; `ColorGame` y `GesturesGame` siguen en **legacy**. Ambas conviven; por eso existen DOS `ColorRenderPort` y DOS `ParticlesRenderPort` (uno en `domain/ports/render_port.py` y otro en `domain/ports/render/`). **Importa siempre la ruta completa.**
+**Estado real hoy**: `ParticlesGame` usa la **nueva** arquitectura; `ColorGame` y `GesturesGame` siguen en **legacy**. Ambas conviven; por eso existen DOS `ColorRenderPort` y DOS `ParticlesRenderPort` (uno en `src/pose_app/domain/ports/render_port.py` y otro en `src/pose_app/domain/ports/render/`). **Importa siempre la ruta completa.**
 
-## 3.5 Módulo: API + autenticación (`adapters/api/`, `adapters/auth/`, `infrastructure/auth/`)
+## 3.5 Módulo: API + autenticación (`src/pose_app/adapters/api/`, `src/pose_app/adapters/auth/`, `src/pose_app/infrastructure/auth/`)
 
 ```mermaid
 flowchart TD
@@ -270,7 +270,7 @@ flowchart TD
 
 **Flujo de login**: `POST /api/v1/auth/token` → `CredentialsAuthProvider.authenticate` (bcrypt + verificación dummy anti-timing) → `JWTService.create_access_token(user)` → `{access_token, token_type: bearer}`.
 
-## 3.6 Módulo: eventos (`domain/events/` + `infrastructure/events/`)
+## 3.6 Módulo: eventos (`src/pose_app/domain/events/` + `src/pose_app/infrastructure/events/`)
 
 ```mermaid
 flowchart LR
@@ -289,11 +289,11 @@ flowchart LR
 
 Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o módulo nuevo**.
 
-## 4.1 `domain/` — el corazón 🧠
+## 4.1 `src/pose_app/domain/` — el corazón 🧠
 
 **Propósito**: TODO el conocimiento de negocio: entidades, contratos (puertos), eventos, estados y los juegos mismos. No depende de frameworks.
 
-### `domain/entities/`
+### `src/pose_app/domain/entities/`
 - **Propósito**: objetos de negocio puros. `RGBColor`, `Particle`, `PoseLandmark`, `User`, `Identity`, `Gesture`.
 - **Al añadir archivo**:
   1. Si es inmutable → `@dataclass(frozen=True)`. Si necesita mutación deliberada (como `Particle`) → dataclass normal y documenta por qué.
@@ -301,7 +301,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   3. Usa patrón `with_*` para "copias modificadas" (`User.with_email(...)`), nunca mutar.
   4. Nada de pygame/cv2/pydantic aquí. Solo stdlib + tipos de dominio.
 
-### `domain/ports/`
+### `src/pose_app/domain/ports/`
 - **Propósito**: contratos (ABC) entre dominio y exterior. Son la **fuente de verdad** (ver `docs/ports_contract.md`).
 - **Al añadir puerto**:
   1. Puerto **nuevo y pequeño** (una responsabilidad, ISP). No le agregues métodos a un puerto existente si puedes crear otro.
@@ -310,70 +310,70 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   4. Los `close()`/`start()`/`stop()` deben ser **idempotentes**.
   5. Un adaptador implementa **un** puerto, nunca varios a la vez.
 
-### `domain/ports/render/`
+### `src/pose_app/domain/ports/render/`
 - **Propósito**: **nueva** arquitectura de render (capacidades `set_*`+`render_*`, overlays, scene).
-- **Al añadir capacidad**: crea `*_render_port.py` con `set_x()` / `render_x()` / `close()`, y añade su implementación Pygame en `adapters/render/`. Documenta en `docs/render_architecture.md`.
+- **Al añadir capacidad**: crea `*_render_port.py` con `set_x()` / `render_x()` / `close()`, y añade su implementación Pygame en `src/pose_app/adapters/render/`. Documenta en `docs/render_architecture.md`.
 
-### `domain/events/`
+### `src/pose_app/domain/events/`
 - **Propósito**: hechos inmutables ya ocurridos (`DomainEvent` base con `occurred_at` automático).
 - **Al añadir evento**: `@dataclass(frozen=True, kw_only=True)`, hereda de `DomainEvent`, nombre en pasado/sustantivo (`PaletteChangeRequested`). Registra quién lo publica y quién lo consume en `docs/ports_contract.md`.
 
-### `domain/state/`
+### `src/pose_app/domain/state/`
 - **Propósito**: `GameStatePort` (qué expone cada juego a la API) y `AppSnapshot` (DTO agregado).
 - **Al añadir estado**: implementa `game_id` + `snapshot()` (copia serializable, <1 ms) + `stats()`. **No devuelvas referencias mutables.**
 
-### `domain/plugins/`
+### `src/pose_app/domain/plugins/`
 - **Propósito**: contrato `GamePlugin` (ABC factory) y `GameProtocol` (Protocol estructural del juego).
 - **Al añadir**: casi nunca tocas esto. Si necesitas un método nuevo en el contrato, es una **modificación de interfaz pública → pregunta primero**.
 
-### `domain/games/<juego>/`
+### `src/pose_app/domain/games/<juego>/`
 - **Propósito**: un juego completo y autocontenido: `main.py` (lógica + loop), `state.py` (estado thread-safe).
 - **Al añadir juego**:
-  1. Crea `domain/games/<id>/` con `main.py`, `state.py`, `__init__.py`.
+  1. Crea `src/pose_app/domain/games/<id>/` con `main.py`, `state.py`, `__init__.py`.
   2. `state.py` implementa `GameStatePort` y usa `threading.Lock` en cada mutación.
   3. `main.py` recibe TODO por constructor (DI) y solo conoce puertos.
   4. Loop: `run_async(should_stop)`, `asyncio.to_thread` para bloqueantes, cleanup en `finally`, re-lanzar `CancelledError`.
-  5. Crea su plugin en `app/plugins/<id>_plugin.py` y regístralo en `app/plugins/__init__.py`.
+  5. Crea su plugin en `src/pose_app/app/plugins/<id>_plugin.py` y regístralo en `src/pose_app/app/plugins/__init__.py`.
   6. Guía completa: `docs/adding_a_game_plugin.md`.
 
-### `domain/use_cases/`
-- 🔴 **Carpeta residual/vacía** (los juegos migraron a `domain/games/`). No añadas nada aquí.
+### `src/pose_app/domain/use_cases/`
+- 🔴 **Carpeta residual/vacía** (los juegos migraron a `src/pose_app/domain/games/`). No añadas nada aquí.
 
-## 4.2 `app/` — composition root 🧩
+## 4.2 `src/pose_app/app/` — composition root 🧩
 
 **Propósito**: único lugar que sabe juntar dependencias concretas. Contiene entry point, contenedor DI, registries y plugins.
 
-- **`app/main.py`**: entry point. **No pongas lógica de negocio aquí.**
-- **`app/game_context.py`**: `GameContext` frozen. Si añades un campo, **no rompe** a los plugins existentes (por eso existe).
-- **`app/plugin_registry.py` / `state_registry.py`**: registries thread-safe. Cualquier método nuevo debe usar `self._lock`.
-- **`app/plugins/`**: aquí viven los plugins (construyen adaptadores concretos: pygame, mocks).
+- **`src/pose_app/app/main.py`**: entry point. **No pongas lógica de negocio aquí.**
+- **`src/pose_app/app/game_context.py`**: `GameContext` frozen. Si añades un campo, **no rompe** a los plugins existentes (por eso existe).
+- **`src/pose_app/app/plugin_registry.py` / `state_registry.py`**: registries thread-safe. Cualquier método nuevo debe usar `self._lock`.
+- **`src/pose_app/app/plugins/`**: aquí viven los plugins (construyen adaptadores concretos: pygame, mocks).
 
-**Al añadir archivo en `app/`**:
-1. Si es un plugin nuevo → `app/plugins/<id>_plugin.py` + 1 línea en `register_builtin_plugins`.
+**Al añadir archivo en `src/pose_app/app/`**:
+1. Si es un plugin nuevo → `src/pose_app/app/plugins/<id>_plugin.py` + 1 línea en `register_builtin_plugins`.
 2. Si es una dependencia compartida nueva → agrégala al `Container` como `@property` **lazy** + al `GameContext` si los juegos la necesitan.
 3. No importes `domain.games.*` desde `Container`: eso rompería la desacoplación.
 
-## 4.3 `adapters/` — el exterior implementado 🔌
+## 4.3 `src/pose_app/adapters/` — el exterior implementado 🔌
 
 **Propósito**: traducir puertos del dominio a tecnologías reales (OpenCV, Mediapipe, pygame, FastAPI, bcrypt) y viceversa.
 
 | Carpeta | Qué implementa |
 |---|---|
-| `adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`) |
-| `adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
-| `adapters/render/` | Puertos de render (legacy y nuevos) con pygame |
-| `adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
-| `adapters/api/` | Routers FastAPI + DTOs (puertos de entrada HTTP) |
-| `adapters/mock/` | Dobles de test: mocks y spies deterministas |
+| `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`) |
+| `src/pose_app/adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
+| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame |
+| `src/pose_app/adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
+| `src/pose_app/adapters/api/` | Routers FastAPI + DTOs (puertos de entrada HTTP) |
+| `src/pose_app/adapters/mock/` | Dobles de test: mocks y spies deterministas |
 
 **Al añadir archivo**:
 1. **Un adaptador = un puerto**. Si implementas dos, estás haciendo mal el diseño.
-2. Los mocks van **siempre** en `adapters/mock/`, son deterministas (sin aleatoriedad real, sin cámara real) y exponen contadores/spies para asserts.
+2. Los mocks van **siempre** en `src/pose_app/adapters/mock/`, son deterministas (sin aleatoriedad real, sin cámara real) y exponen contadores/spies para asserts.
 3. Si el adaptador falla, lanza la excepción del contrato (`CameraNotAvailableError`, `PoseEstimationError`, `ConfigurationError`), nunca `Exception` genérica.
-4. `adapters/api/`: los DTO **nunca** exponen `password_hash`. Orden de rutas importante: `/me` antes de `/{user_id}`.
+4. `src/pose_app/adapters/api/`: los DTO **nunca** exponen `password_hash`. Orden de rutas importante: `/me` antes de `/{user_id}`.
 5. Carpetas sin `__init__.py` (`auth/`, `decorators/`) funcionan como namespace packages; si creas paquete nuevo, sigue el estilo de sus vecinas.
 
-## 4.4 `infrastructure/` — servicios transversales 🛠️
+## 4.4 `src/pose_app/infrastructure/` — servicios transversales 🛠️
 
 **Propósito**: capacidades transversales usadas por todas las capas.
 
@@ -384,11 +384,11 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 | `errors/` | Jerarquía de excepciones + clasificador de acciones |
 | `logging/` | Logger raíz `pose_ar` (consola JSON/color, `logs/app.log`, `logs/errors.log`) |
 | `auth/` | `JWTService` (crear/decodificar tokens) |
-| `lifecycle/` | 🔴 `AppRunner` huérfano (el ciclo real vive en `app/main.py`) |
+| `lifecycle/` | 🔴 `AppRunner` huérfano (el ciclo real vive en `src/pose_app/app/main.py`) |
 
 **Al añadir archivo**: debe ser genérico (no saber de juegos concretos), usar `get_logger("infrastructure.<x>")`, y registrar su `ConfigurationError`/`InfrastructureError` correspondiente en `exceptions.py`.
 
-## 4.5 `config/` ⚙️
+## 4.5 `src/pose_app/config/` ⚙️
 
 - **Propósito**: `Settings` raíz con sub-configs (`camera`, `pose`, `render`, `game`, `logging`, `api`, `jwt`), cargadas de `.env` + env vars con prefijos (`CAMERA_`, `POSE_`, ...).
 - **Al añadir setting**:
@@ -413,7 +413,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 - `check_structure.py`: fitness function de arquitectura (existe archivo X, importa clase Y, hay 3 plugins). **Ejecútalo tras mover/crear módulos estructurales.**
 - `directory_tree_generator.py`: regenera `docs/directory_structure.md`.
 - `debug_mediapipe_tasks.py`: repro de crashes de Mediapipe fuera de pytest.
-- `AGENST.md`: reglas del proyecto (**obligatorio**). Ojo: el archivo real se llama `AGENST.md`.
+- `AGENTS.md`: reglas del proyecto (**obligatorio**).
 - `docs/`: `ports_contract.md` (contratos), `render_architecture.md` (nueva arquitectura), `adding_a_game_plugin.md` (tutorial de juegos), `code_style.md` (estilo), `directory_structure.md` (árbol), `coverage_baseline.md`, y este `system_learning.md`.
 
 ---
@@ -424,12 +424,12 @@ Para cada archivo: **propósito**, **patrones de diseño**, y una tabla con **re
 
 ---
 
-## 5.1 `domain/entities/`
+## 5.1 `src/pose_app/domain/entities/`
 
-### `domain/entities/__init__.py`
+### `src/pose_app/domain/entities/__init__.py`
 Paquete vacío (solo marca namespace). Los consumidores importan submódulos directamente.
 
-### `domain/entities/color.py`
+### `src/pose_app/domain/entities/color.py`
 **Propósito**: `RGBColor`, value object inmutable de color con validación e interpolación.
 **Patrones**: Dataclass `frozen=True`, Value Object, Factory method (`interpolate`), validación en `__post_init__`.
 
@@ -441,7 +441,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `RGBColor.to_rgb_tuple` | `(self) -> tuple[int,int,int]` | Tupla para `surface.fill()` | Invocado por `PygameColorRenderer.render_color`, `PygameParticlesRenderer`, versiones legacy |
 | `RGBColor.interpolate` | `(cls, color1: RGBColor, color2: RGBColor, t: float) -> RGBColor` (classmethod) | Interpolación lineal con `t` acotado a [0,1] | Invocado por `ColorGame._calculate_color` (transiciones de fondo) y `tests/property/test_rgb_color_properties.py` |
 
-### `domain/entities/gesture.py`
+### `src/pose_app/domain/entities/gesture.py`
 **Propósito**: catálogo cerrado de gestos reconocibles.
 **Patrones**: `str, Enum` tipado (serializable a JSON), constantes con nombre.
 
@@ -450,7 +450,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `Gesture` | `class Gesture(str, Enum)` | Valores: `hand_up`, `greeting`, `arms_crossed`, `t_pose`, `squat`, `one_leg_balance` | Claves del dict de detectores de `GesturesGame._detectors`, de `GesturesState._activation_counts` y de los tests |
 | `Gesture.display_name` | `@property (self) -> str` | Nombre legible (`"Hand Up"`) para logs | Leído por `GesturesGame._on_gesture_activated/_deactivated` |
 
-### `domain/entities/identity.py`
+### `src/pose_app/domain/entities/identity.py`
 **Propósito**: vincula usuario + método de autenticación, separando credenciales del perfil.
 **Patrones**: Dataclass `frozen=True`, patrón `with_*` (`dataclasses.replace`), helper `_now()`.
 
@@ -461,7 +461,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `Identity.is_password` | `@property (self) -> bool` | `provider == "password"` | Tests property; uso previsto en `CredentialsAuthProvider` 🟡 |
 | `Identity.with_last_login` | `(self, when: datetime\|None = None) -> Identity` | Copia con `last_login_at` actualizado | Invocado por `CredentialsAuthProvider.authenticate` tras login exitoso |
 
-### `domain/entities/particle.py`
+### `src/pose_app/domain/entities/particle.py`
 **Propósito**: partícula **mutable** con física de dominio puro.
 **Patrones**: Dataclass mutable (mutación intencional), Factory method, update in-place.
 
@@ -472,7 +472,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `Particle.is_alive` | `(self) -> bool` | `life > 0.01` | Filtro de `ParticlesGame._update_particles` y del renderer |
 | `Particle.create_burst` | `(cls, center_x: float, center_y: float, count: int = 20) -> list[Particle]` (classmethod) | `count` partículas aleatorias alrededor de un centro | Invocado por `ParticlesGame._spawn_particles_from_landmarks` con coordenadas de landmarks visibles |
 
-### `domain/entities/pose_landmark.py`
+### `src/pose_app/domain/entities/pose_landmark.py`
 **Propósito**: punto clave del esqueleto en coordenadas normalizadas 0-1.
 **Patrones**: Dataclass `frozen=True`, Value Object.
 
@@ -482,7 +482,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `PoseLandmark.is_visible` | `(self) -> bool` | Regla: `visibility > 0.5` | Usado por los 3 juegos y por `MediapipeAdapter` para filtrar |
 | `PoseLandmark.distance_to` | `(self, other: PoseLandmark) -> float` | Distancia euclidiana 2D (ignora `z`) | Usado por `GesturesGame._detect_greeting` y `_detect_arms_crossed` |
 
-### `domain/entities/user.py`
+### `src/pose_app/domain/entities/user.py`
 **Propósito**: perfil de usuario inmutable **sin credenciales**.
 **Patrones**: Dataclass `frozen=True`, patrón `with_*`, `default_factory` para id.
 
@@ -496,9 +496,9 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 
 ---
 
-## 5.2 `domain/events/`
+## 5.2 `src/pose_app/domain/events/`
 
-### `domain/events/base.py`
+### `src/pose_app/domain/events/base.py`
 **Propósito**: base de todos los eventos: hechos inmutables ya ocurridos.
 **Patrones**: Dataclass `frozen=True, kw_only=True`, clase base / plantilla, timestamp automático.
 
@@ -507,7 +507,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `DomainEvent` | `@dataclass(frozen=True, kw_only=True)` con `occurred_at: datetime` (auto) | Base de eventos; `kw_only` permite añadir campos sin defaults | Heredado por todos los eventos |
 | `DomainEvent.event_name` | `@property (self) -> str` | `type(self).__name__` para logging | Leído por `AsyncEventBus.publish` en sus logs |
 
-### `domain/events/game_events.py`
+### `src/pose_app/domain/events/game_events.py`
 **Propósito**: comandos que van de la API hacia los juegos.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
@@ -516,7 +516,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `GameResetRequested` | `frozen` (solo `occurred_at`) | Pide reset de partículas | 🟢 Publicado por `POST /api/v1/commands/reset-particles` → consumido por `ParticlesGame._on_reset_requested` (fija `_reset_requested=True`) |
 | `PaletteChangeRequested` | `frozen: palette_name:str` | Pide cambio de paleta | 🟢 Publicado por `POST /api/v1/commands/change-palette` → consumido por `ColorGame._on_palette_change` (fija `_pending_palette`) |
 
-### `domain/events/pose_events.py`
+### `src/pose_app/domain/events/pose_events.py`
 **Propósito**: resultado de la estimación de pose.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
@@ -526,12 +526,12 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 
 ---
 
-## 5.3 `domain/ports/`
+## 5.3 `src/pose_app/domain/ports/`
 
-### `domain/ports/__init__.py`
+### `src/pose_app/domain/ports/__init__.py`
 Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPort`, `PoseEstimatorPort` (los tres primeros, legacy). `__all__` controla la API pública.
 
-### `domain/ports/camera_port.py`
+### `src/pose_app/domain/ports/camera_port.py`
 **Propósito**: obtener frames sin saber la fuente (webcam, mock, archivo).
 **Patrones**: Puerto (ABC), Context Manager.
 
@@ -544,7 +544,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `CameraPort.is_running` | `(self) -> bool` | Estado de la cámara | 🟡 sin invocadores en producción |
 | `CameraPort.__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | `with` → `start()`/`stop()` | Tests manuales |
 
-### `domain/ports/pose_estimator_port.py`
+### `src/pose_app/domain/ports/pose_estimator_port.py`
 **Propósito**: extraer landmarks de un frame sin conocer el modelo.
 **Patrones**: Puerto (ABC), Context Manager, `close()` con default (hook no abstracto).
 
@@ -554,7 +554,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `PoseEstimatorPort.get_landmark_names` | `(self) -> list[str]` | Nombres soportados | 🟡 introspección/debug |
 | `PoseEstimatorPort.close` | `(self) -> None` | Libera modelo (no abstracto) | `__exit__` y `Container.shutdown()` |
 
-### `domain/ports/event_bus_port.py`
+### `src/pose_app/domain/ports/event_bus_port.py`
 **Propósito**: comunicación desacoplada por eventos.
 **Patrones**: Puerto (ABC), Observer pub/sub async, alias `EventHandler`.
 
@@ -563,10 +563,10 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `EventHandler` | `= Callable[[Any], Awaitable[None]]` | Firma de handler async | Usado por `AsyncEventBus` y por el `cast(...)` en `ParticlesGame.__init__` |
 | `EventBusPort.subscribe` | `(self, event_type: type[DomainEvent], handler: EventHandler) -> None` | Suscribe sin duplicar | `ParticlesGame.__init__` (`GameResetRequested`), `ColorGame.__init__` (`PaletteChangeRequested`) |
 | `EventBusPort.unsubscribe` | `(self, event_type, handler) -> None` | Desuscribe | 🟡 teardown/tests |
-| `EventBusPort.publish` | `async (self, event: DomainEvent) -> None` | Ejecuta handlers en orden; errores loggeados y continúa | 🟢 `adapters/api/routes.py` (reset + paleta) |
+| `EventBusPort.publish` | `async (self, event: DomainEvent) -> None` | Ejecuta handlers en orden; errores loggeados y continúa | 🟢 `src/pose_app/adapters/api/routes.py` (reset + paleta) |
 | `EventBusPort.clear` | `(self) -> None` | Borra suscriptores | 🟡 tests |
 
-### `domain/ports/auth_port.py`
+### `src/pose_app/domain/ports/auth_port.py`
 **Propósito**: validar credenciales → `User`.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
@@ -574,7 +574,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `AuthPort.authenticate` | `(self, username: str, password: str) -> User \| None` | `User` si válidas, `None` si no | Invocado por `POST /api/v1/auth/token` (`auth_routes.login`) |
 | `AuthPort.get_user` | `(self, username: str) -> User \| None` | Usuario sin validar password | Invocado por `dependencies.get_current_user` (usa el `sub` del JWT) |
 
-### `domain/ports/user_repository_port.py` / `identity_repository_port.py`
+### `src/pose_app/domain/ports/user_repository_port.py` / `identity_repository_port.py`
 **Propósito**: CRUD separado de **perfiles** (`User`) y **credenciales** (`Identity`) — ISP.
 **Patrones**: Puerto (ABC), Repository.
 
@@ -588,8 +588,8 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `IdentityRepositoryPort.get_by_user_id` | `(self, user_id: str) -> list[Identity]` | Credenciales de un usuario | `DELETE /users/{id}` |
 | `IdentityRepositoryPort.create / update / delete` | como arriba | CRUD de credenciales | `json_bootstrap`, `change_my_password`, `authenticate` (last_login) |
 
-### 🔴 `domain/ports/render_port.py` (LEGACY)
-**Propósito**: puertos de render antiguos segregados por juego. Sustituidos por `domain/ports/render/`.
+### 🔴 `src/pose_app/domain/ports/render_port.py` (LEGACY)
+**Propósito**: puertos de render antiguos segregados por juego. Sustituidos por `src/pose_app/domain/ports/render/`.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
@@ -598,7 +598,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `ColorRenderPort.render_background` | `(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None` | Fondo + esqueleto | 🟢 `ColorGame.run_async` y `GesturesGame.run_async` |
 | `LandmarkAwareRenderPort.update_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | Guarda landmarks para el próximo render | `ParticlesGame._render_legacy` vía `isinstance(...)` |
 
-### 🟢 `domain/ports/render/` (nueva arquitectura)
+### 🟢 `src/pose_app/domain/ports/render/` (nueva arquitectura)
 
 | Archivo | Objetos | Firmas clave | Quién lo invoca |
 |---|---|---|---|
@@ -606,16 +606,16 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `particles_render_port.py` | `ParticlesRenderPort` | `set_particles(particles: list[Particle])`, `render_particles()`, `close()` | `set_particles` por `ParticlesGame._render_new`; `render_particles` por el SceneManager |
 | `hud_render_port.py` | `HudRenderPort` | `set_hud(score:int, rounds:int, timer:float, extra:dict[str,str]\|None)`, `render_hud()`, `close()` | `render_hud` por SceneManager; `set_hud` 🟡 (juegos futuros) |
 | `overlay_port.py` | `OverlayPort` | `draw(surface: Any, landmarks: list[PoseLandmark]\|None)`, `close()` | `PygameSceneManager.render_frame`; implementado por `PoseOverlay`, `FpsOverlay` |
-| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_new`; registros en `app/plugins/particles_plugin.py` |
+| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_new`; registros en `src/pose_app/app/plugins/particles_plugin.py` |
 | `__init__.py` | reexports | `__all__` con los 5 | `from domain.ports.render import ...` |
 
 **Patrones comunes**: puerto (ABC), capacidad componible, patrón declarar→ejecutar (`set_*` + `render_*`), Composite (SceneManager).
 
 ---
 
-## 5.4 `domain/state/` y `domain/plugins/`
+## 5.4 `src/pose_app/domain/state/` y `src/pose_app/domain/plugins/`
 
-### `domain/state/game_state_port.py`
+### `src/pose_app/domain/state/game_state_port.py`
 **Propósito**: contrato de estado consultable de cada juego (API/monitoring), thread-safe.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
@@ -624,17 +624,17 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `GameStatePort.snapshot` | `@abstractmethod (self) -> dict[str, Any]` | Copia serializable JSON | `StateRegistry.snapshot_all()` → `GET /api/v1/state` |
 | `GameStatePort.stats` | `@abstractmethod (self) -> dict[str, Any]` | Estadísticas ligeras | `StateRegistry.stats_all()` → `GET /api/v1/stats` |
 
-### `domain/state/snapshot.py`
+### `src/pose_app/domain/state/snapshot.py`
 `AppSnapshot` (dataclass mutable, DTO) con `games`, `active_games`, `captured_at` y `to_dict() -> dict[str, Any]`. 🟡 El agregado real lo arma `StateRegistry.snapshot_all()`.
 
-### `domain/plugins/game_plugin.py`
+### `src/pose_app/domain/plugins/game_plugin.py`
 **Propósito**: contrato de plugin (fábrica) y contrato estructural del juego.
 **Patrones**: ABC (`GamePlugin`), **Protocol** (`GameProtocol`), Abstract Factory, `TYPE_CHECKING` para evitar ciclos.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
 | `GameProtocol.state` | `@property (self) -> GameStatePort` | Estado del juego | Leído por `Container.create_game` → `state_registry.register(game.state)` |
-| `GameProtocol.run_async` | `async (self, should_stop: Callable[[], bool] \| None = None) -> None` | Loop principal | Ejecutado por `app/main.py` (`asyncio.create_task`) |
+| `GameProtocol.run_async` | `async (self, should_stop: Callable[[], bool] \| None = None) -> None` | Loop principal | Ejecutado por `src/pose_app/app/main.py` (`asyncio.create_task`) |
 | `GamePlugin.game_id / display_name` | `@property @abstractmethod -> str` | Clave del registro / nombre legible | Clave de `PluginRegistry._plugins`, logs |
 | `GamePlugin.description` | `@property (self) -> str` | Default `""` (no abstracto) | 🟡 informativo |
 | `GamePlugin.create_state` | `@abstractmethod (self) -> GameStatePort` | Crea estado inicial | Tests (`test_builtin_plugins`) |
@@ -642,9 +642,9 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 
 ---
 
-## 5.5 `domain/games/`
+## 5.5 `src/pose_app/domain/games/`
 
-### `domain/games/particles/state.py` — `ParticlesState`
+### `src/pose_app/domain/games/particles/state.py` — `ParticlesState`
 **Patrones**: implementa `GameStatePort`, thread-safe (`Lock`), snapshot DTO.
 
 | Método | Firma | Responsabilidad | Valores / proveniencia |
@@ -657,7 +657,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `snapshot` | `(self) -> dict[str, Any]` | `particles_count`, `particles_sample` (máx 10), `frame_count`, `landmarks_count` | 🟢 `GET /api/v1/state` |
 | `stats` | `(self) -> dict[str, Any]` | `particles_active`, `frames_processed` | 🟢 `GET /api/v1/stats` |
 
-### `domain/games/particles/main.py` — `ParticlesGame`
+### `src/pose_app/domain/games/particles/main.py` — `ParticlesGame`
 **Patrones**: Observer (EventBus), Strategy (ruta legacy vs nueva), DI, Template Method (loop async).
 
 | Método | Firma (tipado) | Responsabilidad | Valores / proveniencia |
@@ -665,7 +665,7 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `__init__` | `(self, camera: CameraPort, pose_estimator: PoseEstimatorPort, state: ParticlesState, event_bus: EventBusPort, renderer: legacy.ParticlesRenderPort\|None = None, scene: ScenePort\|None = None, particles_capability: new.ParticlesRenderPort\|None = None, gravity: float = 0.1, burst_count: int = 5, max_particles: int = 2000) -> None` | Inyecta dependencias, decide ruta (`_use_new_render = scene is not None`), suscribe `GameResetRequested` | Creado por `ParticlesPlugin.create_game` |
 | `state` | `@property -> ParticlesState` | Estado | `GameProtocol.state` |
 | `_on_reset_requested` | `async (self, event: GameResetRequested) -> None` | `_reset_requested = True` | Invocado por `AsyncEventBus.publish` |
-| `run_async` | `(self, should_stop: Callable[[], bool] \| None = None) -> Awaitable[None]` | Loop: reset → frame → pose → spawn → update → render → sleep | 🟢 `app/main.py` (`asyncio.create_task`) |
+| `run_async` | `(self, should_stop: Callable[[], bool] \| None = None) -> Awaitable[None]` | Loop: reset → frame → pose → spawn → update → render → sleep | 🟢 `src/pose_app/app/main.py` (`asyncio.create_task`) |
 | `reset` | `(self) -> None` | Reinicio público | 🟡 comandos/tests |
 | `_render_new` | `async (self, landmarks) -> bool` | `set_particles` + `scene.render_frame(landmarks)` | Por `run_async` si `_use_new_render` |
 | `_render_legacy` | `async (self, landmarks) -> bool` | `update_landmarks` (si aplica) + `render_particles` | Por `run_async` si no |
@@ -673,10 +673,10 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `_update_particles` | `(self) -> None` | **Muta** `_particles` (`update` + filtra `is_alive`) | Por `run_async` |
 | `_reset_particles` | `(self) -> None` | `_particles.clear()` | Por `run_async` y `reset()` |
 
-### `domain/games/color/state.py` — `ColorState`
+### `src/pose_app/domain/games/color/state.py` — `ColorState`
 Thread-safe. Métodos: `game_id -> "color"`, `update_color(color: RGBColor)` (por `_calculate_color`), `update_palette(str)` (por el handler de evento), `update_pose(list[PoseLandmark])`, `increment_frames()`, `snapshot()` (`background_color` hex, `current_palette`, `frame_count`, `landmarks_count`), `stats()`.
 
-### `domain/games/color/main.py` — `ColorGame`
+### `src/pose_app/domain/games/color/main.py` — `ColorGame`
 **Patrones**: Strategy (paletas), Observer, DI, Template Method.
 
 | Elemento | Detalle | Proveniencia |
@@ -684,21 +684,21 @@ Thread-safe. Métodos: `game_id -> "color"`, `update_color(color: RGBColor)` (po
 | `PALETTES: dict[str, list[RGBColor]]` | `fire`, `ocean`, `forest`, `neon` | Constante de clase; usada por `__init__` y `_on_palette_change` |
 | `__init__(camera, pose_estimator, renderer: ColorRenderPort, state, event_bus, palette_name="fire")` | Valida paleta, **suscribe** `PaletteChangeRequested` | `ColorPlugin.create_game` |
 | `_on_palette_change(event)` | **Modifica** `_pending_palette` si es válida | `AsyncEventBus.publish` |
-| `run_async(should_stop)` | **Modifica** `_palette_name`, `_palette`, `_frame_count`; llama `state.update_pose/increment_frames/update_color` y `renderer.render_background(color, landmarks)` | `app/main.py` |
+| `run_async(should_stop)` | **Modifica** `_palette_name`, `_palette`, `_frame_count`; llama `state.update_pose/increment_frames/update_color` y `renderer.render_background(color, landmarks)` | `src/pose_app/app/main.py` |
 | `_calculate_color(landmarks) -> RGBColor` | Interpola según posición de muñeca/nariz | Por `run_async` |
 | `_find(landmarks, name) -> PoseLandmark \| None` | Búsqueda case-insensitive | Por `_calculate_color` |
 
-### `domain/games/gestures/state.py` — `GesturesState`
+### `src/pose_app/domain/games/gestures/state.py` — `GesturesState`
 Thread-safe. `update_active_gestures(newly_activated: set[Gesture], currently_active: set[Gesture])` **muta** `_active_gestures` e **incrementa** `_activation_counts[g]` (invocado por `GesturesGame._process_frame`); `increment_frames()`; `snapshot()` (`active_gestures`, `activation_counts`, `frame_count`); `stats()`.
 
-### `domain/games/gestures/main.py` — `GesturesGame`
+### `src/pose_app/domain/games/gestures/main.py` — `GesturesGame`
 **Patrones**: Strategy (mapa de detectores), **máquina de estados** (frames consecutivos + activo), Template Method, DI.
 
 | Elemento | Detalle | Proveniencia |
 |---|---|---|
 | Constantes | `MIN_FRAMES_TO_ACTIVATE=8`, `UP_MARGIN=0.05`, `GREETING_MAX_DISTANCE=0.15`, `CROSSED_ARMS_MAX_DISTANCE=0.2`, `SQUAT_MAX_KNEE_ANGLE=130.0`, `ONE_LEG_MARGIN=0.03` | Reglas de negocio; usadas por los `_detect_*` |
 | `__init__(camera, pose_estimator, renderer: ColorRenderPort, state, event_bus)` | Inyecta; crea `_consecutive_frames: dict[Gesture,int]` y `_active: set[Gesture]` | `GesturesPlugin.create_game` |
-| `run_async(should_stop)` | Loop + `state.increment_frames()` + `render_background(RGBColor(20,20,30), landmarks)` | `app/main.py` |
+| `run_async(should_stop)` | Loop + `state.increment_frames()` + `render_background(RGBColor(20,20,30), landmarks)` | `src/pose_app/app/main.py` |
 | `_process_frame(landmarks)` | **Muta** `_consecutive_frames` y `_active`; genera `newly_activated` → `state.update_active_gestures(...)` | Por `run_async` |
 | `_detectors` | `dict[Gesture, Callable[[list[PoseLandmark]], bool]]` con 6 detectores | Por `_process_frame` |
 | `_detect_hand_up / _detect_greeting / _detect_arms_crossed / _detect_t_pose / _detect_squat / _detect_one_leg_balance` | `(self, landmarks: list[PoseLandmark]) -> bool` — reglas geométricas | Por `_detectors` |
@@ -708,9 +708,9 @@ Thread-safe. `update_active_gestures(newly_activated: set[Gesture], currently_ac
 
 ---
 
-## 5.6 `app/`
+## 5.6 `src/pose_app/app/`
 
-### `app/main.py`
+### `src/pose_app/app/main.py`
 **Propósito**: entry point async; orquesta arranco, tareas y shutdown ordenado.
 **Patrones**: Entry Point, Composition Root, Graceful Shutdown, mapeo de errores → exit codes.
 
@@ -720,12 +720,12 @@ Thread-safe. `update_active_gestures(newly_activated: set[Gesture], currently_ac
 | `main_async` | `() -> Awaitable[int]` | Settings → logger → `Container` → señales → juego/API → shutdown; devuelve código de salida | Llamado por `main()` vía `asyncio.run` |
 | `main` | `() -> int` | Captura `KeyboardInterrupt` (130) y fallos fatales (1) | `sys.exit(main())` en `__main__` |
 
-### `app/game_context.py`
+### `src/pose_app/app/game_context.py`
 `@dataclass(frozen=True) GameContext` con `camera: CameraPort`, `pose_estimator: PoseEstimatorPort`, `event_bus: EventBusPort`, `settings: Settings`.
 **Patrones**: Context Object (DI), dataclass inmutable.
 Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(context)`.
 
-### `app/plugin_registry.py`
+### `src/pose_app/app/plugin_registry.py`
 **Patrones**: Registry, thread-safe (`Lock`), Factory Lookup.
 
 | Método | Firma | Responsabilidad | Proveniencia |
@@ -737,7 +737,7 @@ Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(cont
 | `all` | `(self) -> dict[str, GamePlugin]` | Copia segura | 🟡 |
 | `clear` | `(self) -> None` | Vacia (tests) | 🟡 |
 
-### `app/state_registry.py`
+### `src/pose_app/app/state_registry.py`
 **Patrones**: Registry thread-safe, read-model/projection.
 
 | Método | Firma | Responsabilidad | Proveniencia |
@@ -751,13 +751,13 @@ Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(cont
 ### `docs/state_contract.md`
 Documento vivo (sin código ejecutable) que lista qué keys publica cada juego y qué comandos soporta. Referencia, no se importa.
 
-### `app/plugins/game_plugin.py` — eliminado (nota histórica)
-Los plugins importan de `domain/plugins/game_plugin.py`, que es la **única fuente del contrato**. La copia `app/plugins/game_plugin.py` fue eliminada por ser huérfana (0 imports).
+### `src/pose_app/app/plugins/game_plugin.py` — eliminado (nota histórica)
+Los plugins importan de `src/pose_app/domain/plugins/game_plugin.py`, que es la **única fuente del contrato**. La copia `src/pose_app/app/plugins/game_plugin.py` fue eliminada por ser huérfana (0 imports).
 
-### `app/plugins/__init__.py`
+### `src/pose_app/app/plugins/__init__.py`
 `register_builtin_plugins(registry: PluginRegistry) -> None`: registra `ColorPlugin`, `GesturesPlugin`, `ParticlesPlugin` (imports locales para evitar ciclos). Invocado por `Container.plugin_registry` (lazy, primera vez).
 
-### `app/plugins/particles_plugin.py` — `ParticlesPlugin` 🟢 nueva arquitectura
+### `src/pose_app/app/plugins/particles_plugin.py` — `ParticlesPlugin` 🟢 nueva arquitectura
 **Patrones**: Plugin, Factory Method, Composition (capacidades + overlays).
 
 | Método | Firma | Responsabilidad | Proveniencia |
@@ -766,17 +766,17 @@ Los plugins importan de `domain/plugins/game_plugin.py`, que es la **única fuen
 | `create_state` | `(self) -> GameStatePort` | `ParticlesState()` | Contrato/tests |
 | `create_game` | `(self, context: GameContext) -> GameProtocol` | Crea `PygameParticlesRenderer` (+`_initialize` con try/except), overlays si `RENDER_DEBUG_OVERLAY` (`PoseOverlay`, `FpsOverlay`), `PygameSceneManager(surface, capabilities, overlays)`, y devuelve `ParticlesGame(renderer=None, scene=..., particles_capability=..., gravity=..., burst_count=..., max_particles=...)` desde `settings.game.*` | 🟢 `Container.create_game()` |
 
-### `app/plugins/color_plugin.py` — `ColorPlugin` 🔴 legacy
+### `src/pose_app/app/plugins/color_plugin.py` — `ColorPlugin` 🔴 legacy
 `create_game(context)` → `_create_renderer(context)`: `RENDER_PROVIDER=mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter`; si `debug_overlay` y es `PygameBaseAdapter`, envuelve con **`PoseDebugOverlay`** (Decorator). `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(...)`.
 
-### `app/plugins/gestures_plugin.py` — `GesturesPlugin` 🔴 legacy
+### `src/pose_app/app/plugins/gestures_plugin.py` — `GesturesPlugin` 🔴 legacy
 Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter(title="Gestures Game")`. Devuelve `GesturesGame(camera, pose_estimator, renderer, state, event_bus)`.
 
 ---
 
-## 5.7 `config/`
+## 5.7 `src/pose_app/config/`
 
-### `config/settings.py`
+### `src/pose_app/config/settings.py`
 **Propósito**: configuración central con `pydantic-settings` (`.env` + env vars con prefijos).
 **Patrones**: Singleton (`get_settings`), Configuration Object, validación Pydantic, Environment-based Config.
 
@@ -793,15 +793,15 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 
 | Función | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
-| `get_settings` | `() -> Settings` | Singleton (crea `Settings()` la primera vez) | `app/main.py`, y cualquier módulo que necesite config |
+| `get_settings` | `() -> Settings` | Singleton (crea `Settings()` la primera vez) | `src/pose_app/app/main.py`, y cualquier módulo que necesite config |
 | `reset_settings` | `() -> None` | `_settings = None` | 🟡 tests |
 | `_settings` | `Settings \| None` | Estado global del singleton | Escrito por los dos anteriores |
 
 ---
 
-## 5.8 `adapters/api/`
+## 5.8 `src/pose_app/adapters/api/`
 
-### `adapters/api/fastapi_adapter.py` — `FastAPIAdapter`
+### `src/pose_app/adapters/api/fastapi_adapter.py` — `FastAPIAdapter`
 **Patrones**: Adapter, Composition Root (`app.state` como contenedor), Facade.
 
 | Método | Firma | Responsabilidad | Proveniencia |
@@ -809,11 +809,11 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 | `__init__` | `(self, settings: Settings, event_bus: EventBusPort, registry: StateRegistry) -> None` | Guarda deps y llama `_build_app()` | `Container.api` (lazy) y tests con `TestClient` |
 | `_build_app` | `(self) -> FastAPI` | CORS, **pobla `app.state`** (`settings`, `user_repository`, `identity_repository`, `auth_adapter`, `jwt_service`) con `bootstrap_from_json("data/users.json")`, monta routers | Por `__init__` |
 | `app` | `@property -> FastAPI` | Expone la app | `TestClient(adapter.app)`, `uvicorn` |
-| `serve` | `async (self) -> None` | `uvicorn.Server` con host/puerto de settings | `app/main.py` (task `api`) |
+| `serve` | `async (self) -> None` | `uvicorn.Server` con host/puerto de settings | `src/pose_app/app/main.py` (task `api`) |
 | `shutdown` | `async (self) -> None` | `server.should_exit = True` | `main_async` y `Container.shutdown` |
 | `root` | handler `GET /` | `{"name","docs"}` (oculto de OpenAPI) | curl |
 
-### `adapters/api/routes.py`
+### `src/pose_app/adapters/api/routes.py`
 **Patrones**: Adapter de entrada (HTTP → dominio), factory de router, Publisher de eventos.
 
 | Handler | Firma | Ruta HTTP | Valores / proveniencia |
@@ -826,7 +826,7 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 | `reset_particles` | `async () -> CommandResponse` | `POST /api/v1/commands/reset-particles` | `event_bus.publish(GameResetRequested())` → juego |
 | `change_palette` | `async (request: ChangePaletteRequest) -> CommandResponse` | `POST /api/v1/commands/change-palette` | `event_bus.publish(PaletteChangeRequested(palette_name=...))` → juego |
 
-### `adapters/api/dependencies.py`
+### `src/pose_app/adapters/api/dependencies.py`
 **Patrones**: Dependency Injection (FastAPI `Depends`), Guard de autorización, Facade sobre `app.state`.
 
 | Objeto | Firma | Responsabilidad | Proveniencia |
@@ -837,13 +837,13 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 | `CurrentUser` | `Annotated[User, Depends(get_current_user)]` | Alias inyectable | `GET /state`, `/me` |
 | `require_admin / AdminUser` | `(user: CurrentUser) -> User` | 403 si `not user.is_admin()` | CRUD `/users` |
 
-### `adapters/api/auth_routes.py`
+### `src/pose_app/adapters/api/auth_routes.py`
 | Handler | Ruta | Responsabilidad |
 |---|---|---|
 | `login` | `POST /api/v1/auth/token` (form OAuth2) | `auth.authenticate(...)` → 401 o `jwt_service.create_access_token(user)` → `{access_token, token_type: "bearer"}` |
 | `read_current_user` | `GET /api/v1/auth/me` (JWT) | `{username, full_name, roles}` |
 
-### `adapters/api/user_routes.py`
+### `src/pose_app/adapters/api/user_routes.py`
 **Patrones**: DTO mapping (`_user_to_response`), guard admin, `with_*` sobre entidades inmutables.
 **Orden importante**: los handlers `/me` van **antes** de `/{user_id}`.
 
@@ -859,17 +859,17 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 | `update_user` | `PATCH /api/v1/users/{user_id}` (admin) | 400 si se auto-quita `admin`/se deshabilita |
 | `delete_user` | `DELETE /api/v1/users/{user_id}` (admin, 204) | Borra identidades y luego usuario |
 
-### `adapters/api/user_schemas.py`
+### `src/pose_app/adapters/api/user_schemas.py`
 DTOs pydantic: `UserCreateRequest` (username `^[a-z][a-z0-9_]*$` 3-50, password 8-128), `UserUpdateRequest`, `PasswordChangeRequest`, `UserResponse`, `MessageResponse`.
 
-### `adapters/api/schemas.py`
+### `src/pose_app/adapters/api/schemas.py`
 DTOs de estado/health: `LandmarkSchema`, `ParticleSchema`, `StatsSchema`, `PoseSchema`, `ParticlesSchema`, `StateSnapshotSchema`, `HealthSchema`, `ChangePaletteRequest` (`Literal["fire","ocean","forest","neon"]`), `CommandResponse`.
 
-*(Existe `adapters/api/fastapi_adapter.back.py` 🔴: backup ignorado por git, no importar.)*
+*(Existe `src/pose_app/adapters/api/fastapi_adapter.back.py` 🔴: backup ignorado por git, no importar.)*
 
 ---
 
-## 5.9 `adapters/auth/`
+## 5.9 `src/pose_app/adapters/auth/`
 
 ### `credentials_auth_provider.py` — `CredentialsAuthProvider(AuthPort)`
 **Patrones**: Adapter, Strategy (proveedor intercambiable), inyección de repositorios.
@@ -900,7 +900,7 @@ Thread-safe; doble índice `_by_provider[(provider, id)]` y `_by_user_id`. Misma
 
 ---
 
-## 5.10 `adapters/camera/`, `adapters/pose/`, `adapters/mock/`
+## 5.10 `src/pose_app/adapters/camera/`, `src/pose_app/adapters/pose/`, `src/pose_app/adapters/mock/`
 
 ### `camera/webcam_adapter.py` — `WebcamAdapter(CameraPort)`
 **Patrones**: Adapter, Context Manager, RAII (`__del__`), `Lock` para el buffer.
@@ -947,7 +947,7 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 
 ---
 
-## 5.11 `adapters/render/`
+## 5.11 `src/pose_app/adapters/render/`
 
 ### 🔴 `pygame_base.py` — `PygameBaseAdapter`
 **Propósito**: base común de ventana pygame (no es un puerto; es detalle).
@@ -1012,18 +1012,18 @@ Creado por `ColorPlugin._create_renderer` cuando `RENDER_DEBUG_OVERLAY=true`.
 
 ---
 
-## 5.12 `infrastructure/`
+## 5.12 `src/pose_app/infrastructure/`
 
 ### `di/container.py` — `Container`
 **Patrones**: DI Container / Service Locator, Factory Method, Lazy Initialization, Context Manager.
 
 | Miembro | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
-| `__init__` | `(self, settings: Settings) -> None` | Slots a `None` | `app/main.py` |
+| `__init__` | `(self, settings: Settings) -> None` | Slots a `None` | `src/pose_app/app/main.py` |
 | `camera / pose_estimator / event_bus / state_registry / plugin_registry / api` | `@property` lazy | Construyen en primera acceso | `create_game()`, `main_async` |
 | `_create_camera` | `(self) -> CameraPort` | `ENVIRONMENT=testing` → Mock; si no `WebcamAdapter`; `ConfigurationError` si falla | por `camera` |
 | `_create_pose_estimator` | `(self) -> PoseEstimatorPort` | `POSE_PROVIDER` → Mock/Mediapipe; `ConfigurationError` si desconocido | por `pose_estimator` |
-| `create_game` | `(self) -> GameProtocol` | plugin → `GameContext` → `plugin.create_game` → `state_registry.register(game.state)` | 🟢 `app/main.py` |
+| `create_game` | `(self) -> GameProtocol` | plugin → `GameContext` → `plugin.create_game` → `state_registry.register(game.state)` | 🟢 `src/pose_app/app/main.py` |
 | `shutdown` | `async (self) -> None` | api → cámara → pose (con try/except y log) | `finally` de `main_async` |
 | `__enter__ / __exit__` | — | `with Container(...)` → shutdown | Tests |
 
@@ -1038,7 +1038,7 @@ AppError(Exception)                     ← message + context
 │   ├── PoseEstimationError             ← SKIP (omite frame)
 │   └── RenderError                     ← FATAL
 └── DomainError                         ← reglas de negocio
-TokenError(AppError)  (definida en infrastructure/auth/jwt_service.py)
+TokenError(AppError)  (definida en src/pose_app/infrastructure/auth/jwt_service.py)
 ```
 
 `AppError.__init__(message, *, context: dict | None = None)` y `__str__` → `"msg | context={...}"`.
@@ -1062,7 +1062,7 @@ TokenError(AppError)  (definida en infrastructure/auth/jwt_service.py)
 | `clear` | `(self) -> None` | Vacia | Tests |
 
 ### `lifecycle/app_runner.py` — `AppRunner` 🔴 huérfano
-`_setup_signal_handlers`, `_handle_signal`, `should_shutdown()`, `run(target: Callable[[], None]) -> int`. **Nadie lo instancia**: el ciclo de vida real está en `app/main.py`.
+`_setup_signal_handlers`, `_handle_signal`, `should_shutdown()`, `run(target: Callable[[], None]) -> int`. **Nadie lo instancia**: el ciclo de vida real está en `src/pose_app/app/main.py`.
 
 ### `logging/logger.py`
 | Objeto | Firma | Responsabilidad | Proveniencia |
@@ -1070,7 +1070,7 @@ TokenError(AppError)  (definida en infrastructure/auth/jwt_service.py)
 | `JSONFormatter.format` | `(self, record) -> str` | Log JSON (para `LOG_FORMAT=json`) | `setup_logger` |
 | `ConsoleFormatter.format` | `(self, record) -> str` | `[HH:MM:SS.mmm] LEVEL logger \| msg` con color ANSI | `setup_logger` |
 | `MaxLevelFilter / MinLevelFilter` | `.filter(record) -> bool` | Filtran por nivel (Min se usa en `errors.log`) | `setup_logger` |
-| `setup_logger` | `(settings: LoggingSettings) -> logging.Logger` | Configura raíz `pose_ar`, handlers consola+archivos, crea `logs/` | 🟢 `app/main.py` |
+| `setup_logger` | `(settings: LoggingSettings) -> logging.Logger` | Configura raíz `pose_ar`, handlers consola+archivos, crea `logs/` | 🟢 `src/pose_app/app/main.py` |
 | `get_logger` | `(name: str) -> logging.Logger` | Logger hijo `pose_ar.<name>` | 🟢 casi todos los módulos |
 
 ### `auth/jwt_service.py` — `JWTService`
@@ -1128,7 +1128,7 @@ TokenError(AppError)  (definida en infrastructure/auth/jwt_service.py)
 
 ### `scripts/check_coverage.py`
 **Propósito**: gate de cobertura **por capa** sobre `coverage.xml`.
-- `COVERAGE_THRESHOLDS: dict[str, float]` → `domain/entities` 90, `domain/state` 90, `config` 90, `domain/games` 70, `domain/ports` 70, `domain/plugins` 70, `adapters/mock` 75, `domain/events` 60, `app` 55, `adapters/{camera,pose,api}` 55, `infrastructure` 45, `adapters/render` 40.
+- `COVERAGE_THRESHOLDS: dict[str, float]` → `src/pose_app/domain/entities` 90, `src/pose_app/domain/state` 90, `config` 90, `src/pose_app/domain/games` 70, `src/pose_app/domain/ports` 70, `src/pose_app/domain/plugins` 70, `src/pose_app/adapters/mock` 75, `src/pose_app/domain/events` 60, `app` 55, `src/pose_app/adapters/{camera,pose,api}` 55, `infrastructure` 45, `src/pose_app/adapters/render` 40.
 - `GLOBAL_THRESHOLD = 60.0` (coincide con `fail_under` de `pyproject.toml`).
 - Funciones: `parse_coverage_xml(xml_path: Path) -> dict[str, dict[str, float]]`, `check_thresholds(folder_stats) -> int`, `main() -> int`. Se ejecuta en el hook **pre-push**.
 
@@ -1171,7 +1171,7 @@ Pinning para instalación sin `uv` (generados con `uv export`). `requirements-de
 ### `opencode.json`
 Config del agente opencode: `instructions` (docs inyectados) + matriz de permisos (`deny` para `rm`, `git reset`, `git push`; `ask` para `git commit`, `mv`, `cp`).
 
-### `AGENST.md` ⚠️ (nombre real del archivo)
+### `AGENTS.md`
 Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **zonas prohibidas** (`data/`, `.env`, `logs/`, coverage, `uv.lock`, `*.back`); **zonas restringidas** (renombrar/eliminar, romper interfaces, añadir deps → preguntar); flujo obligatorio de 6 pasos para tareas multi-archivo (resumir → listar ≤4 archivos → pasos → dudas → **detenerse**); tipado estricto moderno; pytest antes y después de cada cambio.
 
 ---
@@ -1180,9 +1180,9 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 | Patrón | Dónde vive | En una frase |
 |---|---|---|
-| **Puerto / Adaptador** (Hexagonal) | `domain/ports/*` ↔ `adapters/*` | El dominio define interfaces; el exterior las implementa. |
+| **Puerto / Adaptador** (Hexagonal) | `src/pose_app/domain/ports/*` ↔ `src/pose_app/adapters/*` | El dominio define interfaces; el exterior las implementa. |
 | **Dependency Injection** | `Container`, `GameContext`, constructores de juegos | Nadie instancia sus dependencias: se las entregan. |
-| **Composition Root** | `app/main.py`, `FastAPIAdapter._build_app`, plugins | Un único lugar ensambla todo. |
+| **Composition Root** | `src/pose_app/app/main.py`, `FastAPIAdapter._build_app`, plugins | Un único lugar ensambla todo. |
 | **Abstract Factory** | `GamePlugin.create_game/create_state` | Una fábrica que crea familias completas (juego + estado). |
 | **Strategy** | `_create_renderer` (elige mock/pygame), `_detectors` (elige regla de gesto) | El algoritmo se intercambia en tiempo de construcción. |
 | **Observer / Pub-Sub** | `EventBusPort` + `AsyncEventBus` | API y juegos no se conocen: hablan por eventos. |
@@ -1195,9 +1195,9 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | **Singleton** | `get_settings()` | Una única instancia de configuración por proceso. |
 | **DTO / Anti-corruption layer** | `*_schemas.py`, `_user_to_response` | Los tipos HTTP nunca se cuelan en el dominio. |
 | **Protocol (duck typing tipado)** | `GameProtocol`, `PygameRenderable` | Contrato estructural sin herencia. |
-| **Spy / Mock (Test Double)** | `adapters/mock/*` | Dobles deterministas con contadores para asserts. |
+| **Spy / Mock (Test Double)** | `src/pose_app/adapters/mock/*` | Dobles deterministas con contadores para asserts. |
 | **Context Manager** | Cámaras, renderers, `Container` | `with X()` garantiza `start/stop` o `close`. |
-| **Graceful Shutdown** | `app/main.py` | Señales → espera 5 s → cancel → `finally` cleanup. |
+| **Graceful Shutdown** | `src/pose_app/app/main.py` | Señales → espera 5 s → cancel → `finally` cleanup. |
 
 ---
 
@@ -1205,7 +1205,7 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 **Primer día**:
 1. `uv sync --extra dev` y luego `uv run pytest -v` (debe estar verde).
-2. Lee `AGENST.md`, `docs/ports_contract.md`, `docs/directory_structure.md`.
+2. Lee `AGENTS.md`, `docs/ports_contract.md`, `docs/directory_structure.md`.
 3. Levanta un juego demo: `GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app.main`.
 4. Consulta el estado: `curl http://localhost:8000/api/v1/state`.
 
@@ -1216,18 +1216,18 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | Qué añades | Qué debes tocar |
 |---|---|
 | Archivo en una carpeta existente | Solo el archivo + sus tests (verifica con `check_structure.py` si es estructural) |
-| Puerto nuevo | `domain/ports/...` + `docs/ports_contract.md` (versión/changelog) + adaptador + tests |
-| Juego nuevo | `domain/games/<id>/` + `app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/adding_a_game_plugin.md` |
+| Puerto nuevo | `src/pose_app/domain/ports/...` + `docs/ports_contract.md` (versión/changelog) + adaptador + tests |
+| Juego nuevo | `src/pose_app/domain/games/<id>/` + `src/pose_app/app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/adding_a_game_plugin.md` |
 | Setting nuevo | sub-clase de `Settings` + `.env.example` + `tests/unit/test_settings.py` |
-| Evento nuevo | `domain/events/...` + publicador + suscriptor + `docs/ports_contract.md` |
+| Evento nuevo | `src/pose_app/domain/events/...` + publicador + suscriptor + `docs/ports_contract.md` |
 | Endpoint nuevo | router + schema + (¿auth?) + test de integración |
 
 **Errores más comunes al empezar**:
-1. Importar el `ColorRenderPort`/`ParticlesRenderPort` equivocado (hay dos: legacy en `domain/ports/render_port.py`, nuevo en `domain/ports/render/`).
+1. Importar el `ColorRenderPort`/`ParticlesRenderPort` equivocado (hay dos: legacy en `src/pose_app/domain/ports/render_port.py`, nuevo en `src/pose_app/domain/ports/render/`).
 2. Mutar el estado sin el `Lock` (rompe `GET /state`).
 3. Llamar código bloqueante (pygame/cv2/mediapipe) sin `asyncio.to_thread`.
 4. Olvidar el `finally` con `close()`/`stop()` en un loop nuevo.
-5. Asumir que `domain/` puede importar de `adapters/` (no puede).
+5. Asumir que `src/pose_app/domain/` puede importar de `src/pose_app/adapters/` (no puede).
 
 ---
 

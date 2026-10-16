@@ -237,10 +237,10 @@ import pygame
 from fastapi import APIRouter
 
 # 3. first-party (del proyecto)
-from adapters.render.pygame_base import PygameBaseAdapter
-from domain.entities.particle import Particle
-from domain.ports.render_port import ParticlesRenderPort
-from infrastructure.logging.logger import get_logger
+from pose_app.adapters.render.pygame_base import PygameBaseAdapter
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.ports.render_port import ParticlesRenderPort
+from pose_app.infrastructure.logging.logger import get_logger
 ```
 
 **Cada archivo tiene**:
@@ -265,8 +265,8 @@ from __future__ import annotations  # opcional, solo si hay ciclos de tipos
 
 from dataclasses import dataclass
 
-from domain.entities.particle import Particle
-from infrastructure.logging.logger import get_logger
+from pose_app.domain.entities.particle import Particle
+from pose_app.infrastructure.logging.logger import get_logger
 
 logger = get_logger("modulo.submodulo")
 
