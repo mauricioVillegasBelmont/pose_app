@@ -120,9 +120,16 @@ class TestEnsureModel:
         return MediapipeAdapter.__new__(MediapipeAdapter)
 
     def test_ensure_model_returns_existing_path(
-        self, bare: MediapipeAdapter, monkeypatch: pytest.MonkeyPatch
+        self, bare: MediapipeAdapter, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """Si el modelo ya existe, no intenta descargarlo."""
+        # 1. Redirigimos PROJECT_ROOT al directorio temporal del test
+        monkeypatch.setattr(mediapipe_module, "PROJECT_ROOT", tmp_path)
+
+        # 2. Pre-creamos la estructura y el archivo falso para simular que ya existe
+        model_dir = tmp_path / "src/pose_app/adapters/pose/models"
+        model_dir.mkdir(parents=True, exist_ok=True)
+        (model_dir / "pose_landmarker_full.task").write_bytes(b"fake-model")
 
         def fail_download(_url: str, _filename: str) -> None:
             raise AssertionError("no debería descargar")
@@ -130,9 +137,7 @@ class TestEnsureModel:
         monkeypatch.setattr(
             mediapipe_module.urllib.request, "urlretrieve", fail_download
         )
-
         path = bare._ensure_model()
-
         assert path.endswith("pose_landmarker_full.task")
         assert Path(path).exists()
 
@@ -140,11 +145,9 @@ class TestEnsureModel:
         self, bare: MediapipeAdapter, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """Si el modelo falta, lo descarga desde MODEL_URL."""
-        monkeypatch.setattr(
-            mediapipe_module,
-            "Path",
-            lambda *_args, **_kwargs: tmp_path / "mediapipe_adapter.py",
-        )
+        # Redirigimos PROJECT_ROOT al directorio temporal del test
+        monkeypatch.setattr(mediapipe_module, "PROJECT_ROOT", tmp_path)
+
         downloads: list[tuple[str, str]] = []
 
         def fake_urlretrieve(url: str, filename: str) -> None:
@@ -154,9 +157,7 @@ class TestEnsureModel:
         monkeypatch.setattr(
             mediapipe_module.urllib.request, "urlretrieve", fake_urlretrieve
         )
-
         path = bare._ensure_model()
-
         assert Path(path).exists()
         assert downloads[0][0] == MediapipeAdapter.MODEL_URL
 
@@ -164,11 +165,8 @@ class TestEnsureModel:
         self, bare: MediapipeAdapter, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         """Un fallo de red produce RuntimeError con contexto de descarga."""
-        monkeypatch.setattr(
-            mediapipe_module,
-            "Path",
-            lambda *_args, **_kwargs: tmp_path / "mediapipe_adapter.py",
-        )
+        # Redirigimos PROJECT_ROOT al directorio temporal del test
+        monkeypatch.setattr(mediapipe_module, "PROJECT_ROOT", tmp_path)
 
         def fail_download(_url: str, _filename: str) -> None:
             raise OSError("network down")
@@ -176,7 +174,6 @@ class TestEnsureModel:
         monkeypatch.setattr(
             mediapipe_module.urllib.request, "urlretrieve", fail_download
         )
-
         with pytest.raises(RuntimeError, match="No se pudo descargar"):
             bare._ensure_model()
 
