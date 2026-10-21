@@ -99,7 +99,7 @@ class ParticlesPlugin(GamePlugin):
             target_fps=render_cfg.target_fps,
         )
 
-        # sprite_config = None
+        sprite_config = None
         asset_loader = AssetLoader()
         sprite_config = asset_loader.load_sprite_config(
             category="particles",

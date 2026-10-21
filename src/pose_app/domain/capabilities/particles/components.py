@@ -31,6 +31,8 @@ class Appearance:
 
     size: float = 5.0
     color: tuple[int, int, int] = (255, 255, 255)
+    padding_x: float = 0.0
+    padding_y: float = 0.0
 
 
 @dataclass(frozen=True)

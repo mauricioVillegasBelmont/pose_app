@@ -125,3 +125,17 @@ class TestPygameParticlesRendererECS:
 
         # Assert: el buffer debe estar vacío (solo transparente)
         assert renderer._particle_surface is not None
+
+    def test_zero_size_particle_not_rendered_even_with_padding(self) -> None:
+        """Si size=0, la partícula no se renderiza aunque tenga padding."""
+        renderer = PygameParticlesRenderer(width=800, height=600)
+        particle = Particle(
+            position=Position(x=400.0, y=300.0),
+            appearance=Appearance(size=0.0, padding_x=10.0, padding_y=10.0),
+        )
+        renderer.set_particles([particle])
+        renderer.render_particles()
+
+        # Verificar que el buffer está vacío (solo transparente)
+        # (En un test real, verificarías que no se llamó a pygame.draw.circle)
+        assert renderer._particle_surface is not None

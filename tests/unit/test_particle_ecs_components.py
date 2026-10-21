@@ -134,6 +134,28 @@ class TestParticleEntity:
         assert particle.is_alive() is False
 
 
+class TestAppearanceComponents:
+    """El componente Appearance define la representación visual."""
+
+    def test_appearance_is_frozen(self) -> None:
+        """Appearance es inmutable."""
+        app = Appearance(size=10.0, color=(255, 0, 0))
+        with pytest.raises(AttributeError):
+            app.size = 20.0  # type: ignore[misc]
+
+    def test_appearance_accepts_padding(self) -> None:
+        """Appearance puede tener padding_x y padding_y para margen visual."""
+        app = Appearance(size=20.0, color=(255, 0, 0), padding_x=5.0, padding_y=10.0)
+        assert app.padding_x == 5.0
+        assert app.padding_y == 10.0
+
+    def test_appearance_padding_defaults_to_zero(self) -> None:
+        """Por defecto, padding es 0 para mantener retrocompatibilidad."""
+        app = Appearance()
+        assert app.padding_x == 0.0
+        assert app.padding_y == 0.0
+
+
 class TestLifespanInvariants:
     """El contrato del componente debe ser imposible de violar."""
 

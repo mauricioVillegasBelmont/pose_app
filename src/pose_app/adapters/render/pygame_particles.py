@@ -128,17 +128,21 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
             return
 
         for particle in particles:
-            # 1. Si tiene sprite, dibujar sprite
+            # BLINDAJE: Solo dibujar sprite si AMBOS componentes existen explícitamente
             if particle.sprite_config is not None and particle.sprite_state is not None:
                 self._draw_sprite(particle)
-            # 2. Si solo tiene Appearance, dibujar círculo (fallback)
+            # FALLBACK: Si no hay sprite, pero sí apariencia, dibujar círculo
             elif particle.appearance is not None:
                 self._draw_circle(particle)
 
     def _draw_circle(self, particle: Particle) -> None:
         """Dibuja una partícula como círculo (fallback)."""
+
         if self._particle_surface is None:
             return
+
+        if particle.appearance.size <= 0:
+            return  # No renderizar si el tamaño base es 0
 
         # Calcular alpha basado en lifespan
         alpha = 255
@@ -146,10 +150,18 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
             life_ratio = particle.lifespan.current_life / particle.lifespan.max_life
             alpha = int(255 * life_ratio)
 
-        size = int(particle.appearance.size)
-        if size < 1:
-            return
+        # ==========================================
+        # CÁLCULO DE TAMAÑO VISUAL (incluye padding)
+        # ==========================================
+        visual_size = (
+            particle.appearance.size
+            + particle.appearance.padding_x
+            + particle.appearance.padding_y
+        )
+        radius = int(visual_size / 2)
 
+        if radius < 1:
+            return
         color = (
             min(255, max(0, particle.appearance.color[0])),
             min(255, max(0, particle.appearance.color[1])),
@@ -163,22 +175,36 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         if self._mirror:
             x = self.width - x
 
-        # Culling
-        if x < -size or x > self.width + size or y < -size or y > self.height + size:
+        # Culling (no dibujar si está fuera de pantalla)
+        if (
+            x < -radius
+            or x > self.width + radius
+            or y < -radius
+            or y > self.height + radius
+        ):
             return
 
-        # mypy ahora sabe que self._particle_surface es pygame.Surface
-        pygame.draw.circle(self._particle_surface, color, (x, y), size)
+        pygame.draw.circle(self._particle_surface, color, (x, y), radius)
 
     def _draw_sprite(self, particle: Particle) -> None:
         """Dibuja una partícula como sprite (estático o animado)."""
+
         if self._particle_surface is None:
             return
 
-        # 1. Guard clauses para satisfacer a mypy
         config = particle.sprite_config
         state = particle.sprite_state
 
+        if config is None or state is None:
+            return
+
+        # ==========================================
+        # VALIDACIÓN SEMÁNTICA: size debe ser > 0
+        # ==========================================
+        if particle.appearance.size <= 0:
+            return  # No renderizar si el tamaño base es 0
+
+        # BLINDAJE EXTRA
         if config is None or state is None:
             return
 
@@ -189,15 +215,14 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         image = cache["image"]
         frames = cache["frames"]
 
-        # 2. Obtener coordenadas del frame actual
+        # Obtener coordenadas del frame actual
         frame_coords = frames.get(state.current_frame)
         if frame_coords is None:
-            # Fallback: si no hay JSON, asumir que es un sprite estático
             frame_coords = (0, 0, int(config.frame_width), int(config.frame_height))
 
         fx, fy, fw, fh = frame_coords
 
-        # 3. Crear subsurface del frame
+        # Crear subsurface del frame
         try:
             frame_surface = image.subsurface((fx, fy, fw, fh))
         except ValueError:
@@ -206,25 +231,35 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
             )
             return
 
-        # 4. Escalar si es necesario
-        if fw != int(config.frame_width) or fh != int(config.frame_height):
+        # ==========================================
+        # ESCALADO VISUAL (tamaño base + padding)
+        # ==========================================
+        target_width = int(particle.appearance.size + particle.appearance.padding_x)
+        target_height = int(particle.appearance.size + particle.appearance.padding_y)
+
+        if target_width < 1 or target_height < 1:
+            return
+
+        if fw != target_width or fh != target_height:
             frame_surface = pygame.transform.scale(
-                frame_surface, (int(config.frame_width), int(config.frame_height))
+                frame_surface, (target_width, target_height)
             )
 
-        # 5. Posición de destino (centrada en la partícula)
-        x = int(particle.position.x - config.frame_width / 2)
-        y = int(particle.position.y - config.frame_height / 2)
+        # ==========================================
+        # POSICIÓN: Centrar en las coordenadas de la partícula
+        # ==========================================
+        x = int(particle.position.x - target_width / 2)
+        y = int(particle.position.y - target_height / 2)
 
         if self._mirror:
-            x = self.width - x - int(config.frame_width)
+            x = self.width - x - target_width
 
-        # 6. Alpha basado en lifespan
+        # Alpha basado en lifespan
         if particle.lifespan is not None:
             life_ratio = particle.lifespan.current_life / particle.lifespan.max_life
             frame_surface.set_alpha(int(255 * life_ratio))
 
-        # 7. Dibujar (mypy sabe que self._particle_surface es Surface)
+        # Dibujar
         self._particle_surface.blit(frame_surface, (x, y))
 
     def _on_resize(self, new_size: tuple[int, int]) -> None:
