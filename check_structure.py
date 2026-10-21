@@ -55,7 +55,6 @@ REQUIRED_FILES = [
     # Adaptadores
     "src/pose_app/adapters/camera/webcam_adapter.py",
     "src/pose_app/adapters/pose/mediapipe_adapter.py",
-    "src/pose_app/adapters/render/pygame_particles_adapter.py",
     "src/pose_app/adapters/render/pygame_color_adapter.py",
     "src/pose_app/adapters/render/pygame_base.py",
     "src/pose_app/adapters/render/pygame_color.py",
@@ -127,7 +126,6 @@ def check_imports() -> bool:
         ("pose_app.app.game_context", "GameContext"),
         ("pose_app.app.plugin_registry", "PluginRegistry"),
         ("pose_app.app.state_registry", "StateRegistry"),
-        ("pose_app.adapters.render.pygame_particles_adapter", "PygameParticlesAdapter"),
         ("pose_app.adapters.render.pygame_color_adapter", "PygameColorAdapter"),
         ("pose_app.adapters.render.decorators.pose_debug_overlay", "PoseDebugOverlay"),
         ("pose_app.adapters.mock.mock_render", "MockParticlesRenderAdapter"),

@@ -4,6 +4,11 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from pose_app.domain.capabilities.particles.components import (
+    Appearance,
+    Position,
+)
+
 # ==========================================
 # detect_collisions
 # ==========================================
@@ -17,7 +22,17 @@ from pose_app.domain.games.particles.geometry import (
 
 def _make_particle(x: float, y: float) -> Particle:
     """Helper para crear partículas de prueba."""
-    return Particle(x=x, y=y, vx=0.0, vy=0.0, size=20.0, life=1.0)
+    return Particle(
+        position=Position(
+            x=x,
+            y=y,
+            vx=0.0,
+            vy=0.0,
+        ),
+        appearance=Appearance(
+            size=20.0,
+        ),
+    )
 
 
 def _make_landmark(
@@ -300,7 +315,7 @@ class TestDetectCollisionsBehavior:
         )
         assert hits == 2
         assert len(remaining) == 1
-        assert remaining[0].x == 700
+        assert remaining[0].position.x == 700
 
     def test_multiple_hands_one_particle_counts_once(self) -> None:
         """Si 2 manos tocan la misma partícula, cuenta 1 vez."""

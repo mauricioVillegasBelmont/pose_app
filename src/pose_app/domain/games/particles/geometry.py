@@ -130,7 +130,7 @@ def detect_collisions(
     landmark de toque visible es menor que `hit_radius`.
 
     Args:
-        particles: partículas activas (coordenadas en píxeles).
+        particles: partículas activas (coordenadas en píxeles, estructura ECS-lite).
         landmarks: landmarks de pose (coordenadas normalizadas).
         screen_width: ancho de pantalla (para convertir landmarks).
         screen_height: alto de pantalla (para convertir landmarks).
@@ -149,6 +149,7 @@ def detect_collisions(
         - Cada partícula cuenta como máximo 1 vez.
         - Si no hay landmarks de toque visibles, no hay colisiones.
         - Orden de `partículas_no_tocadas` preserva el orden original.
+        - Accede a particle.position.x, particle.position.y (ECS-lite).
     """
     if screen_width <= 0:
         raise ValueError(f"screen_width debe ser > 0, recibido: {screen_width}")
@@ -174,7 +175,8 @@ def detect_collisions(
     for particle in particles:
         touched = False
         for hx, hy in hand_positions_px:
-            distance = math.hypot(particle.x - hx, particle.y - hy)
+            # Acceso a componentes ECS-lite
+            distance = math.hypot(particle.position.x - hx, particle.position.y - hy)
             if distance < hit_radius:
                 touched = True
                 break

@@ -15,6 +15,8 @@ import random
 import time
 from collections.abc import Callable
 
+from pose_app.domain.capabilities.particles.components import SpriteConfig
+from pose_app.domain.capabilities.particles.systems import AnimationSystem
 from pose_app.domain.entities.particle import Particle
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
@@ -63,6 +65,8 @@ class ParticlesGame:
         particle_min_distance: float = 0.15,
         particle_size: float = 20.0,
         particle_color: tuple[int, int, int] = (255, 200, 50),
+        animation_system: AnimationSystem | None = None,
+        sprite_config: SpriteConfig | None = None,
     ) -> None:
         """
         Inicializa el juego.
@@ -111,6 +115,9 @@ class ParticlesGame:
         self._current_round: int = 1
         self._time_remaining: float = time_per_round
         self._frame_count: int = 0
+
+        self._animation_system = animation_system or AnimationSystem()
+        self._sprite_config = sprite_config
 
     @property
     def state(self) -> ParticlesState:
@@ -200,6 +207,7 @@ class ParticlesGame:
             min_distance=self._particle_min_distance,
             particle_size=self._particle_size,
             particle_color=self._particle_color,
+            sprite_config=self._sprite_config,
         )
 
         self._time_remaining = self._time_per_round
@@ -212,6 +220,9 @@ class ParticlesGame:
 
     def _update_logic(self, landmarks: list[PoseLandmark], dt: float) -> None:
         """Actualiza la lógica del juego para este frame."""
+        # 0. Animar sprites (NUEVO)
+        self._animation_system.update(self._particles, dt)
+
         # 1. Detectar colisiones
         remaining, hits = detect_collisions(
             particles=self._particles,

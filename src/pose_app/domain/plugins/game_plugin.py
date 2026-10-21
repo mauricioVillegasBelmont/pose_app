@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Protocol
 from pose_app.domain.state.game_state_port import GameStatePort
 
 if TYPE_CHECKING:
-    from app.game_context import GameContext
+    from pose_app.app.game_context import GameContext
 
 
 class GameProtocol(Protocol):
