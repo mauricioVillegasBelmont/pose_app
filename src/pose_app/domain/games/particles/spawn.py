@@ -1,5 +1,5 @@
 """
-Generación de partículas del juego.
+Generación de partículas del juego con componentes ECS-lite.
 
 Algoritmo de spawn con restricciones geométricas:
 - Todas dentro del Workspace.
@@ -11,6 +11,13 @@ Algoritmo de spawn con restricciones geométricas:
 import math
 import random
 
+from pose_app.domain.capabilities.particles.components import (
+    Appearance,
+    CollisionProfile,
+    Position,
+    SpriteConfig,
+    SpriteState,
+)
 from pose_app.domain.entities.particle import Particle
 from pose_app.domain.games.particles.geometry import Workspace
 
@@ -25,9 +32,10 @@ def spawn_particles(
     particle_size: float = 20.0,
     particle_color: tuple[int, int, int] = (255, 200, 50),
     max_attempts_per_particle: int = 20,
+    sprite_config: SpriteConfig | None = None,
 ) -> list[Particle]:
     """
-    Genera hasta `count` partículas dentro del workspace.
+    Genera hasta `count` partículas dentro del workspace con componentes ECS-lite.
 
     Intenta colocar cada partícula respetando una distancia mínima
     normalizada con las ya colocadas. Si tras `max_attempts_per_particle`
@@ -56,9 +64,10 @@ def spawn_particles(
     Contrato:
         - Todas las partículas están dentro del workspace.
         - Ninguna está a menos de `min_distance` normalizado de otra.
-        - Partículas tienen velocidad inicial 0.
-        - Partículas tienen vida 1.0.
+        - Partículas tienen velocidad inicial 0 (estáticas).
+        - Partículas son infinitas (sin componente Lifespan).
         - Coordenadas en píxeles.
+        - Cada partícula tiene CollisionProfile con radius = size / 2.
     """
     if count < 0:
         raise ValueError(f"count debe ser >= 0, recibido: {count}")
@@ -76,14 +85,15 @@ def spawn_particles(
 
     for _ in range(count):
         placed = False
+
         for _attempt in range(max_attempts_per_particle):
             nx, ny = workspace.random_point(rng)
 
+            # Verificar distancia mínima con partículas existentes
             too_close = False
             for existing in particles:
-                ex_norm = existing.x / screen_width
-                ey_norm = existing.y / screen_height
-
+                ex_norm = existing.position.x / screen_width
+                ey_norm = existing.position.y / screen_height
                 dx = nx - ex_norm
                 dy = ny - ey_norm
                 distance = math.hypot(dx, dy)
@@ -95,20 +105,34 @@ def spawn_particles(
             if too_close:
                 continue
 
+            # Crear partícula con componentes ECS-lite
             particle = Particle(
-                x=nx * screen_width,
-                y=ny * screen_height,
-                vx=0.0,
-                vy=0.0,
-                size=particle_size,
-                life=1.0,
-                color=particle_color,
+                position=Position(
+                    x=nx * screen_width,
+                    y=ny * screen_height,
+                    vx=0.0,
+                    vy=0.0,
+                ),
+                appearance=Appearance(
+                    size=particle_size,
+                    color=particle_color,
+                ),
+                collision=CollisionProfile(
+                    radius=particle_size / 2.0,
+                    behavior="destroy",
+                ),
+                sprite_config=sprite_config,
+                sprite_state=SpriteState(current_frame=0, elapsed_time=0.0)
+                if sprite_config
+                else None,
             )
+
             particles.append(particle)
             placed = True
             break
 
         if not placed:
+            # No se pudo colocar esta partícula, dejar de intentar
             break
 
     return particles

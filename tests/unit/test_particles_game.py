@@ -9,6 +9,10 @@ from unittest.mock import Mock
 
 import pytest
 
+from pose_app.domain.capabilities.particles.components import (
+    Appearance,
+    Position,
+)
 from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.domain.ports.render.color_render_port import ColorRenderPort
@@ -115,7 +119,14 @@ class TestParticlesGameLogic:
         initial_score = game.state.get_score()
 
         # Coloca una partícula en el centro
-        game._particles = [Particle(x=400, y=300, life=1.0)]
+        game._particles = [
+            Particle(
+                position=Position(x=400, y=300),
+                appearance=Appearance(
+                    size=20.0,
+                ),
+            )
+        ]
 
         landmarks = [
             PoseLandmark(x=0.5, y=0.5, z=0.0, visibility=1.0, name="left_wrist")

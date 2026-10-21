@@ -107,8 +107,8 @@ class TestSpawnParticlesBehavior:
         )
 
         for p in particles:
-            nx = p.x / 800
-            ny = p.y / 600
+            nx = p.position.x / 800
+            ny = p.position.y / 600
             assert ws.contains(nx, ny), f"Partícula fuera: ({nx}, {ny})"
 
     def test_particles_respect_min_distance(self) -> None:
@@ -127,8 +127,8 @@ class TestSpawnParticlesBehavior:
         # Verificar pairwise
         for i, p1 in enumerate(particles):
             for p2 in particles[i + 1 :]:
-                nx1, ny1 = p1.x / 800, p1.y / 600
-                nx2, ny2 = p2.x / 800, p2.y / 600
+                nx1, ny1 = p1.position.x / 800, p1.position.y / 600
+                nx2, ny2 = p2.position.x / 800, p2.position.y / 600
                 distance = ((nx1 - nx2) ** 2 + (ny1 - ny2) ** 2) ** 0.5
                 assert (
                     distance >= min_dist
@@ -146,11 +146,11 @@ class TestSpawnParticlesBehavior:
         )
 
         for p in particles:
-            assert p.vx == 0.0
-            assert p.vy == 0.0
-            assert p.life == 1.0
-            assert p.size == 20.0
-            assert p.color == (255, 200, 50)
+            assert p.position.vx == 0.0
+            assert p.position.vy == 0.0
+            assert p.lifespan is None
+            assert p.appearance.size == 20.0
+            assert p.appearance.color == (255, 200, 50)
 
     def test_custom_particle_params(self) -> None:
         """Se respetan los parámetros custom."""
@@ -166,8 +166,8 @@ class TestSpawnParticlesBehavior:
         )
 
         assert len(particles) == 1
-        assert particles[0].size == 50.0
-        assert particles[0].color == (255, 0, 0)
+        assert particles[0].appearance.size == 50.0
+        assert particles[0].appearance.color == (255, 0, 0)
 
     def test_deterministic_with_seed(self) -> None:
         """Con la misma seed, resultado idéntico."""
@@ -188,8 +188,8 @@ class TestSpawnParticlesBehavior:
         )
 
         for p1, p2 in zip(particles1, particles2, strict=True):
-            assert p1.x == p2.x
-            assert p1.y == p2.y
+            assert p1.position.x == p2.position.x
+            assert p1.position.y == p2.position.y
 
 
 class TestSpawnParticlesSaturation:
@@ -247,6 +247,6 @@ class TestSpawnParticlesProperties:
         )
 
         for p in particles:
-            nx = p.x / 800
-            ny = p.y / 600
+            nx = p.position.x / 800
+            ny = p.position.y / 600
             assert ws.contains(nx, ny)

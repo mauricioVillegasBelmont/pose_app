@@ -1,5 +1,4 @@
 import urllib.request
-from pathlib import Path
 from typing import ClassVar
 
 import cv2
@@ -9,6 +8,7 @@ import numpy as np
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
 from pose_app.infrastructure.logging.logger import get_logger
+from pose_app.infrastructure.paths import PROJECT_ROOT
 
 logger = get_logger("adapters.pose.mediapipe_adapter")
 
@@ -122,7 +122,7 @@ class MediapipeAdapter(PoseEstimatorPort):
 
     def _ensure_model(self) -> str:
         """Verifica si el archivo del modelo existe; si no, lo descarga automáticamente."""
-        model_dir = Path(__file__).parent / "models"
+        model_dir = PROJECT_ROOT / "src/pose_app/adapters/pose/models"
         model_dir.mkdir(parents=True, exist_ok=True)
         model_path = model_dir / "pose_landmarker_full.task"
 

@@ -6,21 +6,8 @@ solo que se pueden instanciar y que implementan correctamente.
 """
 
 from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
-from pose_app.adapters.render.pygame_particles_adapter import PygameParticlesAdapter
 from pose_app.domain.entities.pose_landmark import PoseLandmark
-from pose_app.domain.ports.render_port import ColorRenderPort, ParticlesRenderPort
-
-
-def test_pygame_particles_adapter_implements_port():
-    """Verifica que PygameParticlesAdapter cumpla ParticlesRenderPort."""
-    adapter = PygameParticlesAdapter(width=320, height=240, title="Test")
-
-    assert isinstance(adapter, ParticlesRenderPort)
-    assert callable(adapter.render_particles)
-    assert callable(adapter.show)
-    assert callable(adapter.close)
-
-    # NO llamamos a close() aquí porque inicializaría Pygame
+from pose_app.domain.ports.render_port import ColorRenderPort
 
 
 def test_pygame_color_adapter_implements_port():
