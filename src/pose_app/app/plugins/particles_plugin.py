@@ -34,9 +34,7 @@ class ParticlesPlugin(GamePlugin):
         return ParticlesState()
 
     def create_game(self, context: GameContext) -> GameProtocol:
-        """Construye el juego con SceneManager + capacidades."""
-        import pygame
-
+        """Construye el juego con SceneManager + capacidades + overlays."""
         from pose_app.adapters.render.pygame_color import PygameColorRenderer
         from pose_app.adapters.render.pygame_hud import PygameHudRenderer
         from pose_app.adapters.render.pygame_particles import PygameParticlesRenderer
@@ -44,14 +42,17 @@ class ParticlesPlugin(GamePlugin):
 
         settings = context.settings
         render_cfg = settings.render
-        # game_cfg = settings.game
 
-        # 1. Capacidades (la primera crea la ventana)
+        # Leer mirror del config
+        mirror = render_cfg.mirror
+
+        # 1. Capacidades
         color_capability = PygameColorRenderer(
             width=render_cfg.width,
             height=render_cfg.height,
             title=render_cfg.title,
             target_fps=render_cfg.target_fps,
+            # color NO se espeja
         )
         color_capability._initialize()
 
@@ -60,6 +61,7 @@ class ParticlesPlugin(GamePlugin):
             height=render_cfg.height,
             title="Particles",
             target_fps=render_cfg.target_fps,
+            mirror=mirror,  # ← AÑADIR
         )
 
         hud_capability = PygameHudRenderer(
@@ -67,16 +69,22 @@ class ParticlesPlugin(GamePlugin):
             height=render_cfg.height,
             title="HUD",
             target_fps=render_cfg.target_fps,
+            # HUD NO se espeja
         )
 
-        # 2. Overlays (debug)
+        # 2. Overlays
         overlays: list = []
         if render_cfg.debug_overlay:
             from pose_app.adapters.render.overlays.fps_overlay import FpsOverlay
             from pose_app.adapters.render.overlays.pose_overlay import PoseOverlay
 
-            overlays.append(PoseOverlay())
-            overlays.append(FpsOverlay())
+            overlays.append(
+                PoseOverlay(mirror=mirror)  # ← AÑADIR
+            )
+            overlays.append(
+                FpsOverlay()
+                # FPS NO se espeja
+            )
 
         # 3. SceneManager
         scene = PygameSceneManager(
@@ -89,8 +97,6 @@ class ParticlesPlugin(GamePlugin):
             overlays=overlays,
             target_fps=render_cfg.target_fps,
         )
-
-        pygame.display.set_caption("Particles Game")
 
         # 4. Juego
         return ParticlesGame(

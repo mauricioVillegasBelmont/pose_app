@@ -75,6 +75,15 @@ class RenderSettings(BaseSettings):
         description="Activar overlay de pose para debug",
     )
 
+    mirror: bool = Field(
+        default=False,
+        description=(
+            "Espejo horizontal (selfie mode). Aplica a capas de contenido "
+            "(partículas, esqueleto de pose). NO afecta a HUD ni FPS. "
+            "Se aplica DESPUÉS de Mediapipe (no altera la detección)."
+        ),
+    )
+
     width: int = Field(default=800, ge=320, le=3840)
     height: int = Field(default=600, ge=240, le=2160)
     title: str = Field(default="Pose AR App")

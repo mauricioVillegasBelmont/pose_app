@@ -24,6 +24,7 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         height: int = 600,
         title: str = "Particles",
         target_fps: int = 60,
+        mirror: bool = False,
     ) -> None:
         PygameBaseAdapter.__init__(
             self,
@@ -35,6 +36,7 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
 
         self._particle_surface: pygame.Surface | None = None
         self._particles: list[Particle] = []
+        self._mirror = mirror
 
     def set_particles(self, particles: list[Particle]) -> None:
         """
@@ -104,8 +106,11 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
                 alpha,
             )
 
-            x = int(particle.x)
             y = int(particle.y)
+            x = particle.x
+            if self._mirror:
+                x = self.width - x
+            x = int(x)
 
             if x < -size or x > self.width + size:
                 continue
