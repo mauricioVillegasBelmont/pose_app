@@ -19,6 +19,7 @@ Si algo contradice estos documentos, **detente y pregunta**.
 ## 📚 Documentación de apoyo
 
 1. `docs/directory_structure.md` — Estrucutra actual del proyecto.
+2. `docs/particles_ecs_system.md` — Entidades / Particulas.
 
 ---
 
