@@ -111,7 +111,7 @@ class GesturesGame:
 
                 # Render (fondo + esqueleto)
                 try:
-                    from domain.entities.color import RGBColor
+                    from pose_app.domain.entities.color import RGBColor
 
                     await asyncio.to_thread(
                         self._renderer.render_background,
