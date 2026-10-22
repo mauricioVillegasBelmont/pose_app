@@ -5,12 +5,12 @@ Valida que la detección de colisiones funcione con la nueva estructura.
 
 import pytest
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Position,
 )
-from pose_app.domain.entities.particle import Particle
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
     detect_collisions,

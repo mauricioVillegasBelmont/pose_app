@@ -6,7 +6,7 @@ Actúa como un contenedor de componentes, delegando la lógica a los sistemas.
 import uuid
 from dataclasses import dataclass, field
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Lifespan,

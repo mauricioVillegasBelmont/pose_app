@@ -6,19 +6,19 @@ Son tests puramente numéricos: no requieren pygame, cámara, pose ni render.
 
 import pytest
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     Appearance,
     Lifespan,
     Position,
     SpriteConfig,
     SpriteState,
 )
-from pose_app.domain.capabilities.particles.systems import (
+from pose_app.domain.entities.particles.systems import (
     AnimationSystem,
     LifespanSystem,
     MovementSystem,
 )
-from pose_app.domain.entities.particle import Particle
 
 
 def make_particle(

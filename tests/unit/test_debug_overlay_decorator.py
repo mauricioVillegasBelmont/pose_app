@@ -7,8 +7,8 @@ se prueba en tests/integration con Pygame real.
 from unittest.mock import Mock
 
 from pose_app.adapters.render.decorators.pose_debug_overlay import PoseDebugOverlay
-from pose_app.domain.capabilities.particles.components import Appearance, Position
 from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import Appearance, Position
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 
 

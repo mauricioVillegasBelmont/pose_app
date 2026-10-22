@@ -69,7 +69,7 @@ Los componentes son **dataclasses** que representan datos puros. Se dividen en i
 ### Ejemplo: crear una partícula
 
 ```python
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Lifespan,
@@ -189,9 +189,8 @@ class AnimationSystem:
 
                 if config.animation_mode == "loop":
                     state.current_frame = (
-                        (state.current_frame + frames_to_advance)
-                        % config.frame_count
-                    )
+                        state.current_frame + frames_to_advance
+                    ) % config.frame_count
                 elif config.animation_mode == "one_shot":
                     state.current_frame = min(
                         state.current_frame + frames_to_advance,
@@ -381,6 +380,7 @@ Cada componente y sistema tiene tests aislados:
 def test_lifespan_fresh_starts_at_max() -> None:
     life = Lifespan.fresh(8.0)
     assert life.current_life == life.max_life == 8.0
+
 
 def test_lifespan_rejects_negative_current() -> None:
     with pytest.raises(ValueError, match="must be in"):

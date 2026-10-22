@@ -6,7 +6,7 @@ Lee metadatos de sprites (JSON) y construye configuraciones de dominio.
 import json
 from pathlib import Path
 
-from pose_app.domain.capabilities.particles.components import SpriteConfig
+from pose_app.domain.entities.particles.components import SpriteConfig
 from pose_app.infrastructure.assets.sprite_sheet_parser import SpriteSheetParser
 from pose_app.infrastructure.logging.logger import get_logger
 from pose_app.infrastructure.paths import ASSETS_DIR

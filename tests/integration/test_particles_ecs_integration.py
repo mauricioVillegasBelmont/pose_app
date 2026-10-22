@@ -5,15 +5,15 @@ Test de integración: simula un frame completo con sprite animado.
 import pygame
 
 from pose_app.adapters.render.pygame_particles import PygameParticlesRenderer
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Position,
     SpriteConfig,
     SpriteState,
 )
-from pose_app.domain.capabilities.particles.systems import AnimationSystem
-from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.systems import AnimationSystem
 
 
 def test_frame_with_animated_sprite() -> None:

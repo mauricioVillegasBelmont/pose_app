@@ -9,10 +9,10 @@ from pathlib import Path
 import pygame
 
 from pose_app.adapters.render.pygame_base import PygameBaseAdapter
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     SpriteConfig,
 )
-from pose_app.domain.entities.particle import Particle
 from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
 from pose_app.infrastructure.assets.sprite_sheet_parser import SpriteSheetParser
 from pose_app.infrastructure.logging.logger import get_logger

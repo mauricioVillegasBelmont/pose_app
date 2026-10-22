@@ -4,15 +4,14 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pose_app.domain.capabilities.particles.components import (
-    Appearance,
-    Position,
-)
-
 # ==========================================
 # detect_collisions
 # ==========================================
 from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
+    Appearance,
+    Position,
+)
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
     Workspace,

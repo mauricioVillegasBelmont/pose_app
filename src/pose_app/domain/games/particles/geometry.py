@@ -24,8 +24,12 @@ TOUCH_LANDMARKS: frozenset[str] = frozenset(
     {
         "left_wrist",
         "right_wrist",
+        "left_pinky",
+        "right_pinky",
         "left_index",
         "right_index",
+        "left_thumb",
+        "right_thumb",
     }
 )
 """

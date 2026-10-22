@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particles.components import (
     Appearance,
     Position,
 )

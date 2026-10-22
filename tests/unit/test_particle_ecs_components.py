@@ -6,7 +6,8 @@ from dataclasses import replace
 
 import pytest
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Lifespan,
@@ -14,7 +15,6 @@ from pose_app.domain.capabilities.particles.components import (
     SpriteConfig,
     SpriteState,
 )
-from pose_app.domain.entities.particle import Particle
 
 
 class TestPositionComponent:

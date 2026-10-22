@@ -11,14 +11,14 @@ Algoritmo de spawn con restricciones geométricas:
 import math
 import random
 
-from pose_app.domain.capabilities.particles.components import (
+from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import (
     Appearance,
     CollisionProfile,
     Position,
     SpriteConfig,
     SpriteState,
 )
-from pose_app.domain.entities.particle import Particle
 from pose_app.domain.games.particles.geometry import Workspace
 
 

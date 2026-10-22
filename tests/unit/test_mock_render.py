@@ -11,9 +11,9 @@ from pose_app.adapters.mock.mock_render import (
     MockColorRenderAdapter,
     MockParticlesRenderAdapter,
 )
-from pose_app.domain.capabilities.particles.components import Appearance, Position
 from pose_app.domain.entities.color import RGBColor
 from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import Appearance, Position
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.ports.render_port import (
     ColorRenderPort,

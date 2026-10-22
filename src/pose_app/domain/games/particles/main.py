@@ -15,9 +15,9 @@ import random
 import time
 from collections.abc import Callable
 
-from pose_app.domain.capabilities.particles.components import SpriteConfig
-from pose_app.domain.capabilities.particles.systems import AnimationSystem
 from pose_app.domain.entities.particle import Particle
+from pose_app.domain.entities.particles.components import SpriteConfig
+from pose_app.domain.entities.particles.systems import AnimationSystem
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
     Workspace,
