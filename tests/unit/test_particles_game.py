@@ -15,6 +15,7 @@ from pose_app.domain.entities.particles.components import (
 )
 from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
+from pose_app.domain.ports.pose_interaction_port import PoseInteractionPort
 from pose_app.domain.ports.render.color_render_port import ColorRenderPort
 from pose_app.domain.ports.render.hud_render_port import HudRenderPort
 from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
@@ -48,7 +49,7 @@ def game() -> ParticlesGame:
         camera=Mock(),
         pose_estimator=Mock(),
         scene=MockScene(),
-        # <--- CORRECCIÓN: Usar Mock() genérico para evitar errores de métodos faltantes
+        pose_interaction=Mock(spec=PoseInteractionPort),
         particles_capability=Mock(spec=ParticlesRenderPort),
         color_capability=Mock(spec=ColorRenderPort),
         hud_capability=Mock(spec=HudRenderPort),
@@ -133,6 +134,9 @@ class TestParticlesGameLogic:
         ]
 
         game._update_logic(landmarks, dt=0.016)
+
+        # <--- AÑADIR ESTA LÍNEA: Simular que la fachada detecta una colisión
+        game._pose_interaction.is_touching.return_value = True
 
         # La partícula fue tocada → ronda completada → score aumentó
         assert game.state.get_score() == initial_score + 1
