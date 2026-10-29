@@ -34,7 +34,7 @@ class ColorPlugin(GamePlugin):
 
     def create_game(self, context: GameContext) -> GameProtocol:
         renderer = self._create_renderer(context)
-        palette_name = context.settings.game.palette
+        palette_name = context.gameplay_config.game_options.get("palette", "fire")
         state = ColorState(palette_name=palette_name)
 
         return ColorGame(

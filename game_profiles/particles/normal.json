@@ -1,0 +1,15 @@
+{
+  "pose_smoothing_factor": 0.3,
+  "game_options": {
+    "max_score": 10,
+    "time_per_round": 10.0,
+    "hit_radius": 30.0,
+    "particle_size": 20.0,
+    "particle_color": [255, 200, 50],
+    "particle_min_distance": 0.15,
+    "gravity": 0.1,
+    "burst_count": 5,
+    "max_particles": 2000,
+    "palette": "fire"
+  }
+}

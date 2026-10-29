@@ -44,7 +44,14 @@ class ParticlesPlugin(GamePlugin):
 
         settings = context.settings
         render_cfg = settings.render
-        pose_interaction = PoseInteractionFacade(smoothing_factor=0.3)
+        _pose_cfg = settings.pose
+
+        profile_config = context.gameplay_config
+        opts = profile_config.game_options
+
+        pose_interaction = PoseInteractionFacade(
+            smoothing_factor=profile_config.pose_smoothing_factor
+        )
 
         sprite_config = None
         asset_loader = AssetLoader()
@@ -124,4 +131,9 @@ class ParticlesPlugin(GamePlugin):
             screen_width=render_cfg.width,
             screen_height=render_cfg.height,
             sprite_config=sprite_config,
+            max_score=opts.get("max_score", 10),
+            time_per_round=opts.get("time_per_round", 10.0),
+            hit_radius=opts.get("hit_radius", 30.0),
+            particle_size=opts.get("particle_size", 20.0),
+            particle_color=tuple(opts.get("particle_color", [255, 200, 50])),
         )
