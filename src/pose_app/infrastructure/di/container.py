@@ -19,6 +19,7 @@ from pose_app.app.game_context import GameContext
 from pose_app.app.plugin_registry import PluginRegistry
 from pose_app.app.plugins import register_builtin_plugins
 from pose_app.app.state_registry import StateRegistry
+from pose_app.config.game_profile import GameProfileConfig
 from pose_app.config.settings import Settings
 from pose_app.domain.plugins.game_plugin import GameProtocol
 from pose_app.domain.ports.camera_port import CameraPort
@@ -141,7 +142,7 @@ class Container:
     # Fábrica de juegos (delegada al plugin)
     # ==========================================
 
-    def create_game(self) -> GameProtocol:
+    def create_game(self, gameplay_config: "GameProfileConfig") -> GameProtocol:
         """
         Crea el juego configurado usando el plugin correspondiente.
 
@@ -161,6 +162,7 @@ class Container:
             pose_estimator=self.pose_estimator,
             event_bus=self.event_bus,
             settings=self._settings,
+            gameplay_config=gameplay_config,
         )
 
         game = plugin.create_game(context)

@@ -11,6 +11,8 @@ Antes de cualquier tarea, **lee estos documentos**:
 
 1. `docs/ports_contract.md` — Contratos de puertos (fuente de verdad).
 2. `docs/render_architecture.md` — Nueva arquitectura de render (si existe).
+3. `docs/render_refactor_status.md` — Estado del refactor de render (si existe).
+4. `docs/particles_ecs_system.md` — Estado del refactor de particles entity (si existe).
 
 Si algo contradice estos documentos, **detente y pregunta**.
 
@@ -19,7 +21,8 @@ Si algo contradice estos documentos, **detente y pregunta**.
 ## 📚 Documentación de apoyo
 
 1. `docs/directory_structure.md` — Estrucutra actual del proyecto.
-2. `docs/particles_ecs_system.md` — Entidades / Particulas.
+2. `docs/audit_findings.md` — Lista de hallazgos pendientes (si existe).
+3. `docs/code_style.md` — Guía de estilo y tipado.
 
 ---
 
@@ -62,7 +65,7 @@ Si algo contradice estos documentos, **detente y pregunta**.
 
 1. **Leer** los archivos relevantes + `AGENTS.md` + `docs/ports_contract.md`.
 2. **Resumir** el estado actual (3-6 puntos).
-3. **Listar** los archivos que vas a tocar (máximo 4 por iteración).
+3. **Listar** los archivos que vas a tocar (máximo 6 por iteración).
 4. **Describir** los pasos numerados del cambio.
 5. **Listar** dudas o decisiones ambiguas.
 6. **DETENERTE** y esperar confirmación del usuario.

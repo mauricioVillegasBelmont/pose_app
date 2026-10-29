@@ -9,6 +9,7 @@ from pose_app.app.game_context import GameContext
 from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.services.pose_interaction_facade import PoseInteractionFacade
 from pose_app.domain.state.game_state_port import GameStatePort
 from pose_app.infrastructure.assets.asset_loader import AssetLoader
 from pose_app.infrastructure.logging.logger import get_logger
@@ -43,6 +44,23 @@ class ParticlesPlugin(GamePlugin):
 
         settings = context.settings
         render_cfg = settings.render
+        _pose_cfg = settings.pose
+
+        profile_config = context.gameplay_config
+        opts = profile_config.game_options
+
+        pose_interaction = PoseInteractionFacade(
+            smoothing_factor=profile_config.pose_smoothing_factor
+        )
+
+        sprite_config = None
+        asset_loader = AssetLoader()
+        sprite_config = asset_loader.load_sprite_config(
+            category="particles",
+            sprite_name="demo",
+            fps=12.0,
+            animation_mode="loop",
+        )
 
         # Leer mirror del config
         mirror = render_cfg.mirror
@@ -99,19 +117,11 @@ class ParticlesPlugin(GamePlugin):
             target_fps=render_cfg.target_fps,
         )
 
-        sprite_config = None
-        asset_loader = AssetLoader()
-        sprite_config = asset_loader.load_sprite_config(
-            category="particles",
-            sprite_name="demo",
-            fps=12.0,
-            animation_mode="loop",
-        )
-
         # 4. Juego
         return ParticlesGame(
             camera=context.camera,
             pose_estimator=context.pose_estimator,
+            pose_interaction=pose_interaction,
             scene=scene,
             particles_capability=particles_capability,
             color_capability=color_capability,
@@ -121,4 +131,9 @@ class ParticlesPlugin(GamePlugin):
             screen_width=render_cfg.width,
             screen_height=render_cfg.height,
             sprite_config=sprite_config,
+            max_score=opts.get("max_score", 10),
+            time_per_round=opts.get("time_per_round", 10.0),
+            hit_radius=opts.get("hit_radius", 30.0),
+            particle_size=opts.get("particle_size", 20.0),
+            particle_color=tuple(opts.get("particle_color", [255, 200, 50])),
         )

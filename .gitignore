@@ -60,6 +60,8 @@ venv/
 *.back.*
 *.backup
 *.backup.*
+.orig
+.orig.*
 
 # vscode
 .code-workspace

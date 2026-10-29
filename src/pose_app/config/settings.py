@@ -54,6 +54,12 @@ class PoseSettings(BaseSettings):
     min_tracking_confidence: float = Field(
         default=0.5, ge=0.0, le=1.0, description="Confianza mínima para tracking"
     )
+    smoothing_factor: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Smooting el calculo de pose (value < 0.2 movimiento será muy fluido pero con input lag. Value > 0.5 Responde muy rápido pero con 'jitter' de MediaPipe.)",
+    )
 
 
 class RenderSettings(BaseSettings):
@@ -105,15 +111,11 @@ class GameSettings(BaseSettings):
         pattern=r"^[a-z][a-z0-9_]*$",  # snake_case
         description="ID del plugin de juego (validado por PluginRegistry)",
     )
-    gravity: float = Field(default=0.08, ge=0.0, le=1.0)
-    burst_count: int = Field(default=5, ge=1, le=50)
-    max_particles: int = Field(default=2000, ge=100, le=10000)
-    palette: str = Field(
-        default="fire",
+    profile_name: str = Field(
+        default="normal",
         min_length=1,
         max_length=50,
-        pattern=r"^[a-z][a-z0-9_]*$",
-        description="Nombre de la paleta (validado por ColorGame)",
+        description="Nombre del perfil de configuración de juego (Data-Driven)",
     )
 
 

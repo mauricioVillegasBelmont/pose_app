@@ -15,6 +15,7 @@ from pose_app.domain.entities.particles.components import (
 )
 from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
+from pose_app.domain.ports.pose_interaction_port import PoseInteractionPort
 from pose_app.domain.ports.render.color_render_port import ColorRenderPort
 from pose_app.domain.ports.render.hud_render_port import HudRenderPort
 from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
@@ -48,7 +49,7 @@ def game() -> ParticlesGame:
         camera=Mock(),
         pose_estimator=Mock(),
         scene=MockScene(),
-        # <--- CORRECCIÓN: Usar Mock() genérico para evitar errores de métodos faltantes
+        pose_interaction=Mock(spec=PoseInteractionPort),
         particles_capability=Mock(spec=ParticlesRenderPort),
         color_capability=Mock(spec=ColorRenderPort),
         hud_capability=Mock(spec=HudRenderPort),
@@ -110,21 +111,20 @@ class TestParticlesGameCompleteRound:
 
 
 class TestParticlesGameLogic:
-    def test_landmarks_hit_particles(self, game: ParticlesGame):
+    def test_landmarks_hit_particles(self, game: ParticlesGame) -> None:
         """Un landmark visible toca partículas cercanas."""
         from pose_app.domain.entities.particle import Particle
         from pose_app.domain.entities.pose_landmark import PoseLandmark
 
         game._start_new_round()
         initial_score = game.state.get_score()
+        initial_round = game._current_round
 
         # Coloca una partícula en el centro
         game._particles = [
             Particle(
                 position=Position(x=400, y=300),
-                appearance=Appearance(
-                    size=20.0,
-                ),
+                appearance=Appearance(size=20.0),
             )
         ]
 
@@ -132,12 +132,15 @@ class TestParticlesGameLogic:
             PoseLandmark(x=0.5, y=0.5, z=0.0, visibility=1.0, name="left_wrist")
         ]
 
-        game._update_logic(landmarks, dt=0.016)
+        # 1. Alimentar la fachada (simula lo que hace el bucle principal)
+        game._pose_interaction.update(landmarks)
 
-        # La partícula fue tocada → ronda completada → score aumentó
+        # 2. Ejecutar la lógica (ahora solo recibe dt)
+        game._update_logic(dt=0.016)
+
+        # Assert: la partícula debería haber sido tocada y eliminada
         assert game.state.get_score() == initial_score + 1
-        # Y se inició una nueva ronda (ronda 2 tiene 3 partículas)
-        assert len(game._particles) == 3
+        assert game._current_round == initial_round + 1
 
 
 class TestParticlesGameRender:
