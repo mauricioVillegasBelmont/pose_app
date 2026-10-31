@@ -644,18 +644,19 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 
 ## 5.5 `src/pose_app/domain/games/`
 
-### `src/pose_app/domain/games/particles/state.py` — `ParticlesState`
-**Patrones**: implementa `GameStatePort`, thread-safe (`Lock`), snapshot DTO.
+`src/pose_app/domain/games/particles/main.py` — `ParticlesGame`
+Patrones: Observer (EventBus), Strategy (spawn), DI, Template Method (loop async).
 
-| Método | Firma | Responsabilidad | Valores / proveniencia |
-|---|---|---|---|
-| `__init__` | `(self) -> None` | `_lock`, `_particles`, `_last_pose`, `_frame_count` | Creado por `ParticlesPlugin.create_state` / `ParticlesGame` |
-| `game_id` | `@property -> str` | `"particles"` | Leído por `StateRegistry` |
-| `update_particles` | `(self, particles: list[Particle]) -> None` | Copia defensiva bajo Lock | 🟢 `ParticlesGame.run_async` tras spawn+update |
-| `update_pose` | `(self, landmarks: list[PoseLandmark]) -> None` | Guarda última pose | 🟢 `ParticlesGame.run_async` |
-| `increment_frames` | `(self) -> None` | `+1` a `_frame_count` | 🟢 `ParticlesGame.run_async` |
-| `snapshot` | `(self) -> dict[str, Any]` | `particles_count`, `particles_sample` (máx 10), `frame_count`, `landmarks_count` | 🟢 `GET /api/v1/state` |
-| `stats` | `(self) -> dict[str, Any]` | `particles_active`, `frames_processed` | 🟢 `GET /api/v1/stats` |
+| Método|Firma (tipado)|Responsabilidad|Valores / proveniencia|
+| ---|---|---|---|
+| __init__|(self, camera: CameraPort, pose_estimator: PoseEstimatorPort, pose_interaction: PoseInteractionPort, scene: ScenePort, particles_capability: ParticlesRenderPort, color_capability: ColorRenderPort, hud_capability: HudRenderPort, state: ParticlesState, event_bus: EventBusPort, spawn_strategy: SpawnStrategy, archetypes: list[ParticleArchetype], screen_width: int = 800, screen_height: int = 600, rng: random.Random \| None = None, max_score: int = 10, time_per_round: float = 10.0, hit_radius: float = 30.0, workspace: Workspace \| None = None, animation_system: AnimationSystem \| None = None) -> None|Inyecta dependencias + estrategia de spawn + archetypes, decide ruta de render, suscribe GameResetRequested|Creado por ParticlesPlugin.create_game|
+| state|@property -> ParticlesState|Estado|GameProtocol.state|
+| _on_reset_requested|async (self, event: GameResetRequested) -> None|_reset_requested = True|Invocado por AsyncEventBus.publish|
+| run_async|(self, should_stop: Callable[[], bool] \| None = None) -> Awaitable[None]|Loop: reset → frame → pose → spawn → update → render → sleep|🟢 src/pose_app/app/main.py (asyncio.create_task)|
+| _start_new_round|(self) -> None|Usa spawn_strategy.spawn() para generar partículas con los archetypes inyectados|Muta _particles. Invocado por run_async y _complete_round|
+| _update_logic|(self, dt: float) -> None|Actualiza lógica del juego (colisiones, timer, rondas)|Invocado por run_async|
+| _complete_round|(self) -> None|Incrementa score, verifica victoria, inicia nueva ronda|Invocado por _update_logic|
+| _render_frame|(self, landmarks: list[PoseLandmark]) -> None|Actualiza capacidades y renderiza el frame|Invocado por run_async|
 
 ### `src/pose_app/domain/games/particles/main.py` — `ParticlesGame`
 **Patrones**: Observer (EventBus), Strategy (ruta legacy vs nueva), DI, Template Method (loop async).
@@ -785,7 +786,7 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 | `CameraSettings` | `CAMERA_` | `id:int=0` (≥0), `width:int=640` (160-1920), `height:int=480` (120-1080), `fps:int=30` (1-120) |
 | `PoseSettings` | `POSE_` | `provider: Literal["mediapipe","mock"]="mediapipe"`, `model_complexity:int=1` (0-2), `min_detection_confidence/float=0.5`, `min_tracking_confidence/float=0.5` |
 | `RenderSettings` | `RENDER_` | `provider: Literal["pygame","mock"]="pygame"`, `debug_overlay:bool=False`, `width=800`, `height=600`, `title:str`, `target_fps:int=60` (15-144) |
-| `GameSettings` | `GAME_` | `type:str="particles"` (snake_case), `gravity:float=0.08`, `burst_count:int=5`, `max_particles:int=2000`, `palette:str="fire"` |
+| GameSettings|GAME_|type:str="particles" (snake_case), profile_name:str="normal"|
 | `LoggingSettings` | `LOG_` | `level: Literal["DEBUG".."CRITICAL"]="INFO"`, `format: Literal["json","console"]`, `file:bool=False`, `directory:str="logs"` |
 | `APISettings` | `API_` | `enabled:bool=True`, `host:str="0.0.0.0"`, `port:int=8000` (1024-65535), `cors_origins:list[str]=["*"]` |
 | `JWTSettings` | `JWT_` | `secret_key:str` (requerido, ≥32), `algorithm:str="HS256"`, `access_token_expire_minutes:int=60` |

@@ -115,6 +115,252 @@ Separa el concepto de "partícula recién nacida" de "partícula con vida parcia
 
 ---
 
+## 🎯 ParticleArchetype: El ADN de las partículas
+
+Un `ParticleArchetype` es un **Value Object inmutable** que define las propiedades intrínsecas de un tipo de partícula. No contiene reglas de spawn (como `min_distance`), solo propiedades que definen "qué es" la partícula.
+
+### Estructura
+
+```python
+@dataclass(frozen=True)
+class ParticleArchetype:
+    """ADN de un tipo de partícula."""
+
+    name: str  # Identificador único
+    weight: float = 1.0  # Peso para spawn aleatorio
+    size: float = 20.0  # Tamaño visual en píxeles
+    color: tuple[int, int, int] = (255, 200, 50)  # Color RGB
+    sprite_config: SpriteConfig | None = None  # Sprite animado opcional
+```
+
+### Ejemplo de uso
+
+```python
+# Partícula de fuego con sprite animado
+fire_archetype = ParticleArchetype(
+    name="fire",
+    weight=0.7,
+    size=25.0,
+    color=(255, 100, 0),
+    sprite_config=SpriteConfig(
+        path="fire.png",
+        frame_width=64.0,
+        frame_height=64.0,
+        frame_count=8,
+        fps=12.0,
+        animation_mode="loop",
+    ),
+)
+
+# Partícula de hielo simple (sin sprite)
+ice_archetype = ParticleArchetype(
+    name="ice",
+    weight=0.3,
+    size=20.0,
+    color=(100, 200, 255),
+)
+```
+
+### Principios de diseño
+
+1. **Inmutabilidad**: `@dataclass(frozen=True)` garantiza que no puede modificarse después de creado.
+2. **Validación estricta**: `__post_init__` valida que `name` no esté vacío, `weight >= 0`, `size > 0`, y `color` sea RGB válido (0-255).
+3. **Separación de responsabilidades**: El archetype NO contiene reglas de spawn (como `min_distance`). Esas reglas viven en las estrategias de posicionamiento.
+4. **Composición ECS**: El campo `sprite_config` es opcional. Si es `None`, la partícula se renderiza como círculo sólido.
+
+---
+
+## 🎲 Sistema de Spawn Data-Driven
+
+El sistema de spawn permite generar partículas con comportamientos completamente configurables desde JSON, sin modificar código Python.
+
+### Arquitectura de estrategias
+
+```mermaid
+sequenceDiagram
+    participant Game as ParticlesGame
+    participant Composer as ComposedSpawnStrategy
+    participant Selector as ArchetypeSelector
+    participant Positioner as PositionStrategy
+    participant Particle as Nueva Partícula (ECS)
+
+    Game->>Composer: spawn(count=5, archetypes, workspace...)
+
+    loop Para cada partícula (i = 0 a 4)
+        Composer->>Selector: select(archetypes, rng)
+        Selector-->>Composer: Devuelve ParticleArchetype
+
+        Composer->>Positioner: calculate_position(i, existing_particles, workspace...)
+        Positioner-->>Composer: Devuelve (x, y) en píxeles
+
+        Composer->>Particle: Ensamblar(Position, Appearance, CollisionProfile, SpriteState)
+        Composer->>Composer: Añadir a existing_particles
+    end
+
+    Composer-->>Game: Devuelve list[Particle]
+```
+
+### Protocolos (contratos)
+
+#### `ArchetypeSelector`
+Decide **QUÉ** tipo de partícula se genera.
+
+```python
+class ArchetypeSelector(Protocol):
+    def select(
+        self, archetypes: list[ParticleArchetype], rng: random.Random
+    ) -> ParticleArchetype: ...
+```
+
+**Implementaciones:**
+- `WeightedSelector`: Selección aleatoria ponderada por el campo `weight` del archetipo.
+- `SequentialSelector`: Selección cíclica según una secuencia predefinida de nombres.
+
+#### `PositionStrategy`
+Decide **DÓNDE** se coloca la partícula.
+
+```python
+class PositionStrategy(Protocol):
+    def calculate_position(
+        self,
+        index: int,
+        existing_particles: list[Particle],
+        workspace: Workspace,
+        screen_w: int,
+        screen_h: int,
+        rng: random.Random,
+    ) -> tuple[float, float]: ...
+```
+
+**Implementaciones:**
+- `RandomPositionStrategy`: Posiciones aleatorias dentro del workspace, respetando `min_distance` entre partículas.
+- `GridPositionStrategy`: Posiciones deterministas en una grilla de filas × columnas.
+
+#### `SpawnStrategy`
+Orquesta la creación completa de partículas.
+
+```python
+class SpawnStrategy(Protocol):
+    def spawn(
+        self,
+        count: int,
+        archetypes: list[ParticleArchetype],
+        workspace: Workspace,
+        screen_w: int,
+        screen_h: int,
+        rng: random.Random,
+    ) -> list[Particle]: ...
+```
+
+**Implementación principal:**
+- `ComposedSpawnStrategy`: Compone un `ArchetypeSelector` + `PositionStrategy` para generar el lote completo.
+
+### Ejemplo: Estrategia compuesta
+
+```python
+from pose_app.domain.entities.particles.spawn.selectors import WeightedSelector
+from pose_app.domain.entities.particles.spawn.positions import RandomPositionStrategy
+from pose_app.domain.entities.particles.spawn.strategies import ComposedSpawnStrategy
+
+# Crear estrategia: 70% fuego, 30% hielo, con distancia mínima de 0.15
+spawn_strategy = ComposedSpawnStrategy(
+    archetype_selector=WeightedSelector(),
+    position_strategy=RandomPositionStrategy(min_distance=0.15),
+)
+
+# Definir archetypes
+archetypes = [
+    ParticleArchetype(name="fire", weight=0.7, size=25.0, color=(255, 100, 0)),
+    ParticleArchetype(name="ice", weight=0.3, size=20.0, color=(100, 200, 255)),
+]
+
+# Generar 10 partículas
+particles = spawn_strategy.spawn(
+    count=10,
+    archetypes=archetypes,
+    workspace=Workspace(),
+    screen_w=800,
+    screen_h=600,
+    rng=random.Random(42),
+)
+```
+
+### Configuración JSON
+
+El plugin lee la configuración de spawn desde el JSON:
+
+```json
+{
+  "pose_smoothing_factor": 0.3,
+  "game_options": {
+    "max_score": 10,
+    "time_per_round": 10.0,
+    "hit_radius": 30.0,
+    "particle_archetypes": [
+      {
+        "name": "fire",
+        "weight": 0.7,
+        "size": 25.0,
+        "color": [255, 100, 0]
+      },
+      {
+        "name": "ice",
+        "weight": 0.3,
+        "size": 20.0,
+        "color": [100, 200, 255]
+      }
+    ],
+    "spawn_config": {
+      "archetype_selector": "weighted",
+      "position_strategy": "random",
+      "min_distance": 0.15,
+      "max_attempts": 100
+    }
+  }
+}
+```
+
+El plugin (`particles_plugin.py`) construye las estrategias automáticamente:
+
+```python
+# 1. Leer archetypes del JSON
+archetypes = [
+    ParticleArchetype(
+        name=a["name"],
+        weight=a.get("weight", 1.0),
+        size=a.get("size", 20.0),
+        color=tuple(a.get("color", [255, 200, 50])),
+    )
+    for a in opts.get("particle_archetypes", [])
+]
+
+# 2. Construir estrategia según spawn_config
+spawn_cfg = opts.get("spawn_config", {})
+selector = WeightedSelector()  # o SequentialSelector
+positioner = RandomPositionStrategy(min_distance=spawn_cfg.get("min_distance", 0.15))
+spawn_strategy = ComposedSpawnStrategy(selector, positioner)
+
+# 3. Inyectar en el juego
+return ParticlesGame(
+    # ... otros parámetros ...
+    spawn_strategy=spawn_strategy,
+    archetypes=archetypes,
+)
+```
+
+### Validación y Fail-Fast
+
+Si el JSON tiene valores inválidos, el plugin lanza `ConfigurationError` con contexto detallado:
+
+```python
+# Ejemplo de error
+ConfigurationError: "Unknown archetype_selector: 'mystery'. Supported values: weighted"
+```
+
+Esto permite detectar errores de configuración al arrancar la aplicación, no en medio del juego.
+
+---
+
 ## ⚙️ Sistemas
 
 Los sistemas son **clases frozen** que operan sobre listas de entidades. No mantienen estado entre llamadas.
@@ -204,10 +450,12 @@ class AnimationSystem:
 
 ```
 1. SPAWN (inicio de ronda)
-   spawn_particles() → list[Particle]
-   ├── Posiciones aleatorias dentro del Workspace
-   ├── Respetando min_distance entre partículas
-   └── Con componentes según configuración del juego
+    spawn_strategy.spawn(count, archetypes, workspace, screen_w, screen_h, rng)
+    ├── ComposedSpawnStrategy orquesta la creación
+    │   ├── ArchetypeSelector elige el tipo (weighted/sequential)
+    │   └── PositionStrategy calcula la posición (random/grid)
+    ├── Ensambla componentes ECS: Position, Appearance, CollisionProfile, SpriteState
+    └── Retorna list[Particle] completamente configuradas
 
 2. LOOP (cada frame, ~60 FPS)
    a. AnimationSystem.update(particles, dt)
@@ -470,12 +718,21 @@ Más ligero, no requiere import, y los type-checkers lo tratan igual. Convenció
 }
 ```
 
-### Nuevas capacidades
+---
 
-- **`OscillatingMovement`**: movimiento senoidal.
-- **`BounceCollision`**: rebote en bordes (para `falling_particle`).
-- **`SequenceFeedback`**: para el juego de memoria.
-- **`ComboScoring`**: multiplicadores por combos rápidos.
+### ✅ Completado
+- [x] Configuración driven por JSON (archetypes + spawn_config)
+- [x] Sistema de estrategias de spawn (WeightedSelector, RandomPositionStrategy, etc.)
+- [x] ComposedSpawnStrategy para composición flexible
+
+### Próximas capacidades
+- [ ] `FixedPositionStrategy`: posiciones fijas definidas en JSON (orquestación estricta).
+- [ ] `SequentialSelector` integrado en el plugin para juegos de memoria.
+- [ ] Soporte para `stages` en el JSON (secuencias de configuraciones de spawn).
+- [ ] `OscillatingMovement`: movimiento senoidal.
+- [ ] `BounceCollision`: rebote en bordes (para `falling_particle`).
+- [ ] `SequenceFeedback`: para el juego de memoria.
+- [ ] `ComboScoring`: multiplicadores por combos rápidos.
 
 ---
 
@@ -486,17 +743,3 @@ Más ligero, no requiere import, y los type-checkers lo tratan igual. Convenció
 - **Cómo añadir un juego**: `docs/adding_a_game_plugin.md`
 - **Guía de estilos**: `docs/code_style.md`
 - **Aprendizaje del sistema**: `docs/system_learning.md`
-
----
-
-## ✅ Checklist para nuevos juegos de partículas
-
-- [ ] Definir qué componentes necesita (Position, Appearance, Lifespan, Collision, Sprite)
-- [ ] Definir qué sistemas ejecutar y en qué orden
-- [ ] Crear `spawn` específico (o reutilizar el existente con parámetros)
-- [ ] Implementar reglas de negocio en `main.py` (scoring, stages, etc.)
-- [ ] Crear `state.py` thread-safe con `Lock`
-- [ ] Crear plugin en `app/plugins/` y registrarlo
-- [ ] Tests unitarios de componentes y sistemas
-- [ ] Tests de integración del juego completo
-- [ ] Documentar en `docs/games/<nombre>.md`
