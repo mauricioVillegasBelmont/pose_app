@@ -4,9 +4,19 @@
     "max_score": 10,
     "time_per_round": 10.0,
     "hit_radius": 30.0,
-    "particle_size": 20.0,
-    "particle_color": [255, 200, 50],
-    "particle_min_distance": 0.15,
+    "particle_archetypes": [
+      {
+        "name": "default",
+        "weight": 1.0,
+        "size": 20.0,
+        "color": [255, 200, 50]
+      }
+    ],
+    "spawn_config": {
+      "archetype_selector": "weighted",
+      "position_strategy": "random",
+      "min_distance": 0.15
+    },
     "gravity": 0.1,
     "burst_count": 5,
     "max_particles": 2000,

@@ -9,10 +9,14 @@ from unittest.mock import Mock
 
 import pytest
 
+from pose_app.domain.entities.particles.archetype import ParticleArchetype
 from pose_app.domain.entities.particles.components import (
     Appearance,
     Position,
 )
+from pose_app.domain.entities.particles.spawn.positions import RandomPositionStrategy
+from pose_app.domain.entities.particles.spawn.selectors import WeightedSelector
+from pose_app.domain.entities.particles.spawn.strategies import ComposedSpawnStrategy
 from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.domain.ports.pose_interaction_port import PoseInteractionPort
@@ -45,6 +49,13 @@ class MockScene:
 @pytest.fixture
 def game() -> ParticlesGame:
     """Game con mocks."""
+    spawn_strategy = ComposedSpawnStrategy(
+        archetype_selector=WeightedSelector(),
+        position_strategy=RandomPositionStrategy(min_distance=0.15),
+    )
+
+    archetypes = [ParticleArchetype(name="test", size=20.0, color=(255, 200, 50))]
+
     return ParticlesGame(
         camera=Mock(),
         pose_estimator=Mock(),
@@ -55,6 +66,8 @@ def game() -> ParticlesGame:
         hud_capability=Mock(spec=HudRenderPort),
         state=ParticlesState(),
         event_bus=AsyncEventBus(),
+        spawn_strategy=spawn_strategy,
+        archetypes=archetypes,
         rng=random.Random(42),
     )
 

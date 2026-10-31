@@ -16,7 +16,8 @@ import time
 from collections.abc import Callable
 
 from pose_app.domain.entities.particle import Particle
-from pose_app.domain.entities.particles.components import SpriteConfig
+from pose_app.domain.entities.particles.archetype import ParticleArchetype
+from pose_app.domain.entities.particles.spawn.ports import SpawnStrategy
 from pose_app.domain.entities.particles.systems import AnimationSystem
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
@@ -27,7 +28,6 @@ from pose_app.domain.games.particles.scoring import (
     is_winner,
     particles_per_round,
 )
-from pose_app.domain.games.particles.spawn import spawn_particles
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
@@ -56,6 +56,8 @@ class ParticlesGame:
         hud_capability: HudRenderPort,
         state: ParticlesState,
         event_bus: EventBusPort,
+        spawn_strategy: SpawnStrategy,
+        archetypes: list[ParticleArchetype],
         screen_width: int = 800,
         screen_height: int = 600,
         rng: random.Random | None = None,
@@ -63,11 +65,7 @@ class ParticlesGame:
         time_per_round: float = 30.0,
         hit_radius: float = 30.0,
         workspace: Workspace | None = None,
-        particle_min_distance: float = 0.15,
-        particle_size: float = 20.0,
-        particle_color: tuple[int, int, int] = (255, 200, 50),
         animation_system: AnimationSystem | None = None,
-        sprite_config: SpriteConfig | None = None,
     ) -> None:
         """
         Inicializa el juego.
@@ -81,6 +79,8 @@ class ParticlesGame:
             hud_capability: capacidad de render de HUD.
             state: estado del juego (consultable).
             event_bus: bus de eventos.
+            spawn_strategy: estrategia de creación de partículas.
+            archetypes: arquetipos disponibles para el spawn.
             screen_width: ancho de pantalla en píxeles.
             screen_height: alto de pantalla en píxeles.
             rng: generador aleatorio (inyectable para tests).
@@ -88,9 +88,6 @@ class ParticlesGame:
             time_per_round: segundos por ronda.
             hit_radius: radio de colisión en píxeles.
             workspace: zona de spawn (default: Workspace por defecto).
-            particle_min_distance: distancia mínima normalizada entre partículas.
-            particle_size: tamaño base de partícula en píxeles.
-            particle_color: color RGB base de partícula.
         """
         self._camera = camera
         self._pose_estimator = pose_estimator
@@ -109,9 +106,8 @@ class ParticlesGame:
         self._time_per_round = time_per_round
         self._hit_radius = hit_radius
         self._workspace = workspace or Workspace()
-        self._particle_min_distance = particle_min_distance
-        self._particle_size = particle_size
-        self._particle_color = particle_color
+        self._spawn_strategy = spawn_strategy
+        self._archetypes = archetypes
 
         self._particles: list[Particle] = []
         self._current_round: int = 1
@@ -119,7 +115,6 @@ class ParticlesGame:
         self._frame_count: int = 0
 
         self._animation_system = animation_system or AnimationSystem()
-        self._sprite_config = sprite_config
 
     @property
     def state(self) -> ParticlesState:
@@ -201,16 +196,13 @@ class ParticlesGame:
         """Genera partículas nuevas al inicio de una ronda."""
         num_particles = particles_per_round(self._current_round)
 
-        self._particles = spawn_particles(
+        self._particles = self._spawn_strategy.spawn(
             count=num_particles,
+            archetypes=self._archetypes,
             workspace=self._workspace,
-            screen_width=self._screen_width,
-            screen_height=self._screen_height,
+            screen_w=self._screen_width,
+            screen_h=self._screen_height,
             rng=self._rng,
-            min_distance=self._particle_min_distance,
-            particle_size=self._particle_size,
-            particle_color=self._particle_color,
-            sprite_config=self._sprite_config,
         )
 
         self._time_remaining = self._time_per_round
