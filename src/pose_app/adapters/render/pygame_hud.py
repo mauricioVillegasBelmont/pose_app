@@ -99,6 +99,12 @@ class PygameHudRenderer(PygameBaseAdapter, HudRenderPort):
             text_surface = font.render(line, True, self._text_color)
             self.screen.blit(text_surface, (padding * 2, padding + i * line_height))
 
+    def render(self):
+        """Método unificado de RenderCapability.
+        Delega al método específico del puerto.
+        """
+        self.render_hud()
+
     def close(self) -> None:
         """Limpia recursos del HUD."""
         self._font = None

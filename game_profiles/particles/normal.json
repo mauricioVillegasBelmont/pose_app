@@ -4,22 +4,72 @@
     "max_score": 10,
     "time_per_round": 10.0,
     "hit_radius": 30.0,
+    "cursor_timeout": 2.0,
+    "cursors": {
+      "left_hand": {
+        "landmark_names": [
+          "left_wrist",
+          "left_pinky",
+          "left_index",
+          "left_thumb"
+        ],
+        "offset_x": 0.02,
+        "offset_y": -0.03,
+        "appearance": {
+          "size": 40.0,
+          "color": [
+            255,
+            255,
+            0
+          ],
+          "padding_x": 0.0,
+          "padding_y": 0.0
+        },
+        "collision": {
+          "radius": 5.0
+        }
+      },
+      "right_hand": {
+        "landmark_names": [
+          "right_wrist",
+          "right_pinky",
+          "right_index",
+          "right_thumb"
+        ],
+        "offset_x": -0.02,
+        "offset_y": -0.03,
+        "appearance": {
+          "size": 40.0,
+          "color": [
+            0,
+            255,
+            255
+          ],
+          "padding_x": 0.0,
+          "padding_y": 0.0
+        },
+        "collision": {
+          "radius": 5.0
+        }
+      }
+    },
     "particle_archetypes": [
       {
         "name": "default",
         "weight": 1.0,
         "size": 20.0,
-        "color": [255, 200, 50]
+        "color": [
+          255,
+          200,
+          50
+        ]
       }
     ],
     "spawn_config": {
       "archetype_selector": "weighted",
       "position_strategy": "random",
-      "min_distance": 0.15
-    },
-    "gravity": 0.1,
-    "burst_count": 5,
-    "max_particles": 2000,
-    "palette": "fire"
+      "min_distance": 0.15,
+      "max_attempts": 100
+    }
   }
 }

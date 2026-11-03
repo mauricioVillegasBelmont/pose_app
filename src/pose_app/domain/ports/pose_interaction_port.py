@@ -44,8 +44,18 @@ class PoseInteractionPort(ABC):
         radius: float,
         screen_w: int,
         screen_h: int,
+        cursor_id: str | None = None,  # ← NUEVO: opcional
     ) -> bool:
         """
-        Verifica si alguna mano visible (izquierda o derecha) está intersectando
+        Verifica si algún cursor (o uno específico) está intersectando
         con un círculo definido por (target_x, target_y, radius) en la pantalla.
+
+        Args:
+            target_x: Posición X del objetivo en píxeles.
+            target_y: Posición Y del objetivo en píxeles.
+            radius: Radio del objetivo en píxeles.
+            screen_w: Ancho de pantalla en píxeles.
+            screen_h: Alto de pantalla en píxeles.
+            cursor_id: Identificador del cursor específico. Si es None,
+                    verifica todos los cursores activos.
         """

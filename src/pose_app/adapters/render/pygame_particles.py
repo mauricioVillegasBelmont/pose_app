@@ -65,6 +65,12 @@ class PygameParticlesRenderer(PygameBaseAdapter, ParticlesRenderPort):
         # 2. Mezcla sobre el fondo
         self.screen.blit(surface, (0, 0))
 
+    def render(self):
+        """Método unificado de RenderCapability.
+        Delega al método específico del puerto.
+        """
+        self.render_particles()
+
     def close(self) -> None:
         """Limpia el buffer y cierra Pygame."""
         self._particle_surface = None
