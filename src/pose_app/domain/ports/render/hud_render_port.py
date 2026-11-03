@@ -5,10 +5,12 @@ Sigue el patrón set_* + render_* para separar la declaración
 de qué dibujar de la ejecución del dibujo.
 """
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+
+from pose_app.domain.ports.render.render_capability import RenderCapability
 
 
-class HudRenderPort(ABC):
+class HudRenderPort(RenderCapability):
     """Capacidad de render: dibujar un HUD (puntos, rondas, timer)."""
 
     @abstractmethod

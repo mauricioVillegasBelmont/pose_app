@@ -482,6 +482,27 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `PoseLandmark.is_visible` | `(self) -> bool` | Regla: `visibility > 0.5` | Usado por los 3 juegos y por `MediapipeAdapter` para filtrar |
 | `PoseLandmark.distance_to` | `(self, other: PoseLandmark) -> float` | Distancia euclidiana 2D (ignora `z`) | Usado por `GesturesGame._detect_greeting` y `_detect_arms_crossed` |
 
+### `src/pose_app/domain/entities/input_cursor.py`
+**Propósito**: cursor de interacción (mano, pie, cadera, etc.) con estado mutable y componentes visuales/de colisión inmutables. **No es una entidad ECS**: es una herramienta de interacción.
+**Patrones**: Dataclass mutable (estado), dataclasses `frozen=True` (componentes), validación en `__post_init__`.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `CursorAppearance` | `frozen: size:float=40.0`, `color:tuple[int,int,int]=(255,255,0)`, `padding_x:float=0.0`, `padding_y:float=0.0` | Config visual; valida `size > 0` y color 0-255 | Construido por `ParticlesPlugin._build_cursors` desde JSON |
+| `CursorCollision` | `frozen: radius:float=20.0` | Radio como % del mínimo de pantalla; valida `radius > 0` | Construido por `ParticlesPlugin._build_cursors` |
+| `InputCursor` | `@dataclass cursor_id:str`, `position:tuple[float,float]\|None=None`, `is_visible:bool=False`, `last_seen:float=0.0`, `appearance:CursorAppearance`, `collision:CursorCollision`, `sprite_config:SpriteConfig\|None=None`, `sprite_state:SpriteState\|None=None` | Estado + configuración de un cursor | Creado por `ParticlesPlugin._build_cursors` y por `PoseInteractionFacade` (fallback) |
+| `InputCursor.update` | `(self, new_position: tuple[float,float]\|None, current_time:float, timeout:float) -> None` | Actualiza posición/visibilidad; si supera `timeout` marca invisible | **Muta** `position`, `is_visible`, `last_seen`. Invocado por `PoseInteractionFacade.update` |
+| `InputCursor.get_position_pixels` | `(self, screen_w:int, screen_h:int) -> tuple[float,float]\|None` | Convierte posición normalizada a píxeles | Renderer y `PoseInteractionFacade.is_touching` |
+| `InputCursor.get_collision_radius_pixels` | `(self, screen_w:int, screen_h:int) -> float` | `radius * min(screen_w, screen_h) / 100` | `PoseInteractionFacade._check_cursor_touching` |
+
+### `src/pose_app/domain/entities/hand_landmark_config.py`
+**Propósito**: configuración inmutable de qué landmarks alimentan un cursor y el offset aplicado.
+**Patrones**: Dataclass `frozen=True`, validación en `__post_init__`.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `HandLandmarkConfig` | `frozen: landmark_names:tuple[str,...]`, `offset_x:float=0.0`, `offset_y:float=0.0` | Valida lista no vacía y offsets en `[-1.0, 1.0]` | Construido por `ParticlesPlugin._build_cursors`; consumido por `CentroidCollisionHandler` |
+
 ### `src/pose_app/domain/entities/user.py`
 **Propósito**: perfil de usuario inmutable **sin credenciales**.
 **Patrones**: Dataclass `frozen=True`, patrón `with_*`, `default_factory` para id.
@@ -673,6 +694,16 @@ Patrones: Observer (EventBus), Strategy (spawn), DI, Template Method (loop async
 | `_spawn_particles_from_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | **Muta** `_particles` (extiende y recorta a `max_particles*0.75`) | Por `run_async` |
 | `_update_particles` | `(self) -> None` | **Muta** `_particles` (`update` + filtra `is_alive`) | Por `run_async` |
 | `_reset_particles` | `(self) -> None` | `_particles.clear()` | Por `run_async` y `reset()` |
+
+#### Cursores de interacción en `ParticlesGame`
+
+| Aspecto | Detalle | Proveniencia |
+|---|---|---|
+| `pose_interaction: PoseInteractionPort` | Fachada multi-cursor (`PoseInteractionFacade`) inyectada por constructor | `ParticlesPlugin.create_game` |
+| `cursors: list[InputCursor]` | Cursores declarados desde JSON; se pasan al plugin y al renderer | `ParticlesPlugin._build_cursors` |
+| `_render_frame` | Sincroniza `PygameInputCursorRenderer.set_cursors(...)` con `pose_interaction.get_all_cursors()` antes de `scene.render_frame(landmarks)` | `run_async` |
+| `is_touching(...)` | Consulta colisiones de cualquier cursor (`cursor_id=None`) contra cada partícula | `ParticlesGame._update_logic` |
+| `hit_radius: float` | Radio del objetivo para colisiones con cursores | Config JSON `game_options.hit_radius` |
 
 ### `src/pose_app/domain/games/color/state.py` — `ColorState`
 Thread-safe. Métodos: `game_id -> "color"`, `update_color(color: RGBColor)` (por `_calculate_color`), `update_palette(str)` (por el handler de evento), `update_pose(list[PoseLandmark])`, `increment_frames()`, `snapshot()` (`background_color` hex, `current_palette`, `frame_count`, `landmarks_count`), `stats()`.
@@ -995,8 +1026,22 @@ Misma lógica pero en un solo `render_particles(particles)`. 🟡 Sin invocadore
 | `__init__` | `(self, surface: Any, capabilities: Iterable[object] \| None = None, overlays: Iterable[OverlayPort] \| None = None, target_fps: int = 60) -> None` | Registra todo | `ParticlesPlugin.create_game` |
 | `add_capability` | `(self, capability: object) -> None` | Append preservando orden | Constructor y plugin |
 | `add_overlay` | `(self, overlay: OverlayPort) -> None` | Append | Constructor y plugin |
-| `render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Por `isinstance` llama `render_color/render_particles/render_hud`, luego `ov.draw(surface, landmarks)`, luego `flip`+`tick` | 🟢 `ParticlesGame._render_new` |
+| `render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Llama `cap.render()` para cada `RenderCapability`, luego `ov.draw(surface, landmarks)`, luego `flip`+`tick` | 🟢 `ParticlesGame._render_frame` |
 | `close` | `(self) -> None` | Cierra capacidades y overlays (idempotente) | `ParticlesGame.run_async` `finally` |
+
+### 🟢 `pygame_input_cursor.py` — `PygameInputCursorRenderer(InputCursorRenderPort)`
+**Propósito**: capacidad de render de cursores de interacción. **No es un overlay**: afecta la jugabilidad y se registra como capacidad en el `SceneManager`.
+**Patrones**: Adapter, Strategy (círculo vs sprite), cache.
+
+| Método | Firma | Responsabilidad | Proveniencia |
+|---|---|---|---|
+| `__init__` | `(self, width:int=800, height:int=600, title:str="cursors", target_fps:int=60, mirror:bool=False) -> None` | Config ventana + cache de sprites | `ParticlesPlugin.create_game` |
+| `set_cursors` | `(self, cursors: list[InputCursor]) -> None` | Declara cursores a dibujar | `ParticlesPlugin` y `ParticlesGame._render_frame` |
+| `render_cursors` | `(self) -> None` | Dibuja cursores visibles (buffer SRCALPHA + blit) | `render()` / SceneManager |
+| `render` | `(self) -> None` | Método unificado de `RenderCapability`; delega en `render_cursors()` | `PygameSceneManager.render_frame` |
+| `_draw_circle` | `(self, cursor: InputCursor, x: float, y: float) -> None` | Borde de 3 px + relleno translúcido (`alpha=80`) | Interno |
+| `_draw_sprite` | `(self, cursor: InputCursor, x: float, y: float) -> None` | Frame animado desde sprite sheet; fallback a círculo si falla la carga | Interno |
+| `close` | `(self) -> None` | Limpia `_sprite_cache` | `PygameSceneManager.close` |
 
 ### 🔴 `decorators/pose_debug_overlay.py` — `PoseDebugOverlay`
 **Patrón**: **Decorator** (+ `Protocol` `PygameRenderable`).

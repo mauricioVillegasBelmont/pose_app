@@ -58,6 +58,7 @@ Cada capacidad es un **puerto pequeño, tipado y con una sola responsabilidad**:
 | **Color** | `ColorRenderPort` | `set_color`, `render_color` |
 | **Particles** | `ParticlesRenderPort` | `set_particles`, `render_particles` |
 | **HUD** | `HudRenderPort` | `set_hud`, `render_hud` |
+| **InputCursor** | `InputCursorRenderPort` | `set_cursors`, `render_cursors` |
 | **Overlay** | `OverlayPort` | `draw(surface)` |
 
 **Contrato general** (patrón `set_* → render_*`):
@@ -119,6 +120,42 @@ class OverlayPort(ABC):
 - **Dibujar sin redeclarar**.
 - **Composición limpia** en el SceneManager.
 
+### 🧱 `RenderCapability`: interfaz unificada
+
+Todas las capacidades heredan de una interfaz base común:
+
+```python
+class RenderCapability(ABC):
+    @abstractmethod
+    def render(self) -> None:
+        """Ejecuta el dibujo de esta capacidad en la superficie activa."""
+```
+
+**¿Por qué existe?**
+
+- El `SceneManager` no necesita conocer tipos concretos (`ColorRenderPort`,
+  `ParticlesRenderPort`, ...).
+- Ejecuta `cap.render()` para **cualquier** capacidad registrada.
+- Cada puerto específico conserva sus métodos `set_*` / `render_*`; `render()`
+  es el punto de entrada unificado.
+- Añadir una capacidad nueva solo requiere implementar
+  `RenderCapability.render()`.
+
+Ubicación: `domain/ports/render/render_capability.py`.
+
+Jerarquía actual:
+
+```text
+RenderCapability
+├── ColorRenderPort
+├── ParticlesRenderPort
+├── HudRenderPort
+└── InputCursorRenderPort
+```
+
+`PygameSceneManager.render_frame()` recorre las capacidades y llama
+`cap.render()`; ya no necesita `isinstance` por tipo.
+
 ### 🎬 SceneManager
 
 Componente que **compone** varias capacidades sobre una ventana:
@@ -147,7 +184,7 @@ class ScenePort(ABC):
 
 ```
 1. Para cada capacidad registrada:
-   - Llamar a `render_<capacity>()`
+   - Llamar a `capability.render()` (interfaz unificada `RenderCapability`)
 
 2. Para cada overlay registrado:
    - Llamar a `overlay.draw(surface)`

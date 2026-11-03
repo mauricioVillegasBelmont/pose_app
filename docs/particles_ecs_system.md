@@ -736,6 +736,28 @@ Más ligero, no requiere import, y los type-checkers lo tratan igual. Convenció
 
 ---
 
+## 🖱️ Sistema relacionado: cursores de interacción
+
+Los cursores (`InputCursor`) **no forman parte del ECS de partículas**: no
+tienen física, lifespan ni sistemas de animación propios. Son una herramienta
+de interacción que el juego consulta para detectar colisiones.
+
+Aun así, reutilizan el estilo de componentes del sistema de partículas:
+
+| Concepto | Cursor | Partícula |
+|---|---|---|
+| Config visual | `CursorAppearance` | `Appearance` |
+| Colisión | `CursorCollision` | `CollisionProfile` |
+| Sprite | `SpriteConfig` / `SpriteState` | `SpriteConfig` / `SpriteState` |
+
+La separación visual/física es la misma: `CursorAppearance.padding_*` no afecta
+a `CursorCollision.radius`.
+
+Para el diseño completo (multi-cursor, `CollisionHandler`, timeout y
+configuración JSON), ver `docs/cursor_system.md`.
+
+---
+
 ## 📚 Referencias
 
 - **Arquitectura hexagonal**: `docs/ports_contract.md`
@@ -743,3 +765,4 @@ Más ligero, no requiere import, y los type-checkers lo tratan igual. Convenció
 - **Cómo añadir un juego**: `docs/adding_a_game_plugin.md`
 - **Guía de estilos**: `docs/code_style.md`
 - **Aprendizaje del sistema**: `docs/system_learning.md`
+- **Sistema de cursores**: `docs/cursor_system.md`

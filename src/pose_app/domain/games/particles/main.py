@@ -14,7 +14,9 @@ import asyncio
 import random
 import time
 from collections.abc import Callable
+from typing import Any
 
+from pose_app.adapters.render.pygame_input_cursor import PygameInputCursorRenderer
 from pose_app.domain.entities.particle import Particle
 from pose_app.domain.entities.particles.archetype import ParticleArchetype
 from pose_app.domain.entities.particles.spawn.ports import SpawnStrategy
@@ -66,6 +68,7 @@ class ParticlesGame:
         hit_radius: float = 30.0,
         workspace: Workspace | None = None,
         animation_system: AnimationSystem | None = None,
+        cursors: list[Any] | None = None,
     ) -> None:
         """
         Inicializa el juego.
@@ -115,6 +118,8 @@ class ParticlesGame:
         self._frame_count: int = 0
 
         self._animation_system = animation_system or AnimationSystem()
+
+        self._cursors = cursors or []
 
     @property
     def state(self) -> ParticlesState:
@@ -293,6 +298,16 @@ class ParticlesGame:
             rounds=self._current_round,
             timer=self._time_remaining,
         )
+
+        # Cursores de interacción (NUEVO)
+        # Actualizar cursores desde la fachada
+        if hasattr(self._pose_interaction, "get_all_cursors"):
+            current_cursors = self._pose_interaction.get_all_cursors()
+            # Buscar el renderer de cursores en las capacidades del scene
+            for capability in getattr(self._scene, "_capabilities", []):
+                if isinstance(capability, PygameInputCursorRenderer):
+                    capability.set_cursors(current_cursors)
+                    break
 
         # Render
         await asyncio.to_thread(self._scene.render_frame, landmarks)

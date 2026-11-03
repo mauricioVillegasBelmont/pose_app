@@ -51,3 +51,9 @@ class PygameColorRenderer(PygameBaseAdapter, ColorRenderPort):
 
         color = self._color if self._color is not None else RGBColor(0, 0, 0)
         self.screen.fill(color.to_rgb_tuple())
+
+    def render(self):
+        """Método unificado de RenderCapability.
+        Delega al método específico del puerto.
+        """
+        self.render_color()

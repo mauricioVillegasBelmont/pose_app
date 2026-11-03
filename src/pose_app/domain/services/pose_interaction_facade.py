@@ -1,71 +1,137 @@
 """
-Implementación de la fachada de interacción con la pose.
+Fachada de interacción con la pose.
 
-Aplica un filtro de Suavizado Exponencial (EMA) para mejorar el "game feel"
-y encapsula la lógica de colisión para que los juegos no manipulen landmarks crudos.
+Gestiona múltiples cursores de interacción (manos, pies, cadera, etc.),
+aplica suavizado EMA y gestiona timeout de visibilidad.
 """
 
+from __future__ import annotations
+
+import time
 from typing import Literal
 
+from pose_app.domain.entities.hand_landmark_config import HandLandmarkConfig
+from pose_app.domain.entities.input_cursor import InputCursor
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.ports.pose_interaction_port import PoseInteractionPort
+from pose_app.domain.services.collision_handler import (
+    CentroidCollisionHandler,
+    CollisionHandler,
+)
 
 
 class PoseInteractionFacade(PoseInteractionPort):
     """
-    Implementación de la fachada con suavizado Exponential Moving Average (EMA)
-    y lógica de colisión unificada.
+    Fachada que gestiona múltiples cursores de interacción.
+
+    Cada cursor tiene su propia configuración de landmarks, offset,
+    radio de colisión y estilo visual. La fachada aplica suavizado EMA
+    y gestiona timeout de visibilidad para persistencia ante pérdida
+    temporal de landmarks.
+
+    Attributes:
+        _cursors: Diccionario de cursores activos (cursor_id → InputCursor).
+        _cursor_configs: Diccionario de configuraciones de landmarks por cursor.
+        _smoothed_positions: Diccionario de posiciones suavizadas por cursor.
+        _collision_handler: Handler para calcular punto de colisión.
+        _smoothing_factor: Factor de suavizado EMA (0.0-1.0).
+        _hand_timeout: Segundos antes de considerar un cursor como perdido.
     """
 
-    def __init__(self, smoothing_factor: float = 0.3):
+    def __init__(
+        self,
+        smoothing_factor: float = 0.3,
+        hand_timeout: float = 2.0,
+        cursor_configs: dict[str, HandLandmarkConfig] | None = None,
+        collision_handler: CollisionHandler | None = None,
+        cursors: list[InputCursor] | None = None,  # ← NUEVO
+    ) -> None:
         """
+        Inicializa la fachada con configuración de cursores.
+
         Args:
-            smoothing_factor: Valor entre 0.0 y 1.0 que controla la intensidad del suavizado.
-                - 0.3 (Recomendado): Buen equilibrio. Suaviza el temblor sin introducir lag perceptible.
-                - < 0.2 (Ej: 0.1): Suavizado muy agresivo. El movimiento será muy fluido,
-                  pero se sentirá "pesado" o con retraso (input lag).
-                - > 0.5 (Ej: 0.8): Suavizado ligero. Responde muy rápido, pero se notará
-                  el 'jitter' o temblor natural de MediaPipe.
-                - 1.0: Sin suavizado (comportamiento crudo).
+            smoothing_factor: Factor de suavizado EMA (0.0-1.0).
+                              0.3 = equilibrio, <0.2 = más lag, >0.5 = más jitter.
+            hand_timeout: Segundos antes de considerar un cursor como perdido.
+            cursor_configs: Diccionario de configuraciones por cursor.
+                           Si es None, se usan defaults para left_hand y right_hand.
+            collision_handler: Handler para calcular punto de colisión.
+                             Si es None, se usa CentroidCollisionHandler.
         """
         if not (0.0 < smoothing_factor <= 1.0):
-            raise ValueError("smoothing_factor debe estar entre 0.0 (excluido) y 1.0")
+            raise ValueError("smoothing_factor must be between 0.0 (exclusive) and 1.0")
 
         self._smoothing_factor = smoothing_factor
+        self._hand_timeout = hand_timeout
+        self._collision_handler = collision_handler or CentroidCollisionHandler()
 
-        # Estado suavizado interno (coordenadas normalizadas 0-1)
-        self._smoothed_left: tuple[float, float] | None = None
-        self._smoothed_right: tuple[float, float] | None = None
-
-    def update(self, landmarks: list[PoseLandmark]) -> None:
-        """Aplica filtro EMA a las muñecas detectadas."""
-        left_wrist = self._find_landmark(landmarks, "left_wrist")
-        right_wrist = self._find_landmark(landmarks, "right_wrist")
-
-        if left_wrist and left_wrist.is_visible():
-            self._smoothed_left = self._ema(
-                self._smoothed_left, (left_wrist.x, left_wrist.y)
-            )
+        # Configuraciones de landmarks por cursor
+        if cursor_configs is None:
+            self._cursor_configs = {
+                "left_hand": HandLandmarkConfig(landmark_names=("left_wrist",)),
+                "right_hand": HandLandmarkConfig(landmark_names=("right_wrist",)),
+            }
         else:
-            # Si se pierde la mano, reseteamos para evitar saltos bruscos al reaparecer
-            self._smoothed_left = None
+            self._cursor_configs = cursor_configs
 
-        if right_wrist and right_wrist.is_visible():
-            self._smoothed_right = self._ema(
-                self._smoothed_right, (right_wrist.x, right_wrist.y)
+        # Cursores (estado mutable)
+        provided = {c.cursor_id: c for c in (cursors or [])}
+        self._cursors: dict[str, InputCursor] = {}
+        for cursor_id in self._cursor_configs:
+            self._cursors[cursor_id] = provided.get(
+                cursor_id,
+                InputCursor(cursor_id=cursor_id),  # fallback si no vino
             )
-        else:
-            self._smoothed_right = None
+
+        # Posiciones suavizadas (estado interno)
+        self._smoothed_positions: dict[str, tuple[float, float] | None] = {
+            cursor_id: None for cursor_id in self._cursor_configs
+        }
+
+    def update(
+        self, landmarks: list[PoseLandmark], current_time: float | None = None
+    ) -> None:
+        """
+        Actualiza todos los cursores con los nuevos landmarks.
+
+        Args:
+            landmarks: Lista de landmarks del esqueleto.
+            current_time: Timestamp actual (segundos). Si es None, usa time.monotonic().
+        """
+        if current_time is None:
+            current_time = time.monotonic()
+
+        for cursor_id, config in self._cursor_configs.items():
+            # 1. Calcular punto crudo con el handler
+            raw_point = self._collision_handler.calculate_point(landmarks, config)
+
+            # 2. Suavizar con EMA
+            smoothed = self._ema(self._smoothed_positions[cursor_id], raw_point)
+            self._smoothed_positions[cursor_id] = smoothed
+
+            # 3. Actualizar el cursor (gestiona timeout)
+            cursor = self._cursors[cursor_id]
+            cursor.update(smoothed, current_time, self._hand_timeout)
 
     def get_hand_position(
         self, hand: Literal["left", "right"], screen_w: int, screen_h: int
     ) -> tuple[float, float] | None:
-        smoothed = self._smoothed_left if hand == "left" else self._smoothed_right
-        if smoothed is None:
-            return None
+        """
+        Obtiene la posición de una mano específica (backward compatibility).
 
-        # Convertir de normalizado (0-1) a píxeles de pantalla
-        return (smoothed[0] * screen_w, smoothed[1] * screen_h)
+        Args:
+            hand: "left" o "right".
+            screen_w: Ancho de pantalla en píxeles.
+            screen_h: Alto de pantalla en píxeles.
+
+        Returns:
+            (x, y) en píxeles, o None si el cursor no está visible.
+        """
+        cursor_id = f"{hand}_hand"
+        cursor = self._cursors.get(cursor_id)
+        if cursor is None or not cursor.is_visible:
+            return None
+        return cursor.get_position_pixels(screen_w, screen_h)
 
     def is_touching(
         self,
@@ -74,40 +140,96 @@ class PoseInteractionFacade(PoseInteractionPort):
         radius: float,
         screen_w: int,
         screen_h: int,
+        cursor_id: str | None = None,  # ← NUEVO: opcional, al final
     ) -> bool:
         """
-        Evalúa si la mano izquierda o derecha suavizada toca el objetivo.
-        """
-        left_pos = self.get_hand_position("left", screen_w, screen_h)
-        if left_pos and self._distance(left_pos, (target_x, target_y)) <= radius:
-            return True
+        Verifica si algún cursor (o uno específico) está tocando un objetivo.
 
-        right_pos = self.get_hand_position("right", screen_w, screen_h)
-        return bool(
-            right_pos and self._distance(right_pos, (target_x, target_y)) <= radius
+        Args:
+            target_x: Posición X del objetivo en píxeles.
+            target_y: Posición Y del objetivo en píxeles.
+            radius: Radio del objetivo en píxeles.
+            screen_w: Ancho de pantalla en píxeles.
+            screen_h: Alto de pantalla en píxeles.
+            cursor_id: Identificador del cursor específico. Si es None,
+                    verifica todos los cursores activos.
+
+        Returns:
+            True si algún cursor (o el especificado) está tocando el objetivo.
+        """
+        if cursor_id is not None:
+            # Verificar solo el cursor específico
+            return self._check_cursor_touching(
+                cursor_id, target_x, target_y, radius, screen_w, screen_h
+            )
+
+        # Verificar todos los cursores
+        return any(
+            self._check_cursor_touching(
+                cid, target_x, target_y, radius, screen_w, screen_h
+            )
+            for cid in self._cursors
         )
-        # if right_pos and self._distance(right_pos, (target_x, target_y)) <= radius:
-        #     return True
-        # return False
+
+    def _check_cursor_touching(
+        self,
+        cursor_id: str,
+        target_x: float,
+        target_y: float,
+        target_radius: float,
+        screen_w: int,
+        screen_h: int,
+    ) -> bool:
+        """Verifica si un cursor específico está tocando un objetivo."""
+        cursor = self._cursors.get(cursor_id)
+        if cursor is None or not cursor.is_visible or cursor.position is None:
+            return False
+
+        cursor_pos = cursor.get_position_pixels(screen_w, screen_h)
+        if cursor_pos is None:
+            return False
+
+        cursor_radius = cursor.get_collision_radius_pixels(screen_w, screen_h)
+        distance = self._distance(cursor_pos, (target_x, target_y))
+
+        return distance <= (cursor_radius + target_radius)
+
+    def get_cursor(self, cursor_id: str) -> InputCursor | None:
+        """
+        Obtiene un cursor específico (útil para renderizado).
+
+        Args:
+            cursor_id: Identificador del cursor.
+
+        Returns:
+            InputCursor o None si no existe.
+        """
+        return self._cursors.get(cursor_id)
+
+    def get_all_cursors(self) -> list[InputCursor]:
+        """
+        Obtiene todos los cursores activos.
+
+        Returns:
+            Lista de InputCursor.
+        """
+        return list(self._cursors.values())
 
     # ==========================================
     # Métodos auxiliares privados
     # ==========================================
 
-    def _find_landmark(
-        self, landmarks: list[PoseLandmark], name: str
-    ) -> PoseLandmark | None:
-        """Búsqueda case-insensitive robusta."""
-        name_lower = name.lower()
-        for lm in landmarks:
-            if lm.name and lm.name.lower() == name_lower:
-                return lm
-        return None
-
     def _ema(
-        self, previous: tuple[float, float] | None, current: tuple[float, float]
-    ) -> tuple[float, float]:
+        self,
+        previous: tuple[float, float] | None,
+        current: tuple[float, float] | None,
+    ) -> tuple[float, float] | None:
         """Exponential Moving Average para suavizado."""
+        if current is None:
+            return (
+                None  # ← CORREGIR: propagar None para que el cursor gestione el timeout
+            )
+
         if previous is None:
             return current  # Primer frame, sin historial
 

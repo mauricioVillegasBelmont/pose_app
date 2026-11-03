@@ -7,7 +7,14 @@ Vive en app/ (no en domain/) porque construye adaptadores concretos
 
 from typing import Any
 
+from pose_app.adapters.render.pygame_input_cursor import PygameInputCursorRenderer
 from pose_app.app.game_context import GameContext
+from pose_app.domain.entities.hand_landmark_config import HandLandmarkConfig
+from pose_app.domain.entities.input_cursor import (
+    CursorAppearance,
+    CursorCollision,
+    InputCursor,
+)
 from pose_app.domain.entities.particles.archetype import ParticleArchetype
 from pose_app.domain.entities.particles.components import SpriteConfig
 from pose_app.domain.entities.particles.spawn.ports import (
@@ -82,8 +89,19 @@ class ParticlesPlugin(GamePlugin):
             opts.get("spawn_config"),
         )
 
+        # ==========================================
+        # Construir cursores de interacción
+        # ==========================================
+        raw_cursors = opts.get("cursors")
+        cursor_timeout = float(opts.get("cursor_timeout", 2.0))
+        cursor_configs, cursors = self._build_cursors(raw_cursors, opts)
+
+        # Reconstruir pose_interaction con cursor_configs
         pose_interaction = PoseInteractionFacade(
-            smoothing_factor=profile_config.pose_smoothing_factor
+            smoothing_factor=profile_config.pose_smoothing_factor,
+            hand_timeout=cursor_timeout,
+            cursor_configs=cursor_configs,
+            cursors=cursors,
         )
 
         asset_loader = AssetLoader()
@@ -113,6 +131,15 @@ class ParticlesPlugin(GamePlugin):
             # color NO se espeja
         )
         color_capability._initialize()
+
+        cursor_capability = PygameInputCursorRenderer(
+            width=render_cfg.width,
+            height=render_cfg.height,
+            title="cursors",
+            target_fps=render_cfg.target_fps,
+            mirror=mirror,
+        )
+        cursor_capability.set_cursors(cursors)
 
         particles_capability = PygameParticlesRenderer(
             width=render_cfg.width,
@@ -150,6 +177,7 @@ class ParticlesPlugin(GamePlugin):
             capabilities=[
                 color_capability,
                 particles_capability,
+                cursor_capability,
                 hud_capability,
             ],
             overlays=overlays,
@@ -174,6 +202,7 @@ class ParticlesPlugin(GamePlugin):
             max_score=opts.get("max_score", 10),
             time_per_round=opts.get("time_per_round", 10.0),
             hit_radius=opts.get("hit_radius", 30.0),
+            cursors=cursors,
         )
 
     def _build_archetypes(
@@ -220,10 +249,8 @@ class ParticlesPlugin(GamePlugin):
                     raise ValueError("name must be a non-empty string")
 
                 weight = float(item.get("weight", 1.0))
-                size = float(item.get("size", opts.get("particle_size", 20.0)))
-                color = _parse_color(
-                    item.get("color", opts.get("particle_color", [255, 200, 50]))
-                )
+                size = float(item.get("size", 20.0))
+                color = self._parse_color(item.get("color", [255, 200, 50]))
 
                 archetypes.append(
                     ParticleArchetype(
@@ -262,7 +289,7 @@ class ParticlesPlugin(GamePlugin):
         """
         try:
             size = float(opts.get("particle_size", 20.0))
-            color = _parse_color(opts.get("particle_color", [255, 200, 50]))
+            color = self._parse_color(opts.get("particle_color", [255, 200, 50]))
         except (TypeError, ValueError) as e:
             raise ConfigurationError(
                 "Invalid default particle archetype configuration",
@@ -355,23 +382,112 @@ class ParticlesPlugin(GamePlugin):
             position_strategy=position_strategy,
         )
 
+    def _build_cursors(
+        self,
+        raw_cursors: Any,
+        opts: dict[str, Any],
+    ) -> tuple[dict[str, HandLandmarkConfig], list[InputCursor]]:
+        """Construye cursores de interacción desde la configuración JSON.
 
-def _parse_color(raw_color: Any) -> tuple[int, int, int]:
-    """Convierte un color JSON en una tupla RGB validada.
+        Args:
+            raw_cursors: Diccionario de cursores en bruto desde el JSON.
+            opts: Opciones del juego (fallback para defaults).
 
-    Args:
-        raw_color: Valor en bruto proveniente del JSON.
+        Returns:
+            Tupla (cursor_configs, cursors) donde:
+            - cursor_configs: dict[str, HandLandmarkConfig] para la fachada
+            - cursors: list[InputCursor] con configuración visual y de colisión
 
-    Returns:
-        Tupla ``(r, g, b)``.
+        Raises:
+            ConfigurationError: Si la configuración es inválida.
+        """
+        if raw_cursors is None or not isinstance(raw_cursors, dict):
+            # Defaults: left_hand y right_hand con wrist único
+            default_config = HandLandmarkConfig(
+                landmark_names=("left_wrist",),
+            )
+            default_cursor = InputCursor(cursor_id="left_hand")
+            return (
+                {
+                    "left_hand": default_config,
+                    "right_hand": HandLandmarkConfig(landmark_names=("right_wrist",)),
+                },
+                [default_cursor, InputCursor(cursor_id="right_hand")],
+            )
 
-    Raises:
-        ValueError: Si el valor no es una secuencia de 3 enteros.
-    """
-    if not isinstance(raw_color, (list, tuple)) or len(raw_color) != 3:
-        raise ValueError("color must be a list or tuple of 3 integers")
+        cursor_configs: dict[str, HandLandmarkConfig] = {}
+        cursors: list[InputCursor] = []
 
-    if any(not isinstance(component, int) for component in raw_color):
-        raise ValueError("color components must be integers")
+        for cursor_id, cursor_data in raw_cursors.items():
+            if not isinstance(cursor_data, dict):
+                raise ConfigurationError(
+                    f"Cursor '{cursor_id}' must be an object",
+                    context={"cursor_id": cursor_id},
+                )
 
-    return (raw_color[0], raw_color[1], raw_color[2])
+            try:
+                # 1. Construir HandLandmarkConfig
+                landmark_names = tuple(
+                    cursor_data.get("landmark_names", [f"{cursor_id}_wrist"])
+                )
+                offset_x = float(cursor_data.get("offset_x", 0.0))
+                offset_y = float(cursor_data.get("offset_y", 0.0))
+
+                hand_config = HandLandmarkConfig(
+                    landmark_names=landmark_names,
+                    offset_x=offset_x,
+                    offset_y=offset_y,
+                )
+                cursor_configs[cursor_id] = hand_config
+
+                # 2. Construir CursorAppearance
+                appearance_data = cursor_data.get("appearance", {})
+                appearance = CursorAppearance(
+                    size=float(appearance_data.get("size", 40.0)),
+                    color=tuple(appearance_data.get("color", [255, 255, 0])),
+                    padding_x=float(appearance_data.get("padding_x", 0.0)),
+                    padding_y=float(appearance_data.get("padding_y", 0.0)),
+                )
+
+                # 3. Construir CursorCollision
+                collision_data = cursor_data.get("collision", {})
+                collision = CursorCollision(
+                    radius=float(collision_data.get("radius", 5.0)),
+                )
+
+                # 4. Construir InputCursor
+                cursor = InputCursor(
+                    cursor_id=cursor_id,
+                    appearance=appearance,
+                    collision=collision,
+                )
+                cursors.append(cursor)
+
+            except (TypeError, ValueError) as e:
+                raise ConfigurationError(
+                    f"Invalid cursor configuration for '{cursor_id}': {e}",
+                    context={"cursor_id": cursor_id},
+                ) from e
+
+        return cursor_configs, cursors
+
+    @staticmethod
+    def _parse_color(raw_color: Any) -> tuple[int, int, int]:
+        """Convierte un color JSON en una tupla RGB validada.
+
+        Args:
+            raw_color: Valor en bruto proveniente del JSON.
+
+        Returns:
+            Tupla ``(r, g, b)``.
+
+        Raises:
+            ValueError: Si el valor no es una secuencia de 3 enteros.
+        """
+        if not isinstance(raw_color, (list, tuple)) or len(raw_color) != 3:
+            raise ValueError("color must be a list or tuple of 3 integers")
+
+        if any(not isinstance(component, int) for component in raw_color):
+            raise ValueError("color components must be integers")
+
+        return (int(raw_color[0]), int(raw_color[1]), int(raw_color[2]))

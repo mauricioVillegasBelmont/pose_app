@@ -11,10 +11,8 @@ from typing import Any
 import pygame
 
 from pose_app.domain.entities.pose_landmark import PoseLandmark
-from pose_app.domain.ports.render.color_render_port import ColorRenderPort
-from pose_app.domain.ports.render.hud_render_port import HudRenderPort
 from pose_app.domain.ports.render.overlay_port import OverlayPort
-from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
+from pose_app.domain.ports.render.render_capability import RenderCapability
 from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.infrastructure.logging.logger import get_logger
 
@@ -87,12 +85,8 @@ class PygameSceneManager(ScenePort):
             return
 
         for cap in self._capabilities:
-            if isinstance(cap, ColorRenderPort):
-                cap.render_color()
-            elif isinstance(cap, ParticlesRenderPort):
-                cap.render_particles()
-            elif isinstance(cap, HudRenderPort):
-                cap.render_hud()
+            if isinstance(cap, RenderCapability):
+                cap.render()  # ← Método unificado
 
         for ov in self._overlays:
             ov.draw(self._surface, landmarks)
