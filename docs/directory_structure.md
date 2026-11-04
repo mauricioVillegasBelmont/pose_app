@@ -47,7 +47,8 @@ pose_app/
 │
 │   ├── __init__.py
 │   ├── check_coverage.py
-│   └── coverage_check.sh
+│   ├── coverage_check.sh
+│   └── probe_camera.py
 ├── src/
 │
 │   └── pose_app/
@@ -250,6 +251,9 @@ pose_app/
 │   │   └── test_user_properties.py
 │   ├── unit/
 │   │
+│   │   ├── adapters/
+│   │   │
+│   │   │   └── test_webcam_adapter_threading.py
 │   │   ├── __init__.py
 │   │   ├── test_builtin_plugins.py
 │   │   ├── test_color_game.py

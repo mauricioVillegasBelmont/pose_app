@@ -359,7 +359,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 
 | Carpeta | Qué implementa |
 |---|---|
-| `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`) |
+| `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`: captura en hilo + FourCC configurable) |
 | `src/pose_app/adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
 | `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame |
 | `src/pose_app/adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
@@ -554,16 +554,17 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 
 ### `src/pose_app/domain/ports/camera_port.py`
 **Propósito**: obtener frames sin saber la fuente (webcam, mock, archivo).
-**Patrones**: Puerto (ABC), Context Manager.
+**Patrones**: Puerto (ABC), Protocol opcional, Context Manager.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
 | `CameraPort` | `ABC` | Contrato de cámara | Implementado por `WebcamAdapter`, `MockCameraAdapter`; inyectado vía `GameContext` |
-| `CameraPort.start` | `(self) -> None` | Inicia captura | Invocado por los 3 juegos: `await asyncio.to_thread(self._camera.start)` |
-| `CameraPort.stop` | `(self) -> None` | Libera recursos (idempotente) | `finally` de los juegos + `Container.shutdown()` |
-| `CameraPort.get_frame` | `(self) -> np.ndarray \| None` | Frame BGR `(H,W,3)` o `None` | Bucle de los juegos (`asyncio.to_thread`) |
+| `CameraPort.start` | `(self) -> None` | Inicia captura (en `WebcamAdapter` arranca un hilo) | Invocado por los 3 juegos: `await asyncio.to_thread(self._camera.start)` |
+| `CameraPort.stop` | `(self) -> None` | Libera recursos (idempotente; espera al hilo si existe) | `finally` de los juegos + `Container.shutdown()` |
+| `CameraPort.get_frame` | `(self) -> np.ndarray \| None` | Frame BGR `(H,W,3)` o `None`; no bloquea | Bucle de los juegos (`asyncio.to_thread`) |
 | `CameraPort.is_running` | `(self) -> bool` | Estado de la cámara | 🟡 sin invocadores en producción |
 | `CameraPort.__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | `with` → `start()`/`stop()` | Tests manuales |
+| `CameraStatsPort` | `Protocol @runtime_checkable` | Métricas opcionales de captura | Implementado por `WebcamAdapter`; detectado con `isinstance` |
 
 ### `src/pose_app/domain/ports/pose_estimator_port.py`
 **Propósito**: extraer landmarks de un frame sin conocer el modelo.
@@ -814,7 +815,7 @@ Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `
 
 | Clase | Prefijo | Campos (tipo, default, rango) |
 |---|---|---|
-| `CameraSettings` | `CAMERA_` | `id:int=0` (≥0), `width:int=640` (160-1920), `height:int=480` (120-1080), `fps:int=30` (1-120) |
+| `CameraSettings` | `CAMERA_` | `id:int=0` (≥0), `width:int=640` (160-1920), `height:int=480` (120-1080), `fps:int=30` (1-120), `fourcc:str="MJPG"` |
 | `PoseSettings` | `POSE_` | `provider: Literal["mediapipe","mock"]="mediapipe"`, `model_complexity:int=1` (0-2), `min_detection_confidence/float=0.5`, `min_tracking_confidence/float=0.5` |
 | `RenderSettings` | `RENDER_` | `provider: Literal["pygame","mock"]="pygame"`, `debug_overlay:bool=False`, `width=800`, `height=600`, `title:str`, `target_fps:int=60` (15-144) |
 | GameSettings|GAME_|type:str="particles" (snake_case), profile_name:str="normal"|
@@ -935,18 +936,23 @@ Thread-safe; doble índice `_by_provider[(provider, id)]` y `_by_user_id`. Misma
 ## 5.10 `src/pose_app/adapters/camera/`, `src/pose_app/adapters/pose/`, `src/pose_app/adapters/mock/`
 
 ### `camera/webcam_adapter.py` — `WebcamAdapter(CameraPort)`
-**Patrones**: Adapter, Context Manager, RAII (`__del__`), `Lock` para el buffer.
+**Patrones**: Adapter, Context Manager, RAII (`__del__`), productor/consumidor con hilo daemon, `Lock` para buffer y métricas.
 
 | Método | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
-| `__init__` | `(self, camera_id: int = 0, width: int = 640, height: int = 480, fps: int = 30) -> None` | Guarda config; `_latest_frame`, `_lock`, `_running=False` | `Container._create_camera` |
-| `start` | `(self) -> None` | Abre `cv2.VideoCapture`, aplica resolución/FPS, `RuntimeError` si falla | `CameraPort.start` desde los juegos |
-| `stop` | `(self) -> None` | Libera captura (idempotente) | `finally` de juegos, `Container.shutdown` |
-| `get_frame` | `(self) -> np.ndarray \| None` | `_read_frame()` + **copia** bajo `_lock` | Bucle de juegos |
+| `__init__` | `(self, camera_id: int = 0, width: int = 640, height: int = 480, fps: int = 30, fourcc: str = "MJPG") -> None` | Guarda config; inicializa buffer, lock, `_stop_event` y métricas | `Container._create_camera` |
+| `start` | `(self) -> None` | Abre `cv2.VideoCapture(..., CAP_V4L2)`, negocia FourCC/resolución/FPS, loguea el formato real y arranca `_capture_thread` | `CameraPort.start` desde los juegos |
+| `stop` | `(self) -> None` | Setea `_stop_event`, hace `join(timeout=2s)`, libera captura y resetea métricas (idempotente) | `finally` de juegos, `Container.shutdown` |
+| `get_frame` | `(self) -> np.ndarray \| None` | Devuelve copia del último frame bajo lock; **no lee del dispositivo** ni bloquea | Bucle de juegos |
 | `is_running` | `(self) -> bool` | `_running` | 🟡 |
-| `get_fps` | `(self) -> float` | FPS real (fuera del puerto) | Debug |
-| `_read_frame` | `(self) -> None` | `cap.read()` → buffer; log FPS cada 30 frames | `start` y `get_frame` |
+| `get_fps` | `(self) -> float` | FPS de captura de la ventana actual (fuera del puerto) | Debug |
+| `get_stats` | `(self) -> dict` | Snapshot de FPS, frames, resolución, FourCC y estado del hilo | `CameraStatsPort` / debug |
+| `_capture_loop` | `(self) -> None` | Bucle del hilo: `cap.read()` → buffer + métricas; detecta desconexión | `start` |
+| `_update_fps_locked` | `(self, now: float) -> None` | Calcula FPS en ventanas de 1s (requiere lock tomado) | `_capture_loop` |
+| `_get_actual_fourcc` | `(self) -> str` | Decodifica el FourCC real negociado con el dispositivo | `start` |
 | `__enter__/__exit__/__del__` | context manager | `start`/`stop`/`stop` | Tests manuales |
+
+**Nota**: el buffer es de un solo frame: si el consumidor no lee a tiempo, el frame se sobrescribe. El hilo es `daemon` y `stop()` espera hasta 2s a que termine.
 
 ### `pose/mediapipe_adapter.py` — `MediapipeAdapter(PoseEstimatorPort)`
 **Patrones**: Adapter, Context Manager, cache de nombres, factory `_ensure_model` (descarga el `.task`).
@@ -1067,7 +1073,7 @@ Creado por `ColorPlugin._create_renderer` cuando `RENDER_DEBUG_OVERLAY=true`.
 |---|---|---|---|
 | `__init__` | `(self, settings: Settings) -> None` | Slots a `None` | `src/pose_app/app/main.py` |
 | `camera / pose_estimator / event_bus / state_registry / plugin_registry / api` | `@property` lazy | Construyen en primera acceso | `create_game()`, `main_async` |
-| `_create_camera` | `(self) -> CameraPort` | `ENVIRONMENT=testing` → Mock; si no `WebcamAdapter`; `ConfigurationError` si falla | por `camera` |
+| `_create_camera` | `(self) -> CameraPort` | `ENVIRONMENT=testing` → Mock; si no `WebcamAdapter` con `cfg.id`, resolución, FPS y `fourcc=cfg.fourcc`; `ConfigurationError` si falla | por `camera` |
 | `_create_pose_estimator` | `(self) -> PoseEstimatorPort` | `POSE_PROVIDER` → Mock/Mediapipe; `ConfigurationError` si desconocido | por `pose_estimator` |
 | `create_game` | `(self) -> GameProtocol` | plugin → `GameContext` → `plugin.create_game` → `state_registry.register(game.state)` | 🟢 `src/pose_app/app/main.py` |
 | `shutdown` | `async (self) -> None` | api → cámara → pose (con try/except y log) | `finally` de `main_async` |
@@ -1154,6 +1160,8 @@ TokenError(AppError)  (definida en src/pose_app/infrastructure/auth/jwt_service.
 | `unit/test_render_adapters.py` | Adaptadores pygame cumplen puertos; conversión a píxeles |
 | `unit/test_settings.py` | `Settings` carga desde entorno |
 | `unit/test_user_repository.py` | CRUD de usuarios, índices, idempotencia |
+| `unit/test_webcam_adapter.py` | Apertura, FourCC/resolución, lifecycle, ventana de FPS y `get_stats` |
+| `unit/adapters/test_webcam_adapter_threading.py` | Arranque/parada del hilo, `get_frame` no bloqueante, `get_stats` e idempotencia |
 | `integration/test_auth_endpoints.py` | Login, `/me`, 401/403, `/health` público, aislamiento de secrets |
 | `integration/test_user_endpoints.py` | CRUD `/users` completo + guardas de seguridad admin |
 | `integration/test_plugin_system_e2e.py` | Container crea Particles/ColorGame; error si juego desconocido |
@@ -1188,6 +1196,12 @@ Fitness function de arquitectura (se corre a mano, no con pytest):
 ### `directory_tree_generator.py`
 Genera `<dir>_directory_structure.md`. `DirectoryTreeGenerator(root_dir, output_file)`, `generate_tree()`, `_generate_tree_recursive(...)`, `main()`. Sirve para regenerar `docs/directory_structure.md`.
 
+### `scripts/probe_camera.py`
+**Propósito**: diagnóstico rápido de cámara/FPS sin levantar la app.
+- Abre `cv2.VideoCapture(0, cv2.CAP_V4L2)`, negocia `MJPG` a 640x480@30.
+- Imprime el FourCC realmente concedido y mide FPS de captura pura durante 5s.
+- Sirve para separar el cuello de botella de la cámara del de pose/render.
+
 ### `debug_mediapipe_tasks.py`
 Script de reproducción de crashes de Mediapipe **fuera de pytest**: crea `MediapipeAdapter`, llama `estimate()` con frames sintéticos e imprime en qué paso falla. Excluido de coverage.
 
@@ -1209,7 +1223,7 @@ Croquis inicial (16 líneas) de puertos/adaptadores/casos de uso. **Está desact
 | **pre-push** | `pytest --cov --cov-report=xml` + `scripts/check_coverage.py` |
 
 ### `.env.example`
-Lista de nombres (sin valores): `APP_NAME`, `ENVIRONMENT`, `DEBUG`, `CAMERA_*`, `POSE_*`, `RENDER_*`, `API_*`, `GAME_*`, `LOG_*`, `JWT_*`.
+Variables de configuración de ejemplo: `APP_NAME`, `ENVIRONMENT`, `DEBUG`, `CAMERA_*` (incluye `CAMERA_FOURCC=MJPG`), `POSE_*`, `RENDER_*`, `API_*`, `GAME_*`, `LOG_*`, `JWT_*`.
 
 ### `requirements.txt` / `requirements-dev.txt`
 Pinning para instalación sin `uv` (generados con `uv export`). `requirements-dev.txt` añade pytest, hypothesis, mypy, ruff. Recomendado: usar `uv sync`.
