@@ -27,6 +27,7 @@ class CameraSettings(BaseSettings):
     width: int = Field(default=640, ge=160, le=1920, description="Ancho de captura")
     height: int = Field(default=480, ge=120, le=1080, description="Alto de captura")
     fps: int = Field(default=30, ge=1, le=120, description="FPS objetivo")
+    fourcc: str = Field(default="MJPG", description="FourCC code for video encoding")
 
 
 class PoseSettings(BaseSettings):

@@ -1,3 +1,4 @@
+import sys
 import time
 from threading import Lock
 
@@ -21,7 +22,12 @@ class WebcamAdapter(CameraPort):
     """
 
     def __init__(
-        self, camera_id: int = 0, width: int = 640, height: int = 480, fps: int = 30
+        self,
+        camera_id: int = 0,
+        width: int = 640,
+        height: int = 480,
+        fps: int = 30,
+        fourcc: str = "MJPG",
     ):
         """
         Args:
@@ -29,11 +35,13 @@ class WebcamAdapter(CameraPort):
             width: Ancho de captura
             height: Alto de captura
             fps: Frames por segundo (sugerido)
+            fourcc: Código de compresión de video
         """
         self._camera_id = camera_id
         self._width = width
         self._height = height
         self._fps = fps
+        self._fourcc = fourcc
 
         self._cap: cv2.VideoCapture | None = None
         self._running: bool = False
@@ -49,14 +57,15 @@ class WebcamAdapter(CameraPort):
             return
 
         # Abre la cámara
-        # self._cap = cv2.VideoCapture(self._camera_id, cv2.CAP_V4L2) # <-- LINUX/WSL
-        self._cap = cv2.VideoCapture(self._camera_id)
+        self._cap = cv2.VideoCapture(self._camera_id, cv2.CAP_V4L2)  # <-- LINUX/WSL
+        # self._cap = cv2.VideoCapture(self._camera_id)
 
         if not self._cap.isOpened():
             logger.error(f"No se pudo abrir la cámara {self._camera_id}")
             raise RuntimeError(f"No se pudo abrir la cámara {self._camera_id}")
 
         # Configura resolución
+        self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*self._fourcc))  # type: ignore[attr-defined]
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self._width)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self._height)
         self._cap.set(cv2.CAP_PROP_FPS, self._fps)
@@ -65,12 +74,13 @@ class WebcamAdapter(CameraPort):
         actual_width = int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_height = int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         actual_fps = self._cap.get(cv2.CAP_PROP_FPS)
+        actual_fourcc = self._get_actual_fourcc()
 
         logger.info(
-            f"Cámara iniciada: {actual_width}x{actual_height} @ {self._fps} FPS"
+            f"Cámara iniciada: {actual_width}x{actual_height} @ {self._fps} FPS / Formato: {actual_fourcc}"
         )
         print(
-            f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS"
+            f"📷 Cámara iniciada: {actual_width}x{actual_height} @ {actual_fps:.1f} FPS / Formato: {actual_fourcc}"
         )
 
         self._running = True
@@ -125,6 +135,22 @@ class WebcamAdapter(CameraPort):
         if elapsed > 0:
             return self._frame_count / elapsed
         return 0.0
+
+    def _get_actual_fourcc(self) -> str:
+        """Returns the 4-letter string of the codec from a VideoCapture object."""
+        if self._cap is None:
+            return ""
+        # 1. Get the raw integer FourCC value from OpenCV
+        fourcc_int = int(self._cap.get(cv2.CAP_PROP_FOURCC))
+
+        # 2. Convert the integer to 4 bytes using the system's byte order, then decode to string
+        try:
+            return fourcc_int.to_bytes(4, byteorder=sys.byteorder).decode().strip()
+        except Exception:
+            # Fallback method using bit-shifting if decoding fails
+            return "".join(
+                [chr((fourcc_int >> (i * 8)) & 0xFF) for i in range(4)]
+            ).strip()
 
     def _read_frame(self) -> None:
         """

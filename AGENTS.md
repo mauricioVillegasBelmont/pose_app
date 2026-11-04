@@ -153,6 +153,9 @@ Esta sección resume las reglas **obligatorias**. Cualquier código nuevo debe c
 - Usa `from collections.abc import Callable, Awaitable` — **NO** `typing.Callable`.
 - Anota **siempre** parámetros y retornos de funciones públicas.
 - Anota **propiedades** con `@property` + tipo de retorno.
+- Usa **docstrings** descriptivos con Args/Returns/Raises.
+- Añade **logging** apropiado (`logger.debug/info/warning/error`).
+- **No dejes TODOs sin contexto**. Si pones uno, explica qué y por qué.
 
 **Ejemplos del proyecto**:
 
