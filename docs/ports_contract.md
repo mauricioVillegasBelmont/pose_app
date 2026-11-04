@@ -1,6 +1,6 @@
 # Contrato de Puertos - Pose AR App
 
-> **Versión**: 0.6.0
+> **Versión**: 0.7.0
 > **Última actualización**: [fecha]
 > **Estado**: Vivo (se actualiza con cada fase)
 
@@ -14,6 +14,7 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 ### Puertos de Entrada (el dominio LEE del exterior)
 - [CameraPort](#cameraPort)
+- [CameraStatsPort](#cameraStatsPort)
 - [PoseEstimatorPort](#poseEstimatorPort)
 
 ### Puertos de Salida — Render (el dominio ESCRIBE al exterior)
@@ -63,6 +64,8 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - **Propósito**: Iniciar la captura.
 - **Precondición**: ninguno.
 - **Postcondición**: el adaptador está listo para recibir `get_frame()`.
+  En implementaciones con hilo de captura, la lectura del dispositivo ocurre
+  en background.
 - **Errores**:
   - `CameraNotAvailableError` si no puede acceder al dispositivo.
   - `CameraError` para otros fallos.
@@ -71,7 +74,8 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 - **Propósito**: Detener la captura y liberar recursos.
 - **Precondición**: ninguno (idempotente).
-- **Postcondición**: los recursos (cámara, hilos) están liberados.
+- **Postcondición**: los recursos (cámara, hilos) están liberados. Si el
+  adaptador usa un hilo de captura, `stop()` espera su finalización.
 
 ##### `get_frame() -> np.ndarray | None`
 
@@ -80,8 +84,11 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - **Precondición**: `start()` fue llamado.
 - **Postcondición**: devuelve un frame o `None` si no hay disponible.
 - **Notas**:
-  - Puede devolver el **mismo frame** varias veces si la cámara es más lenta que el procesamiento.
-  - Puede devolver `None` transitoriamente (frame drop).
+  - **No bloquea**: devuelve el frame más reciente del buffer; no lee del
+    dispositivo en la llamada.
+  - Puede devolver el **mismo frame** varias veces si no ha llegado uno nuevo.
+  - `WebcamAdapter` devuelve una **copia defensiva** del frame.
+  - Puede devolver `None` transitoriamente (frame drop o cámara aún sin frames).
 
 ##### `is_running() -> bool`
 
@@ -96,6 +103,46 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 | `VideoFileAdapter` | ⏳ Planeado | (para replay/testing) |
 | `RTSPAdapter` | ⏳ Futuro | (para streaming IP) |
 | `DeepCameraAdapter` | ⏳ Futuro | `adapters/camera/deepcam_adapter.py` |
+
+**Notas de implementación**:
+
+- `WebcamAdapter` usa un **hilo de captura daemon** y un buffer de un frame:
+  si el consumidor no llama a `get_frame()` a tiempo, el frame se sobrescribe.
+- El formato de video se negocia con `CAMERA_FOURCC` (default `MJPG`); el
+  adaptador loguea el FourCC real concedido por el dispositivo.
+
+---
+
+<a name="cameraStatsPort"></a>
+### 📊 CameraStatsPort (opcional)
+
+**Propósito**: Exponer métricas de captura sin ampliar `CameraPort`.
+
+**Ubicación**: `domain/ports/camera_port.py`
+
+**Quién lo usa**: diagnóstico y debug (no es dependencia de los juegos).
+
+#### Métodos
+
+##### `get_stats() -> dict`
+
+- **Propósito**: Devolver un snapshot de las métricas de captura.
+- **Contrato**:
+  - No bloquea: toma las métricas bajo lock.
+  - Las claves concretas pueden variar entre adaptadores.
+  - `WebcamAdapter` publica: `fps_captura`, `fps_declarado`, `frames_leidos`,
+    `frames_en_ventana`, `frames_entregados`, `width`, `height`, `fourcc` y
+    `hilo_activo`.
+- **Notas**:
+  - Es un `Protocol` con `@runtime_checkable`: se puede detectar con
+    `isinstance(camera, CameraStatsPort)` sin heredar de `CameraPort`.
+  - No es obligatorio para todos los adaptadores de cámara.
+
+#### Adaptadores conocidos
+
+| Adaptador | Estado | Ubicación |
+|-----------|--------|-----------|
+| `WebcamAdapter` | ✅ Implementado | `adapters/camera/webcam_adapter.py` |
 
 ---
 
@@ -672,6 +719,7 @@ componentes (juegos, API, sistema).
 | 0.4 | [fecha] | StatePort genérico (posteriormente eliminado) |
 | 0.5.1 | [fecha] | Separación de `RenderPort` en `ParticlesRenderPort` y `ColorRenderPort` |
 | 0.6.0 | [fecha] | 1) `StatePort` → `GameStatePort`. 2) Añadido `EventBusPort`. 3) Añadidos `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort`. 4) Añadido `LandmarkAwareRenderPort`. 5) Nueva arquitectura de render (pendiente). |
+| 0.7.0 | [fecha] | 1) Añadido `CameraStatsPort` (métricas opcionales). 2) `CameraPort.get_frame` documentado como no bloqueante y con copia defensiva en `WebcamAdapter`. 3) `WebcamAdapter`: hilo de captura y FourCC configurable (`CAMERA_FOURCC`). |
 
 ---
 
