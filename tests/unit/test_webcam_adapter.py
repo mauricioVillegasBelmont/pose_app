@@ -5,7 +5,7 @@ No requiere cámara física: cv2.VideoCapture se reemplaza por un doble
 configurable (FakeCapture) que simula apertura, lectura y liberación.
 """
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 import cv2
 import numpy as np
@@ -14,12 +14,27 @@ import pytest
 from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
 
 
+def _fourcc_value(code: str) -> int:
+    """Empaqueta un FourCC de 4 caracteres como entero (little-endian)."""
+    return int.from_bytes(code.encode("ascii"), byteorder="little")
+
+
+def _install_fake_capture(
+    monkeypatch: pytest.MonkeyPatch,
+    factory: Callable[..., "FakeCapture"],
+) -> None:
+    """Instala un doble de cv2.VideoCapture sin ensuciar la inferencia de tipos."""
+    monkeypatch.setattr(cv2, "VideoCapture", factory, raising=True)
+
+
 class FakeCapture:
     """Doble de cv2.VideoCapture configurable para tests."""
 
     def __init__(self, opened: bool = True) -> None:
-        """Args:
-        opened: Valor inicial de isOpened().
+        """Inicializa el doble.
+
+        Args:
+            opened: Valor inicial de isOpened().
         """
         self._opened = opened
         self.read_results: list[tuple[bool, np.ndarray | None]] = []
@@ -51,8 +66,10 @@ class FakeCapture:
         self._opened = False
 
     def queue_frames(self, count: int) -> None:
-        """Args:
-        count: Número de frames válidos a encolar.
+        """Encola ``count`` frames válidos para próximas lecturas.
+
+        Args:
+            count: Número de frames válidos a encolar.
         """
         frame = np.zeros((480, 640, 3), dtype=np.uint8)
         for _ in range(count):
@@ -69,11 +86,7 @@ def adapter(
     capture: FakeCapture, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[WebcamAdapter]:
     """WebcamAdapter con cv2.VideoCapture reemplazado por FakeCapture."""
-
-    def factory(_camera_id: int) -> FakeCapture:
-        return capture
-
-    monkeypatch.setattr(cv2, "VideoCapture", factory)
+    _install_fake_capture(monkeypatch, lambda *a, **kw: capture)
     adapter = WebcamAdapter(camera_id=0, width=640, height=480, fps=30)
     yield adapter
     if adapter.is_running():
@@ -88,7 +101,7 @@ class TestStart:
     ) -> None:
         """Si isOpened() es False, start() lanza RuntimeError."""
         closed = FakeCapture(opened=False)
-        monkeypatch.setattr(cv2, "VideoCapture", lambda _id: closed)
+        _install_fake_capture(monkeypatch, lambda *a, **kw: closed)
         adapter = WebcamAdapter()
 
         with pytest.raises(RuntimeError, match="No se pudo abrir la cámara"):
@@ -97,28 +110,42 @@ class TestStart:
     def test_start_configures_resolution_and_fps(
         self, adapter: WebcamAdapter, capture: FakeCapture
     ) -> None:
-        """start() aplica width, height y fps al dispositivo."""
+        """start() aplica fourcc, width, height y fps al dispositivo."""
         capture.queue_frames(1)
 
         adapter.start()
 
         props = [prop for prop, _value in capture.set_calls]
         assert props == [
+            cv2.CAP_PROP_FOURCC,
             cv2.CAP_PROP_FRAME_WIDTH,
             cv2.CAP_PROP_FRAME_HEIGHT,
             cv2.CAP_PROP_FPS,
         ]
 
+    def test_start_uses_configured_fourcc(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        """start() pasa el fourcc configurado al dispositivo."""
+        capture.queue_frames(1)
+
+        adapter.start()
+
+        fourcc_calls = [v for p, v in capture.set_calls if p == cv2.CAP_PROP_FOURCC]
+        assert fourcc_calls == [_fourcc_value("MJPG")]
+
     def test_start_is_idempotent(
         self, adapter: WebcamAdapter, capture: FakeCapture
     ) -> None:
-        """Un segundo start() no reabre la cámara."""
+        """Un segundo start() no reabre la cámara ni reconfigura el dispositivo."""
         capture.queue_frames(2)
 
         adapter.start()
+        calls_after_first = len(capture.set_calls)
         adapter.start()
 
-        assert len(capture.set_calls) == 3
+        assert len(capture.set_calls) == calls_after_first
+        assert calls_after_first == 4  # FOURCC + WIDTH + HEIGHT + FPS
 
     def test_start_captures_initial_frame(
         self, adapter: WebcamAdapter, capture: FakeCapture
@@ -236,79 +263,37 @@ class TestGetFrame:
 
         np.testing.assert_array_equal(result, first)
 
-    def test_camera_disconnect_stops_running(
+    def test_camera_disconnect_stops_capture_thread(
         self, adapter: WebcamAdapter, capture: FakeCapture
     ) -> None:
-        """Si la cámara se desconecta, is_running() pasa a False."""
-        capture.queue_frames(2)
+        """Si la cámara se desconecta, el hilo de captura marca is_running()=False."""
+        import time
+
+        capture.queue_frames(10)
         adapter.start()
+
+        # Simula desconexión: isOpened() pasa a False
         capture._opened = False
 
-        adapter.get_frame()
+        # Espera a que el hilo de captura lo detecte (loop hace check por iteración)
+        deadline = time.time() + 1.0
+        while adapter.is_running() and time.time() < deadline:
+            time.sleep(0.01)
 
         assert adapter.is_running() is False
+        # Con el adaptador detenido, get_frame() devuelve None
         assert adapter.get_frame() is None
 
 
 class TestGetFps:
-    """Tests de WebcamAdapter.get_fps()."""
+    def test_get_fps_returns_cached_value(self, adapter: WebcamAdapter) -> None:
+        """get_fps() devuelve el valor calculado por el hilo de captura."""
+        adapter._fps = 29.5
+        assert adapter.get_fps() == 29.5
 
-    def test_get_fps_zero_with_insufficient_frames(
-        self, adapter: WebcamAdapter
-    ) -> None:
-        """Con menos de 2 frames, get_fps() devuelve 0.0."""
+    def test_get_fps_zero_before_any_measurement(self, adapter: WebcamAdapter) -> None:
+        """Sin mediciones todavía, get_fps() es 0.0."""
         assert adapter.get_fps() == 0.0
-
-    def test_get_fps_computes_frames_over_elapsed(self, adapter: WebcamAdapter) -> None:
-        """get_fps() = frame_count / tiempo transcurrido."""
-        import time
-
-        adapter._frame_count = 10
-        adapter._last_read_time = time.time() - 2.0
-
-        fps = adapter.get_fps()
-
-        assert 4.0 < fps < 6.0
-
-    def test_get_fps_zero_when_no_time_elapsed(self, adapter: WebcamAdapter) -> None:
-        """Si no transcurrió tiempo (reloj en el futuro), get_fps() es 0.0."""
-        import time
-
-        adapter._frame_count = 10
-        adapter._last_read_time = time.time() + 100.0
-
-        assert adapter.get_fps() == 0.0
-
-
-class TestReadFrameInternals:
-    """Tests de WebcamAdapter._read_frame() y logging de FPS."""
-
-    def test_read_frame_noop_when_not_running(self, adapter: WebcamAdapter) -> None:
-        """_read_frame() sin start() no hace nada ni lanza."""
-        adapter._read_frame()
-
-        assert adapter._latest_frame is None
-
-    def test_fps_logging_every_30_frames(
-        self, adapter: WebcamAdapter, capture: FakeCapture
-    ) -> None:
-        """Cada 30 frames se reinicia el contador y se registra el FPS."""
-        capture.queue_frames(70)
-        adapter.start()
-
-        # start() ya leyó 1 frame; 29 más completan el primer ciclo de 30
-        for _ in range(29):
-            adapter.get_frame()
-        first_cycle_time = adapter._last_read_time
-        assert adapter._frame_count == 0
-        assert first_cycle_time > 0
-
-        # 30 frames más: ahora _last_read_time > 0, se calcula FPS real
-        for _ in range(30):
-            adapter.get_frame()
-
-        assert adapter._frame_count == 0
-        assert adapter._last_read_time >= first_cycle_time
 
 
 class TestLifecycle:
@@ -344,3 +329,71 @@ class TestLifecycle:
         adapter.__del__()
 
         assert adapter.is_running() is False
+
+
+class TestFpsWindow:
+    """Tests de la ventana de cálculo de FPS del hilo de captura."""
+
+    def test_fps_window_resets_counter_after_one_second(
+        self, adapter: WebcamAdapter
+    ) -> None:
+        """Tras >=1s, _update_fps_locked resetea _frame_count y fija _fps."""
+        import time
+
+        adapter._frame_count = 30
+        adapter._last_read_time = time.perf_counter() - 1.5
+        adapter._update_fps_locked(time.perf_counter())
+
+        assert adapter._frame_count == 0
+        assert 15.0 < adapter.get_fps() < 25.0  # 30/1.5
+
+    def test_fps_window_does_not_reset_before_one_second(
+        self, adapter: WebcamAdapter
+    ) -> None:
+        """Antes de 1s, no se resetea ni se actualiza _fps."""
+        import time
+
+        adapter._frame_count = 5
+        adapter._last_read_time = time.perf_counter() - 0.2
+        before = adapter.get_fps()
+        adapter._update_fps_locked(time.perf_counter())
+
+        assert adapter._frame_count == 5
+        assert adapter.get_fps() == before
+
+
+class TestGetStats:
+    """Tests de WebcamAdapter.get_stats()."""
+
+    def test_get_stats_exposes_expected_keys(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        capture.queue_frames(1)
+        adapter.start()
+
+        stats = adapter.get_stats()
+
+        assert set(stats) >= {
+            "fps_captura",
+            "fps_declarado",
+            "frames_leidos",
+            "frames_entregados",
+            "width",
+            "height",
+            "fourcc",
+            "hilo_activo",
+        }
+        assert stats["width"] == 640
+        assert stats["height"] == 480
+        assert stats["hilo_activo"] is True
+
+    def test_get_stats_counts_delivered_frames(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        capture.queue_frames(5)
+        adapter.start()
+        adapter.get_frame()
+        adapter.get_frame()
+
+        stats = adapter.get_stats()
+        assert stats["frames_entregados"] == 2
