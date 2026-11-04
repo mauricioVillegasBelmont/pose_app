@@ -1,30 +1,35 @@
 """
-Test de integración: cámara real + pose mock + render mock.
+Script manual: cámara real + pose mock + render mock.
 
-Verifica que la cadena completa de adaptadores funcione.
-Marcado como skip si no hay cámara disponible.
+Requiere cámara física. NO se ejecuta con pytest (está en tests/manual/,
+excluido vía norecursedirs en pyproject.toml).
+
+Uso:
+    uv run python tests/manual/webcam_mock_pose.py
+
+Verifica que la cadena completa de adaptadores funcione corriendo el juego
+por 2 segundos con cámara real y pose/render mockeados.
 """
 
+import asyncio
 import threading
 import time
-
-import pytest
 
 from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
 from pose_app.adapters.mock.mock_pose import MockPoseAdapter
 from pose_app.adapters.mock.mock_render import MockParticlesRenderAdapter
-from pose_app.domain.games.particles.main import ParticlesGame  # ← ruta nueva
+from pose_app.domain.games.particles.main import ParticlesGame
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.infrastructure.events.async_event_bus import AsyncEventBus
 
 
-@pytest.mark.skip(reason="Requiere cámara física, correr manualmente")
-def test_webcam_with_mock_pose_and_render():
+def run_webcam_mock_pose() -> None:
     """
     Corre el juego por 2 segundos con cámara real y mocks.
 
-    Se marca skip por defecto (requiere hardware).
-    Correr con: pytest -k webcam --no-skip
+    Raises:
+        AssertionError: Si no se renderizó ningún frame o el estado
+            no registró frames procesados.
     """
     # Arrange
     camera = WebcamAdapter(camera_id=0, width=320, height=240)
@@ -44,12 +49,10 @@ def test_webcam_with_mock_pose_and_render():
     # Act: corre por 2 segundos en un thread
     stop_flag = {"stop": False}
 
-    def run_game():
-        import asyncio
-
+    def _run_game() -> None:
         asyncio.run(game.run_async(should_stop=lambda: stop_flag["stop"]))
 
-    thread = threading.Thread(target=run_game, daemon=True)
+    thread = threading.Thread(target=_run_game, daemon=True)
     thread.start()
     time.sleep(2.0)
     stop_flag["stop"] = True
@@ -58,3 +61,9 @@ def test_webcam_with_mock_pose_and_render():
     # Assert
     assert renderer.render_count > 0, "No se renderizó ningún frame"
     assert state.snapshot()["frame_count"] > 0
+
+    print(f"✅ Prueba completada: {renderer.render_count} frames renderizados")
+
+
+if __name__ == "__main__":
+    run_webcam_mock_pose()

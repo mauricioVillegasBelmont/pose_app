@@ -1,17 +1,33 @@
+"""
+Script manual: cámara real + Mediapipe real.
+
+Requiere cámara física. NO se ejecuta con pytest (está en tests/manual/,
+excluido vía norecursedirs en pyproject.toml).
+
+Uso:
+    uv run python tests/manual/webcam_mediapipe.py
+
+Muestra en una ventana OpenCV los landmarks detectados en tiempo real.
+Presiona 'q' para salir.
+"""
+
 import time
 
 import cv2
-import pytest
 
 from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
 from pose_app.adapters.pose.mediapipe_adapter import MediapipeAdapter
 
 
-@pytest.mark.skip(reason="Requiere cámara física, correr manualmente")
-def test_webcam_with_mediapipe():
+def run_webcam_mediapipe() -> None:
     """
-    Prueba de integración: cámara real + Mediapipe real.
-    Visualiza los landmarks detectados en tiempo real.
+    Captura de la webcam + estimación de pose en tiempo real.
+
+    Visualiza los landmarks detectados y los FPS durante 10 segundos
+    (o hasta presionar 'q').
+
+    Raises:
+        AssertionError: Si no se procesó ningún frame.
     """
     # Arrange
     camera = WebcamAdapter(camera_id=0, width=640, height=480)
@@ -75,4 +91,4 @@ def test_webcam_with_mediapipe():
 
 
 if __name__ == "__main__":
-    test_webcam_with_mediapipe()
+    run_webcam_mediapipe()
