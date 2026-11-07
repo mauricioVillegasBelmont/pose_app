@@ -68,14 +68,23 @@ app ──► adapters ──► domain ◄── infrastructure
 
 | Sufijo | Significado | Ejemplo |
 |---|---|---|
-| `*Port` | Interfaz abstracta (ABC) que el dominio **define** | `CameraPort` |
-| `*Adapter` / `*Renderer` | Implementación concreta de un puerto | `WebcamAdapter` |
+| `*Port` | Interfaz abstracta (ABC o Protocol) que el dominio **define** | `CameraPort`, `SpawnStrategy` |
+| `*Adapter` / `*Renderer` | Implementación concreta de un puerto | `WebcamAdapter`, `PygameSceneManager` |
 | `*Plugin` | Fábrica que construye un juego completo | `ParticlesPlugin` |
 | `*State` | Estado consultable thread-safe de un juego | `ParticlesState` |
-| `*Overlay` | Elemento visual superpuesto (debug/FPS) | `PoseOverlay` |
+| `*Overlay` | Elemento visual superpuesto (debug/FPS) | `PoseOverlay`, `FpsOverlay` |
 | `*Schema` / `*Response` / `*Request` | DTO pydantic de la API | `UserResponse` |
 | `*Repository` | Almacén CRUD de una entidad | `InMemoryUserRepository` |
 | `*Game` | Juego con su loop asíncrono | `GesturesGame` |
+| `*Facade` | Fachada que simplifica varios subsistemas detrás de una API | `PoseInteractionFacade` |
+| `*Handler` | Estrategia sin estado que resuelve un cálculo concreto | `CentroidCollisionHandler` |
+| `*System` | Sistema ECS que muta componentes por tick | `MovementSystem`, `LifespanSystem` |
+| `*Strategy` | Algoritmo intercambiable inyectado | `ComposedSpawnStrategy` |
+| `*Selector` | Estrategia de selección entre opciones | `WeightedSelector`, `SequentialSelector` |
+| `*Config` | Configuración inmutable (VO o Pydantic) | `HandLandmarkConfig`, `GameProfileConfig` |
+| `*Capability` | Capacidad ECS (lifespan, colisión, render) | `LifespanCapability`, `RenderCapability` |
+| `*Protocol` | Protocolo estructural (`typing.Protocol`) | `GameProtocol`, `SpawnStrategy` |
+| `*Manager` | Coordinador de un conjunto de capacidades/overlays | `PygameSceneManager` |
 
 ---
 
@@ -291,18 +300,53 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 
 ## 4.1 `src/pose_app/domain/` — el corazón 🧠
 
-**Propósito**: TODO el conocimiento de negocio: entidades, contratos (puertos), eventos, estados y los juegos mismos. No depende de frameworks.
+**Propósito**: TODO el conocimiento de negocio: entidades, contratos (puertos), eventos, servicios, estados y los juegos mismos. No depende de frameworks.
 
 ### `src/pose_app/domain/entities/`
-- **Propósito**: objetos de negocio puros. `RGBColor`, `Particle`, `PoseLandmark`, `User`, `Identity`, `Gesture`.
+- **Propósito**: objetos de negocio puros. `RGBColor`, `PoseLandmark`, `User`, `Identity`, `Gesture`, `InputCursor`, `HandLandmarkConfig`. El subpaquete `particles/` contiene la entidad `Particle` en formato ECS (componentes + sistemas).
 - **Al añadir archivo**:
-  1. Si es inmutable → `@dataclass(frozen=True)`. Si necesita mutación deliberada (como `Particle`) → dataclass normal y documenta por qué.
+  1. Si es inmutable → `@dataclass(frozen=True)`. Si necesita mutación deliberada (como `Particle` o `InputCursor`) → dataclass normal y documenta por qué.
   2. Valida en `__post_init__`, lanza `ValueError` (no `assert`).
   3. Usa patrón `with_*` para "copias modificadas" (`User.with_email(...)`), nunca mutar.
   4. Nada de pygame/cv2/pydantic aquí. Solo stdlib + tipos de dominio.
 
+### `src/pose_app/domain/entities/particles/` — ECS-lite
+- **Propósito**: la entidad `Particle` vive aquí como **composición de componentes**. El paquete se divide en:
+  - `archetype.py`: `ParticleArchetype` (plantilla para spawn: nombre, peso, tamaño, color, sprite).
+  - `components.py`: `Position`, `Appearance`, `Lifespan`, `SpriteConfig`, `SpriteState`, `CollisionProfile`, `Particle`.
+  - `lifespan.py`: `LifespanCapability` (ABC), `InfiniteLifespan`, `TimedLifespan`.
+  - `systems.py`: `MovementSystem`, `LifespanSystem`, `AnimationSystem` (mutan componentes por tick).
+  - `spawn/`: subpaquete con `ports.py` (Protocols), `positions.py` (estrategias), `selectors.py` (selectores), `strategies.py` (composición).
+- **Al añadir componente**: `@dataclass(frozen=True)` para inmutables (`Appearance`, `Lifespan`); `@dataclass` para mutables (`Position`, `SpriteState`). Documenta qué `System` lo muta.
+- **Al añadir sistema**: clase con `update(particles: list[Particle], dt: float) -> None`. Sin estado acumulado entre llamadas.
+- **Nota histórica**: hasta v0.4 existió `domain/capabilities/particles/` con los componentes y sistemas. Fue movido a `entities/particles/` para alinear "componentes de una entidad" con la entidad misma. No reintroduzcas `capabilities/`.
+
+### `src/pose_app/domain/entities/input_cursor.py`
+- **Propósito**: cursor de interacción (mano, pie, cadera) con estado mutable + componentes visuales (`CursorAppearance`, `CursorCollision`) inmutables. **No es una entidad ECS**: es una herramienta de interacción.
+- **Nota**: a diferencia de `Particle`, `InputCursor` **muta directamente** (`position`, `is_visible`, `last_seen`) porque su ciclo de vida está atado a `PoseInteractionFacade`, no a un sistema ECS.
+
+### `src/pose_app/domain/entities/hand_landmark_config.py`
+- **Propósito**: `HandLandmarkConfig` inmutable: qué nombres de landmarks alimentan un cursor + offsets normalizados. Valida lista no vacía y offsets en `[-1.0, 1.0]`.
+- **Consumido por**: `CentroidCollisionHandler` (calcula centroide) y `PoseInteractionFacade` (configuración por cursor).
+
+### `src/pose_app/domain/services/`
+- **Propósito**: lógica de dominio **sin estado** que no cabe en una entidad ni en un puerto.
+  - `collision_handler.py`: `CollisionHandler` (Protocol) + `CentroidCollisionHandler` (promedia landmarks visibles + offset).
+  - `pose_interaction_facade.py`: `PoseInteractionFacade` (implementa `PoseInteractionPort`) — gestiona N cursores, aplica EMA y timeout.
+- **Al añadir archivo**:
+  1. Si es **sin estado y resuelve un cálculo** → `*Handler` con un método único.
+  2. Si **coordina varios objetos de dominio** detrás de una API simple → `*Facade`.
+  3. Si **orquesta sistemas ECS** → no va aquí, va en `entities/particles/systems.py`.
+  4. Tipado estricto y docstrings Google-style (es lógica de negocio crítica).
+
 ### `src/pose_app/domain/ports/`
-- **Propósito**: contratos (ABC) entre dominio y exterior. Son la **fuente de verdad** (ver `docs/ports_contract.md`).
+- **Propósito**: contratos (ABC o Protocol) entre dominio y exterior. Son la **fuente de verdad** (ver `docs/ports_contract.md`).
+- **Puertos destacados**:
+  - `camera_port.py`, `pose_estimator_port.py`: entrada de infraestructura.
+  - `pose_interaction_port.py`: `PoseInteractionPort` — interacción multi-cursor (implementado por `PoseInteractionFacade`).
+  - `event_bus_port.py`: comunicación pub/sub.
+  - `auth_port.py`, `user_repository_port.py`, `identity_repository_port.py`: auth.
+  - `render_port.py` (legacy) y `render/` (nuevo): render.
 - **Al añadir puerto**:
   1. Puerto **nuevo y pequeño** (una responsabilidad, ISP). No le agregues métodos a un puerto existente si puedes crear otro.
   2. Tipado estricto en cada `@abstractmethod`; docstring Google-style con Args/Returns/Raises.
@@ -312,6 +356,12 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 
 ### `src/pose_app/domain/ports/render/`
 - **Propósito**: **nueva** arquitectura de render (capacidades `set_*`+`render_*`, overlays, scene).
+- **Archivos**:
+  - `color_render_port.py`, `particles_render_port.py`, `hud_render_port.py`: capacidades visuales.
+  - `overlay_port.py`: elementos superpuestos (debug/FPS).
+  - `scene_port.py`: `ScenePort` — orquesta capacidades + overlays.
+  - `input_cursor_render_port.py`: `InputCursorRenderPort` — capacidad de dibujar cursores.
+  - `render_capability.py`: `RenderCapability` (ABC) — contrato mínimo `render()` que el `SceneManager` invoca.
 - **Al añadir capacidad**: crea `*_render_port.py` con `set_x()` / `render_x()` / `close()`, y añade su implementación Pygame en `src/pose_app/adapters/render/`. Documenta en `docs/render_architecture.md`.
 
 ### `src/pose_app/domain/events/`
@@ -336,8 +386,8 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   5. Crea su plugin en `src/pose_app/app/plugins/<id>_plugin.py` y regístralo en `src/pose_app/app/plugins/__init__.py`.
   6. Guía completa: `docs/adding_a_game_plugin.md`.
 
-### `src/pose_app/domain/use_cases/`
-- 🔴 **Carpeta residual/vacía** (los juegos migraron a `src/pose_app/domain/games/`). No añadas nada aquí.
+### 🔴 `src/pose_app/domain/use_cases/` — eliminada (nota histórica)
+- Hasta v0.4 existió como carpeta residual vacía (los juegos migraron a `src/pose_app/domain/games/`). **Fue eliminada en v0.5** junto con `capabilities/`. No la reintroduzcas: los juegos viven en `games/` y los servicios en `services/`.
 
 ## 4.2 `src/pose_app/app/` — composition root 🧩
 
@@ -361,7 +411,9 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 |---|---|
 | `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`: captura en hilo + FourCC configurable) |
 | `src/pose_app/adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
-| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame |
+| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameSceneManager`, `PygameInputCursorRenderer`, overlays y `PoseDebugOverlay` |
+| `src/pose_app/adapters/render/overlays/` | `PoseOverlay` (esqueleto) y `FpsOverlay` (contador FPS), ambos implementan `OverlayPort` |
+| `src/pose_app/adapters/render/decorators/` | `PoseDebugOverlay` (Decorator de renderer legacy, inyecta el overlay de pose) |
 | `src/pose_app/adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
 | `src/pose_app/adapters/api/` | Routers FastAPI + DTOs (puertos de entrada HTTP) |
 | `src/pose_app/adapters/mock/` | Dobles de test: mocks y spies deterministas |
@@ -372,6 +424,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 3. Si el adaptador falla, lanza la excepción del contrato (`CameraNotAvailableError`, `PoseEstimationError`, `ConfigurationError`), nunca `Exception` genérica.
 4. `src/pose_app/adapters/api/`: los DTO **nunca** exponen `password_hash`. Orden de rutas importante: `/me` antes de `/{user_id}`.
 5. Carpetas sin `__init__.py` (`auth/`, `decorators/`) funcionan como namespace packages; si creas paquete nuevo, sigue el estilo de sus vecinas.
+6. **Renderers Pygame**: heredan de `PygameBaseAdapter` (infraestructura de ventana) + implementan **un** puerto de render. `PygameInputCursorRenderer` es el caso paradigmático: hereda `PygameBaseAdapter` + implementa `InputCursorRenderPort` (no hereda de un puerto, lo implementa). No importes `PygameBaseAdapter` desde el dominio: solo se usa en `adapters/render/`.
 
 ## 4.4 `src/pose_app/infrastructure/` — servicios transversales 🛠️
 
@@ -384,18 +437,41 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 | `errors/` | Jerarquía de excepciones + clasificador de acciones |
 | `logging/` | Logger raíz `pose_ar` (consola JSON/color, `logs/app.log`, `logs/errors.log`) |
 | `auth/` | `JWTService` (crear/decodificar tokens) |
+| `assets/` | `AssetLoader` (carga sprites y configs) + `SpriteSheetParser` (JSON de sprites → dict de coordenadas) |
+| `paths.py` | Rutas del proyecto: `PROJECT_ROOT`, `ASSETS_DIR`, `DATA_DIR`, `GAME_PROFILES_DIR` |
 | `lifecycle/` | 🔴 `AppRunner` huérfano (el ciclo real vive en `src/pose_app/app/main.py`) |
 
 **Al añadir archivo**: debe ser genérico (no saber de juegos concretos), usar `get_logger("infrastructure.<x>")`, y registrar su `ConfigurationError`/`InfrastructureError` correspondiente en `exceptions.py`.
 
+- **Servicios transversales** (`di/`, `events/`, `errors/`, `logging/`, `auth/`): API estable, usada por múltiples capas.
+- **Assets** (`assets/`): `AssetLoader` carga configs JSON de sprites y delega el parseo a `SpriteSheetParser`. `AssetLoader` es agnóstico al consumidor (no sabe de pygame); devuelve dicts/tuplas. Si el consumidor necesita cargar una imagen de pygame, lo hace su adaptador, no `AssetLoader`.
+- **`paths.py`**: constantes de rutas (`PROJECT_ROOT`, `ASSETS_DIR`, `DATA_DIR`, `GAME_PROFILES_DIR`). Si necesitas una ruta nueva, añádela aquí, no la hardcodees en el adaptador. `PROJECT_ROOT` se calcula desde `Path(__file__).resolve().parents[3]` (ajusta si mueves `paths.py`).
+
 ## 4.5 `src/pose_app/config/` ⚙️
 
-- **Propósito**: `Settings` raíz con sub-configs (`camera`, `pose`, `render`, `game`, `logging`, `api`, `jwt`), cargadas de `.env` + env vars con prefijos (`CAMERA_`, `POSE_`, ...).
+- **Propósito**: `Settings` raíz con sub-configs (`camera`, `pose`, `render`, `game`, `logging`, `api`, `jwt`), cargadas de `.env` + env vars con prefijos (`CAMERA_`, `POSE_`, ...). Además, el modelo unificado de perfiles de juego (`GameProfileConfig`).
+
+### `src/pose_app/config/settings.py`
+- `Settings` raíz + subclases Pydantic (`CameraSettings`, `PoseSettings`, `RenderSettings`, `GameSettings`, `LoggingSettings`, `APISettings`, `JWTSettings`).
 - **Al añadir setting**:
   1. Agrégalo a la sub-clase correspondiente con **default seguro** y validación (rango/`Literal`).
   2. Documenta el nombre en `.env.example` (¡sin valores secretos!).
   3. `JWT_SECRET_KEY` es **requerido** y secreto: jamás lo hardcodees ni lo commitees.
-  4. Tras cambiar settings: `uv run pytest tests/unit/test_settings.py -v`.
+  4. Tras cambiar settings: `uv run pytest tests/unit/config/test_settings.py -v`.
+
+### `src/pose_app/config/game_profile.py`
+- **Propósito**: unificar la configuración de jugabilidad **de cualquier juego** en un JSON, sin tocar código Python.
+- **Modelo**: `GameProfileConfig` (Pydantic):
+  - `pose_smoothing_factor: float = 0.3` — común a todos los juegos AR (EMA de los cursores). Valida `0.0 < v <= 1.0`.
+  - `game_options: dict[str, Any] = {}` — específico de cada juego (p. ej. `hit_radius`, `max_score`, `time_per_round` para partículas).
+  - `model_config = ConfigDict(extra="allow")` — permite campos extra sin cambiar el modelo.
+- **Loader**: `load_game_profile(config_path: Path) -> GameProfileConfig` — lee un JSON y valida. Lanza `FileNotFoundError` o `ValueError`.
+- **Dónde viven los JSON**: `game_profiles/<game_id>/<profile_name>.json` (p. ej. `game_profiles/particles/normal.json`). `GameSettings` tiene `profile_name: str = "normal"`; `ParticlesPlugin` resuelve la ruta vía `paths.GAME_PROFILES_DIR`.
+- **Al añadir un campo**:
+  1. Si es **común a todos los juegos** → campo de primer nivel en `GameProfileConfig` + validación Pydantic.
+  2. Si es **específico de un juego** → `game_options["<mi_juego>"]` (dict anidado); documenta el schema en `docs/adding_a_game_plugin.md`.
+  3. Actualiza `game_profiles/<game_id>/normal.json` de ejemplo.
+- **Al añadir un juego con perfiles**: crea `game_profiles/<game_id>/` con al menos `normal.json`; en el plugin, resuelve la ruta con `load_game_profile(GAME_PROFILES_DIR / "<game_id>" / f"{profile_name}.json")`.
 
 ## 4.6 `tests/` 🧪
 
@@ -461,17 +537,6 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `Identity.is_password` | `@property (self) -> bool` | `provider == "password"` | Tests property; uso previsto en `CredentialsAuthProvider` 🟡 |
 | `Identity.with_last_login` | `(self, when: datetime\|None = None) -> Identity` | Copia con `last_login_at` actualizado | Invocado por `CredentialsAuthProvider.authenticate` tras login exitoso |
 
-### `src/pose_app/domain/entities/particle.py`
-**Propósito**: partícula **mutable** con física de dominio puro.
-**Patrones**: Dataclass mutable (mutación intencional), Factory method, update in-place.
-
-| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
-|---|---|---|---|
-| `Particle` | `@dataclass x,y,vx,vy:float`, `size=5.0`, `life=1.0`, `color=(255,255,255)` | Estado de una partícula | Instanciada por `Particle.create_burst` y por tests |
-| `Particle.update` | `(self, gravity: float = 0.1, damping: float = 0.99) -> None` | Integra física: `vy+=gravity`, amortigua, desplaza, `life*=0.995` | **Muta** `x,y,vx,vy,life`. Invocado por `ParticlesGame._update_particles` |
-| `Particle.is_alive` | `(self) -> bool` | `life > 0.01` | Filtro de `ParticlesGame._update_particles` y del renderer |
-| `Particle.create_burst` | `(cls, center_x: float, center_y: float, count: int = 20) -> list[Particle]` (classmethod) | `count` partículas aleatorias alrededor de un centro | Invocado por `ParticlesGame._spawn_particles_from_landmarks` con coordenadas de landmarks visibles |
-
 ### `src/pose_app/domain/entities/pose_landmark.py`
 **Propósito**: punto clave del esqueleto en coordenadas normalizadas 0-1.
 **Patrones**: Dataclass `frozen=True`, Value Object.
@@ -514,6 +579,78 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `User.has_role` | `(self, role: str) -> bool` | `role in self.roles` | Interno de `is_admin` |
 | `User.is_admin` | `(self) -> bool` | `has_role("admin")` | **Guard de autorización**: `dependencies.require_admin` → 403 |
 | `User.with_username / with_email / with_full_name / with_roles / with_disabled` | `(...) -> User` | Copias modificadas | Invocados por `user_routes` (PATCH `/users/me`, PATCH `/users/{id}`) |
+
+### `src/pose_app/domain/entities/particle.py` — entidad ECS-lite
+**Propósito**: entidad `Particle` como **contenedor de componentes**. No tiene lógica de física ni de render; delega en los sistemas (`MovementSystem`, `LifespanSystem`, `AnimationSystem`) y en el renderer.
+**Patrones**: Dataclass mutable (composición), `field(default_factory=...)` para `id`.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `Particle` | `@dataclass position: Position`, `appearance: Appearance`, `id: str = field(default_factory=lambda: str(uuid.uuid4()))`, `lifespan: Lifespan \| None = None`, `collision: CollisionProfile \| None = None`, `sprite_config: SpriteConfig \| None = None`, `sprite_state: SpriteState \| None = None` | Entidad compuesta. La **presencia o ausencia de un componente** define su comportamiento (ECS-lite) | Creado por `ComposedSpawnStrategy.spawn`; mutado por `MovementSystem` (vía `Position`), `LifespanSystem` (reemplaza `Lifespan` con `replace`), `AnimationSystem` (vía `SpriteState`) |
+| `Particle.is_alive` | `(self) -> bool` | Si `lifespan is None` → `True` (infinita). Si `lifespan` existe → `lifespan.current_life >= 0.01` | Filtro de `ParticlesGame._update_logic` y `LifespanCull` |
+
+### `src/pose_app/domain/entities/particles/` — ECS-lite (subpaquete)
+
+**Propósito**: la entidad `Particle` vive en `entities/particle.py` (archivo suelto, ver arriba). Este **subpaquete** contiene los **componentes** (datos puros), los **sistemas** (lógica por tick) y las **estrategias de spawn**. Es la separación clásica ECS: `entity` (id + componentes) ≠ `component` (datos) ≠ `system` (lógica).
+
+#### `particles/archetype.py` — `ParticleArchetype`
+**Propósito**: plantilla para spawn (nombre, peso, tamaño, color, sprite opcional).
+**Patrones**: Dataclass `frozen=True`, validación en `__post_init__`.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `ParticleArchetype` | `frozen: name:str`, `weight:float=1.0`, `size:float`, `color:tuple[int,int,int]`, `sprite_config:SpriteConfig\|None=None` | Valida nombre no vacío, `weight>=0`, `size>0`, color 0-255, `sprite_config` válido | Creado por `ParticlesPlugin._build_archetypes` desde `game_options.archetypes`; consumido por `WeightedSelector` y `ComposedSpawnStrategy` |
+
+#### `particles/components.py` — componentes ECS
+**Propósito**: componentes puros. La inmutabilidad (`frozen=True`) se usa siempre que sea posible; los mutables (`Position`, `SpriteState`) existen por rendimiento en tiempo real.
+**Patrones**: Dataclass `frozen=True` (Appearance, Lifespan, CollisionProfile, SpriteConfig), dataclass mutable (Position, SpriteState).
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `Position` | `@dataclass x:float`, `y:float`, `vx:float=0.0`, `vy:float=0.0` | Estado espacial (mutable). Único componente mutado in-place por `MovementSystem` | **Muta** `x`, `y`, `vx`, `vy`. Creado por `ComposedSpawnStrategy`; mutado por `MovementSystem.update` |
+| `Appearance` | `frozen: size:float=5.0`, `color:tuple[int,int,int]=(255,255,255)`, `padding_x:float=0.0`, `padding_y:float=0.0` | Config visual inmutable | Construido por `ComposedSpawnStrategy`; leído por `PygameParticlesRenderer` |
+| `Lifespan` | `frozen: max_life:float`, `current_life:float` | Ciclo de vida. `__post_init__` valida `max_life > 0` y `0 <= current_life <= max_life`. `fresh(max_life)` crea `current_life=max_life` | Inicializado por `ComposedSpawnStrategy` (vía `Lifespan.fresh`); **reemplazado** por `LifespanSystem.update` (con `dataclasses.replace`, porque es frozen) |
+| `Lifespan.fresh` | `(cls, max_life: float) -> Lifespan` (classmethod) | Crea `current_life=max_life` | Constructor canónico de `ComposedSpawnStrategy` |
+| `CollisionProfile` | `frozen: radius:float`, `behavior:Literal["destroy","bounce"]="destroy"` | Comportamiento de colisión | Construido por `ComposedSpawnStrategy`; leído por `ParticlesGame._update_logic` |
+| `SpriteConfig` | `frozen: path:str`, `frame_width:float`, `frame_height:float`, `frame_count:int=1`, `fps:float=0.0`, `animation_mode:Literal["loop","one_shot"]="loop"` | "Receta" del sprite; puede ser compartida por muchas partículas. `__post_init__` valida `frame_count>=1`, `fps>=0`, `animation_mode` válido | Construido por `AssetLoader`/`SpriteSheetParser` desde JSON; consumido por `PygameParticlesRenderer` y `AnimationSystem` |
+| `SpriteState` | `@dataclass current_frame:int=0`, `elapsed_time:float=0.0` | Estado mutable de animación | **Muta** `current_frame`, `elapsed_time`. Invocado por `AnimationSystem.update` |
+
+#### `particles/lifespan.py` — `LifespanCapability`
+**Propósito**: contrato de vida útil.
+**Patrones**: ABC, Strategy.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `LifespanCapability` | `ABC` | Contrato: `max_life: float`, `current_life: float`, `decay(dt)`, `is_expired` | Implementado por `InfiniteLifespan`, `TimedLifespan` |
+| `InfiniteLifespan` | `class InfiniteLifespan(LifespanCapability)` | Nunca expira (partículas decorativas) | Inicializado por `ComposedSpawnStrategy` cuando el archetype no tiene `lifespan` |
+| `TimedLifespan` | `class TimedLifespan(LifespanCapability)` | Expira tras `max_life` segundos | Inicializado por `ComposedSpawnStrategy` cuando el archetype tiene `lifespan` |
+
+#### `particles/systems.py` — sistemas ECS
+**Propósito**: sistemas sin estado que mutan componentes por tick.
+**Patrones**: Strategy, sistemas puros.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `MovementSystem` | `class MovementSystem(gravity: float = 0.1, damping: float = 0.99)` | `update(particles, dt)`: aplica gravedad (`vy += gravity * dt`), damping (`vx *= damping`, `vy *= damping`), integra posición (`x += vx * dt`, `y += vy * dt`) | **Muta** `Position.x/y/vx/vy`. Invocado por `ParticlesGame._update_logic` |
+| `LifespanSystem` | `class LifespanSystem()` | `update(particles, dt)`: decrementa `current_life` (multiplicativo), **reemplaza** `Lifespan` con `dataclasses.replace` | **Reemplaza** `Particle.lifespan` (frozen) |
+| `LifespanCull` | (método estático / función auxiliar de `LifespanSystem`) | Filtra partículas con `Particle.is_alive() == True` | Devuelve nueva lista; no muta la original |
+| `AnimationSystem` | `class AnimationSystem()` | `update(particles, dt)`: avanza `SpriteState.current_frame` según `SpriteConfig.fps` y `animation_mode` | **Muta** `SpriteState.current_frame` / `elapsed_time`. Invocado por `ParticlesGame._update_logic` |
+
+#### `particles/spawn/` — estrategias de generación (subpaquete)
+
+**Propósito**: composición de estrategias para spawnear partículas.
+**Patrones**: Strategy, Protocol `@runtime_checkable`, composición.
+
+| Archivo | Objeto | Firma clave | Proveniencia |
+|---|---|---|---|
+| `spawn/ports.py` | `ArchetypeSelector` (Protocol `@runtime_checkable`) | `select(archetypes, rng) -> ParticleArchetype` | Inyectado en `ComposedSpawnStrategy` |
+| `spawn/ports.py` | `PositionStrategy` (Protocol `@runtime_checkable`) | `generate(workspace, existing, count, rng) -> list[tuple[float,float]]` | Inyectado en `ComposedSpawnStrategy` |
+| `spawn/ports.py` | `SpawnStrategy` (Protocol `@runtime_checkable`) | `spawn(archetypes, workspace, existing, count, rng) -> list[Particle]` | Inyectado en `ParticlesGame` |
+| `spawn/positions.py` | `RandomPositionStrategy(min_distance: float)` | Posiciones aleatorias con separación mínima; reintenta hasta `max_attempts` | Construido por `ParticlesPlugin._build_spawn_strategy` según `game_options.positioner` |
+| `spawn/positions.py` | `GridPositionStrategy()` | Posiciones en grid uniforme (predecible) | Idem |
+| `spawn/selectors.py` | `WeightedSelector()` | Selecciona archetype por peso (respeta `weight`); valida suma > 0 | Construido por `ParticlesPlugin._build_spawn_strategy` según `game_options.selector` |
+| `spawn/selectors.py` | `SequentialSelector(sequence: list[str])` | Recorre archetypes en orden cíclico; valida nombres existentes | Idem |
+| `spawn/strategies.py` | `ComposedSpawnStrategy(archetype_selector, position_strategy)` | Combina selector + positioner; genera `count` partículas con componentes inicializados | Inyectado en `ParticlesGame.__init__` |
 
 ---
 
@@ -576,6 +713,18 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `PoseEstimatorPort.get_landmark_names` | `(self) -> list[str]` | Nombres soportados | 🟡 introspección/debug |
 | `PoseEstimatorPort.close` | `(self) -> None` | Libera modelo (no abstracto) | `__exit__` y `Container.shutdown()` |
 
+### `src/pose_app/domain/ports/pose_interaction_port.py`
+**Propósito**: contrato de interacción multi-cursor (lo que un juego necesita de `PoseInteractionFacade`).
+**Patrones**: Puerto (ABC), Facade del lado del consumidor.
+
+| Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
+|---|---|---|---|
+| `PoseInteractionPort.update` | `(self, landmarks: list[PoseLandmark], current_time: float \| None = None) -> None` | Actualiza todos los cursores (EMA + timeout) | `ParticlesGame._update_logic` (vía `run_async`) |
+| `PoseInteractionPort.is_touching` | `(self, target_x, target_y, radius, screen_w, screen_h, cursor_id: str \| None = None) -> bool` | ¿Algún cursor (o uno específico) toca el objetivo? | `ParticlesGame._check_collisions` |
+| `PoseInteractionPort.get_cursor` | `(self, cursor_id: str) -> InputCursor \| None` | Cursor por id | 🟡 usado por tests |
+| `PoseInteractionPort.get_all_cursors` | `(self) -> list[InputCursor]` | Todos los cursores | `ParticlesGame._render_frame` (sincroniza con el renderer) |
+| `PoseInteractionPort.get_hand_position` | `(self, hand: Literal["left","right"], screen_w, screen_h) -> tuple[float,float] \| None` | Backward compat con el API de una sola mano | 🟡 legado |
+
 ### `src/pose_app/domain/ports/event_bus_port.py`
 **Propósito**: comunicación desacoplada por eventos.
 **Patrones**: Puerto (ABC), Observer pub/sub async, alias `EventHandler`.
@@ -625,13 +774,15 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | Archivo | Objetos | Firmas clave | Quién lo invoca |
 |---|---|---|---|
 | `color_render_port.py` | `ColorRenderPort` | `set_color(color: RGBColor)`, `render_color()`, `close()` | `render_color` por `PygameSceneManager.render_frame`; `set_color` 🟡 |
-| `particles_render_port.py` | `ParticlesRenderPort` | `set_particles(particles: list[Particle])`, `render_particles()`, `close()` | `set_particles` por `ParticlesGame._render_new`; `render_particles` por el SceneManager |
+| `particles_render_port.py` | `ParticlesRenderPort` | `set_particles(particles: list[Particle])`, `render_particles()`, `close()` | `set_particles` por `ParticlesGame._render_frame`; `render_particles` por el SceneManager |
 | `hud_render_port.py` | `HudRenderPort` | `set_hud(score:int, rounds:int, timer:float, extra:dict[str,str]\|None)`, `render_hud()`, `close()` | `render_hud` por SceneManager; `set_hud` 🟡 (juegos futuros) |
 | `overlay_port.py` | `OverlayPort` | `draw(surface: Any, landmarks: list[PoseLandmark]\|None)`, `close()` | `PygameSceneManager.render_frame`; implementado por `PoseOverlay`, `FpsOverlay` |
-| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_new`; registros en `src/pose_app/app/plugins/particles_plugin.py` |
-| `__init__.py` | reexports | `__all__` con los 5 | `from domain.ports.render import ...` |
+| `scene_port.py` | `ScenePort` | `add_capability(object)`, `add_overlay(OverlayPort)`, `render_frame(landmarks: list[PoseLandmark])`, `close()` | `render_frame` por `ParticlesGame._render_frame`; registros en `src/pose_app/app/plugins/particles_plugin.py` |
+| `input_cursor_render_port.py` | `InputCursorRenderPort` | `set_cursors(cursors: list[InputCursor])`, `render_cursors()`, `render()`, `close()` | `set_cursors` por `ParticlesPlugin` y `ParticlesGame._render_frame`; `render` por `PygameSceneManager` |
+| `render_capability.py` | `RenderCapability` (ABC) | `render() -> None` | `PygameSceneManager.render_frame` (invoca `cap.render()` para cada capability) |
+| `__init__.py` | reexports | `__all__` con los 7 | `from domain.ports.render import ...` |
 
-**Patrones comunes**: puerto (ABC), capacidad componible, patrón declarar→ejecutar (`set_*` + `render_*`), Composite (SceneManager).
+**Patrones comunes**: puerto (ABC), capacidad componible, patrón declarar→ejecutar (`set_*` + `render_*`), Composite (SceneManager), Protocol `@runtime_checkable` (para validación estructural).
 
 ---
 
@@ -666,35 +817,20 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 
 ## 5.5 `src/pose_app/domain/games/`
 
-`src/pose_app/domain/games/particles/main.py` — `ParticlesGame`
-Patrones: Observer (EventBus), Strategy (spawn), DI, Template Method (loop async).
+### `src/pose_app/domain/games/particles/main.py` — `ParticlesGame` 🟢 nueva arquitectura
 
-| Método|Firma (tipado)|Responsabilidad|Valores / proveniencia|
-| ---|---|---|---|
-| __init__|(self, camera: CameraPort, pose_estimator: PoseEstimatorPort, pose_interaction: PoseInteractionPort, scene: ScenePort, particles_capability: ParticlesRenderPort, color_capability: ColorRenderPort, hud_capability: HudRenderPort, state: ParticlesState, event_bus: EventBusPort, spawn_strategy: SpawnStrategy, archetypes: list[ParticleArchetype], screen_width: int = 800, screen_height: int = 600, rng: random.Random \| None = None, max_score: int = 10, time_per_round: float = 10.0, hit_radius: float = 30.0, workspace: Workspace \| None = None, animation_system: AnimationSystem \| None = None) -> None|Inyecta dependencias + estrategia de spawn + archetypes, decide ruta de render, suscribe GameResetRequested|Creado por ParticlesPlugin.create_game|
-| state|@property -> ParticlesState|Estado|GameProtocol.state|
-| _on_reset_requested|async (self, event: GameResetRequested) -> None|_reset_requested = True|Invocado por AsyncEventBus.publish|
-| run_async|(self, should_stop: Callable[[], bool] \| None = None) -> Awaitable[None]|Loop: reset → frame → pose → spawn → update → render → sleep|🟢 src/pose_app/app/main.py (asyncio.create_task)|
-| _start_new_round|(self) -> None|Usa spawn_strategy.spawn() para generar partículas con los archetypes inyectados|Muta _particles. Invocado por run_async y _complete_round|
-| _update_logic|(self, dt: float) -> None|Actualiza lógica del juego (colisiones, timer, rondas)|Invocado por run_async|
-| _complete_round|(self) -> None|Incrementa score, verifica victoria, inicia nueva ronda|Invocado por _update_logic|
-| _render_frame|(self, landmarks: list[PoseLandmark]) -> None|Actualiza capacidades y renderiza el frame|Invocado por run_async|
-
-### `src/pose_app/domain/games/particles/main.py` — `ParticlesGame`
-**Patrones**: Observer (EventBus), Strategy (ruta legacy vs nueva), DI, Template Method (loop async).
+**Patrones**: Observer (EventBus), Strategy (spawn), DI, Template Method (loop async).
 
 | Método | Firma (tipado) | Responsabilidad | Valores / proveniencia |
 |---|---|---|---|
-| `__init__` | `(self, camera: CameraPort, pose_estimator: PoseEstimatorPort, state: ParticlesState, event_bus: EventBusPort, renderer: legacy.ParticlesRenderPort\|None = None, scene: ScenePort\|None = None, particles_capability: new.ParticlesRenderPort\|None = None, gravity: float = 0.1, burst_count: int = 5, max_particles: int = 2000) -> None` | Inyecta dependencias, decide ruta (`_use_new_render = scene is not None`), suscribe `GameResetRequested` | Creado por `ParticlesPlugin.create_game` |
+| `__init__` | `(self, camera: CameraPort, pose_estimator: PoseEstimatorPort, pose_interaction: PoseInteractionPort, scene: ScenePort, particles_capability: ParticlesRenderPort, color_capability: ColorRenderPort, hud_capability: HudRenderPort, state: ParticlesState, event_bus: EventBusPort, spawn_strategy: SpawnStrategy, archetypes: list[ParticleArchetype], screen_width: int = 800, screen_height: int = 600, rng: random.Random \| None = None, max_score: int = 10, time_per_round: float = 10.0, hit_radius: float = 30.0, workspace: Workspace \| None = None, animation_system: AnimationSystem \| None = None) -> None` | Inyecta dependencias + estrategia de spawn + archetypes, decide ruta de render (siempre nueva), suscribe `GameResetRequested` | Creado por `ParticlesPlugin.create_game` |
 | `state` | `@property -> ParticlesState` | Estado | `GameProtocol.state` |
 | `_on_reset_requested` | `async (self, event: GameResetRequested) -> None` | `_reset_requested = True` | Invocado por `AsyncEventBus.publish` |
 | `run_async` | `(self, should_stop: Callable[[], bool] \| None = None) -> Awaitable[None]` | Loop: reset → frame → pose → spawn → update → render → sleep | 🟢 `src/pose_app/app/main.py` (`asyncio.create_task`) |
-| `reset` | `(self) -> None` | Reinicio público | 🟡 comandos/tests |
-| `_render_new` | `async (self, landmarks) -> bool` | `set_particles` + `scene.render_frame(landmarks)` | Por `run_async` si `_use_new_render` |
-| `_render_legacy` | `async (self, landmarks) -> bool` | `update_landmarks` (si aplica) + `render_particles` | Por `run_async` si no |
-| `_spawn_particles_from_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | **Muta** `_particles` (extiende y recorta a `max_particles*0.75`) | Por `run_async` |
-| `_update_particles` | `(self) -> None` | **Muta** `_particles` (`update` + filtra `is_alive`) | Por `run_async` |
-| `_reset_particles` | `(self) -> None` | `_particles.clear()` | Por `run_async` y `reset()` |
+| `_start_new_round` | `(self) -> None` | Usa `spawn_strategy.spawn()` para generar partículas con los `archetypes` inyectados | Muta `_particles`. Invocado por `run_async` y `_complete_round` |
+| `_update_logic` | `(self, dt: float) -> None` | Actualiza `pose_interaction` con landmarks; aplica `MovementSystem`, `LifespanSystem`, `AnimationSystem`; gestiona colisiones y timer de ronda | Muta `_particles`, `_current_round`. Invocado por `run_async` |
+| `_complete_round` | `(self) -> None` | Incrementa score, verifica victoria, inicia nueva ronda | Invocado por `_update_logic` |
+| `_render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Sincroniza cursores con `PygameInputCursorRenderer.set_cursors(...)`; actualiza `particles_capability.set_particles(...)`, `color_capability.set_color(...)`, `hud_capability.set_hud(...)`; invoca `scene.render_frame(landmarks)` | Invocado por `run_async` |
 
 #### Cursores de interacción en `ParticlesGame`
 
@@ -995,7 +1131,7 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 |---|---|---|---|
 | `__init__` | `(self, width=800, height=600, title="Pose AR", target_fps=60)` | Config ventana | Subclases |
 | `_initialize` | `(self) -> None` | Idempotente: crea `_screen`, `_clock` | `show`, `render_*` de subclases, `ParticlesPlugin` |
-| `show` | `(self) -> None` | Bucle bloqueante de ventana | 🟡 (los juegos no lo usan; renderon por frame) |
+| `show` | `(self) -> None` | Bucle bloqueante de ventana | 🟡 (los juegos no lo usan; render por frame) |
 | `close` | `(self) -> None` | Idempotente; `pygame.quit()` | `finally` de juegos |
 | `screen / width / height / is_running` | `@property` | Acceso a estado | Renderers, overlays, plugins |
 | `flush` | `(self) -> None` | `display.flip()` + `tick` | Adaptadores legacy, `PoseDebugOverlay` |
@@ -1013,13 +1149,13 @@ Invocado por `ColorGame.run_async` y `GesturesGame.run_async` (vía `asyncio.to_
 | Método | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
 | `__init__` | `(..., background_color: RGBColor \| None = None)` | Default `RGBColor(20,20,30)` | `ParticlesPlugin.create_game` |
-| `set_particles` | `(self, particles: list[Particle]) -> None` | Copia a `_particles` | 🟢 `ParticlesGame._render_new` |
-| `render_particles` | `(self) -> None` | Fondo + buffer SRCALPHA + blit | `PygameSceneManager.render_frame` |
+| `set_particles` | `(self, particles: list[Particle]) -> None` | Copia a `_particles` | 🟢 `ParticlesGame._render_frame` |
+| `render_particles` | `(self) -> None` | Fondo + buffer SRCALPHA + blit. **Soporta sprite**: si `particle.sprite_config` y `particle.sprite_state` están presentes, dibuja el frame animado; si no, dibuja círculo. | `PygameSceneManager.render_frame` |
 | `close` | `(self) -> None` | Libera buffer + cierra pygame | `PygameSceneManager.close` |
-| `_ensure_particle_surface / _draw_particles / _on_resize` | privados | Buffer, dibujo con alpha por `life`, culling | Internos |
+| `_ensure_particle_surface / _draw_particles / _draw_sprite / _on_resize` | privados | Buffer, culling, sprite cache, alpha por `life` | Internos |
 
 ### 🔴 `pygame_particles_adapter.py` — `PygameParticlesAdapter(ParticlesRenderPort legacy)`
-Misma lógica pero en un solo `render_particles(particles)`. 🟡 Sin invocadores en producción (solo `tests/unit/test_render_adapters.py`).
+Misma lógica que `PygameParticlesRenderer` pero en un solo `render_particles(particles)`. 🟡 Sin invocadores en producción (solo `tests/unit/adapters/render/test_render_adapters.py` y `test_pygame_particles_ecs.py`).
 
 ### 🟢 `pygame_hud.py` — `PygameHudRenderer(HudRenderPort)`
 `set_hud(score:int, rounds:int, timer:float, extra:dict[str,str]|None=None)` (🟡) y `render_hud()` (fuente lazy + panel translúcido; invocado por el SceneManager). Listo para juegos con puntuación.
@@ -1035,7 +1171,7 @@ Misma lógica pero en un solo `render_particles(particles)`. 🟡 Sin invocadore
 | `render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Llama `cap.render()` para cada `RenderCapability`, luego `ov.draw(surface, landmarks)`, luego `flip`+`tick` | 🟢 `ParticlesGame._render_frame` |
 | `close` | `(self) -> None` | Cierra capacidades y overlays (idempotente) | `ParticlesGame.run_async` `finally` |
 
-### 🟢 `pygame_input_cursor.py` — `PygameInputCursorRenderer(InputCursorRenderPort)`
+### 🟢 `pygame_input_cursor.py` — `PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort)`
 **Propósito**: capacidad de render de cursores de interacción. **No es un overlay**: afecta la jugabilidad y se registra como capacidad en el `SceneManager`.
 **Patrones**: Adapter, Strategy (círculo vs sprite), cache.
 
@@ -1136,47 +1272,148 @@ TokenError(AppError)  (definida en src/pose_app/infrastructure/auth/jwt_service.
 
 ## 5.13 `tests/`
 
-**Organización**: `unit/` (unidad aislada), `integration/` (componentes + API), `property/` (hypothesis), `manual/` (excluido de pytest).
-**No hay `conftest.py`**: cada archivo define sus fixtures (`game`, `color_game`, `client`, `admin_token`, ...).
+**Organización**: `tests/` **espeja** `src/pose_app/` árbol a árbol (excepto `integration/` y `property/`, que son planos por flujo/invariante).
+
+- `tests/unit/{config,app,adapters,infrastructure,domain}/` — espejo de `src/pose_app/`. Cada módulo de `src/` tiene su `test_<archivo>.py` (o `test_<concepto>.py`) en la subcarpeta homónima.
+- `tests/integration/` — plano, un archivo por flujo E2E (auth, user, plugin system, gestures, particles ECS). No espeja `src/` porque su unidad de análisis es el **flujo**, no el módulo.
+- `tests/property/` — plano, un archivo por invariante de dominio (`rgb_color`, `pose_landmark`, `particle`, `user`, `identity`, `password_hasher`, `plugin_registry`).
+- `tests/manual/` — scripts con hardware (cámara). **Excluidos de pytest** vía `norecursedirs` en `pyproject.toml`. Se corren con `uv run python tests/manual/<script>.py`.
+
+**No hay `conftest.py`**: cada archivo define sus fixtures locales (`game`, `color_game`, `client`, `admin_token`, ...).
 **Frameworks**: pytest + pytest-asyncio (`asyncio_mode=auto`) + pytest-cov + hypothesis.
 **Markers**: `slow` (excluido por defecto con `-m 'not slow'`), `requires_mediapipe`.
 
-| Archivo | Qué verifica |
+### Estructura completa
+
+```
+tests/
+├── __init__.py
+├── integration/                          # E2E planos (por flujo)
+│   ├── __init__.py
+│   ├── pose/test_mediapipe_adapter.py
+│   ├── test_auth_endpoints.py
+│   ├── test_gestures_plugin_e2e.py
+│   ├── test_particles_ecs_integration.py
+│   ├── test_plugin_system_e2e.py
+│   ├── test_user_endpoints.py
+│   └── test_webcam_with_*.py  → MOVIDOS a tests/manual/ (hardware)
+├── manual/                               # Hardware, excluido de pytest
+│   ├── webcam_capture.py
+│   ├── webcam_mediapipe.py
+│   └── webcam_mock_pose.py
+├── property/                             # Hypothesis, plano
+│   ├── __init__.py
+│   ├── test_identity_properties.py
+│   ├── test_particle_properties.py
+│   ├── test_password_hasher_properties.py
+│   ├── test_plugin_registry_properties.py
+│   ├── test_pose_landmark_properties.py
+│   ├── test_rgb_color_properties.py
+│   └── test_user_properties.py
+└── unit/                                 # Espejo de src/pose_app/
+    ├── __init__.py
+    ├── adapters/                         # Espejo de src/pose_app/adapters/
+    │   ├── auth/{test_credentials_auth_provider, test_identity_repository, test_user_repository}.py
+    │   ├── camera/{test_webcam_adapter, test_webcam_adapter_threading}.py
+    │   ├── mock/test_mock_render.py
+    │   ├── pose/test_mediapipe_adapter.py
+    │   └── render/
+    │       ├── test_pygame_input_cursor.py
+    │       ├── test_pygame_particles_ecs.py
+    │       ├── test_render_adapters.py
+    │       ├── decorators/test_debug_overlay_decorator.py
+    │       └── overlays/test_mirror_mode.py
+    ├── app/                              # Espejo de src/pose_app/app/
+    │   ├── plugins/{test_builtin_plugins, test_particles_plugin_cursors, test_particles_plugin_spawn}.py
+    │   ├── test_game_context.py
+    │   └── test_plugin_registry.py
+    ├── config/                           # Espejo de src/pose_app/config/
+    │   ├── test_game_profile_config.py
+    │   └── test_settings.py
+    ├── domain/                           # Espejo de src/pose_app/domain/
+    │   ├── entities/
+    │   │   ├── particles/
+    │   │   │   ├── spawn/{test_ports, test_positions, test_selectors, test_strategies}.py
+    │   │   │   ├── test_archetype.py
+    │   │   │   ├── test_components.py
+    │   │   │   └── test_systems.py
+    │   │   ├── test_hand_landmark_config.py
+    │   │   └── test_input_cursor.py
+    │   ├── games/
+    │   │   ├── color/test_main.py
+    │   │   ├── gestures/{test_detection, test_state}.py
+    │   │   └── particles/{test_geometry, test_geometry_ecs, test_main, test_scoring, test_spawn, test_spawn_ecs}.py
+    │   └── services/{test_collision_handler, test_pose_interaction_facade}.py
+    └── infrastructure/                   # Espejo de src/pose_app/infrastructure/
+        ├── assets/test_sprite_sheet_parser.py
+        ├── auth/test_jwt_service.py
+        ├── logging/test_console_formatter.py
+        └── test_paths.py
+```
+
+### Tabla resumen de tests por módulo
+
+| Archivo de test | Qué verifica |
 |---|---|
-| `unit/test_builtin_plugins.py` | Registro y metadatos de los 3 plugins + `create_state` |
-| `unit/test_color_game.py` | Cálculo de color con manos arriba/abajo |
-| `unit/test_credentials_auth_provider.py` | Login válido/inválido, disabled, `last_login`, `get_user` |
-| `unit/test_debug_overlay_decorator.py` | El Decorator delega y dibuja overlay |
-| `unit/test_game_context.py` | `GameContext` es frozen y guarda campos |
-| `unit/test_gestures_detection.py` | Los 6 detectores + activación anti-ruido por frames consecutivos |
-| `unit/test_gestures_state.py` | Estado inicial, contadores, `stats`, `game_id` |
-| `unit/test_identity_repository.py` | CRUD de identidades, duplicados, delete idempotente |
-| `unit/test_jwt_service.py` | Token válido/expirado/inválido/secret incorrecto |
-| `unit/test_mock_render.py` | Spies: copias defensivas, contadores, `close` idempotente |
-| `unit/test_particles_game.py` | Spawn, update+muerte, reset |
-| `unit/test_particles_game_integration.py` | `run_async` genera partículas y llama al renderer |
-| `unit/test_plugin_registry.py` | Register/get/duplicado/`get_or_raise`/`clear`/`all` |
-| `unit/test_pose_debug_overlay_with_mocks.py` | Loop async con renderer mock, con y sin landmarks |
-| `unit/test_render_adapters.py` | Adaptadores pygame cumplen puertos; conversión a píxeles |
-| `unit/test_settings.py` | `Settings` carga desde entorno |
-| `unit/test_user_repository.py` | CRUD de usuarios, índices, idempotencia |
-| `unit/test_webcam_adapter.py` | Apertura, FourCC/resolución, lifecycle, ventana de FPS y `get_stats` |
-| `unit/adapters/test_webcam_adapter_threading.py` | Arranque/parada del hilo, `get_frame` no bloqueante, `get_stats` e idempotencia |
+| `unit/adapters/auth/test_credentials_auth_provider.py` | Login válido/inválido, disabled, `last_login`, `get_user` |
+| `unit/adapters/auth/test_identity_repository.py` | CRUD de identidades, duplicados, delete idempotente |
+| `unit/adapters/auth/test_user_repository.py` | CRUD de usuarios, índices, idempotencia |
+| `unit/adapters/camera/test_webcam_adapter.py` | Apertura, FourCC/resolución, lifecycle, ventana de FPS y `get_stats` |
+| `unit/adapters/camera/test_webcam_adapter_threading.py` | Arranque/parada del hilo, `get_frame` no bloqueante, `get_stats` e idempotencia |
+| `unit/adapters/mock/test_mock_render.py` | Spies: copias defensivas, contadores, `close` idempotente |
+| `unit/adapters/pose/test_mediapipe_adapter.py` | Validación de frames y resultados (`@pytest.mark.slow`) |
+| `unit/adapters/render/test_pygame_input_cursor.py` | Cursores pygame: set, render, culling, cache |
+| `unit/adapters/render/test_pygame_particles_ecs.py` | Render de partículas ECS: sprites, animación, lifespan, culling |
+| `unit/adapters/render/test_render_adapters.py` | Adaptadores pygame cumplen puertos; conversión a píxeles |
+| `unit/adapters/render/decorators/test_debug_overlay_decorator.py` | El Decorator delega y dibuja overlay |
+| `unit/adapters/render/overlays/test_mirror_mode.py` | `PoseOverlay` con `mirror=True/False` |
+| `unit/app/plugins/test_builtin_plugins.py` | Registro y metadatos de los 3 plugins + `create_state` |
+| `unit/app/plugins/test_particles_plugin_cursors.py` | Cursores desde JSON, timeout, validación |
+| `unit/app/plugins/test_particles_plugin_spawn.py` | Archetypes, selector, positioner, validación |
+| `unit/app/test_game_context.py` | `GameContext` es frozen y guarda campos |
+| `unit/app/test_plugin_registry.py` | Register/get/duplicado/`get_or_raise`/`clear`/`all` |
+| `unit/config/test_game_profile_config.py` | `GameProfileConfig` defaults, validación, loader JSON |
+| `unit/config/test_settings.py` | `Settings` carga desde entorno |
+| `unit/domain/entities/particles/spawn/test_ports.py` | Protocols `@runtime_checkable` (ArchetypeSelector, PositionStrategy, SpawnStrategy) |
+| `unit/domain/entities/particles/spawn/test_positions.py` | `RandomPositionStrategy`, `GridPositionStrategy` |
+| `unit/domain/entities/particles/spawn/test_selectors.py` | `WeightedSelector`, `SequentialSelector` |
+| `unit/domain/entities/particles/spawn/test_strategies.py` | `ComposedSpawnStrategy` (combina selector + positioner) |
+| `unit/domain/entities/particles/test_archetype.py` | `ParticleArchetype` validación |
+| `unit/domain/entities/particles/test_components.py` | `Position`, `Appearance`, `Lifespan`, `SpriteConfig`, `SpriteState`, `CollisionProfile`, `Particle` |
+| `unit/domain/entities/particles/test_systems.py` | `MovementSystem`, `LifespanSystem`, `AnimationSystem` |
+| `unit/domain/entities/test_hand_landmark_config.py` | `HandLandmarkConfig` validación |
+| `unit/domain/entities/test_input_cursor.py` | `InputCursor` mutabilidad, `update`, `get_*_pixels` |
+| `unit/domain/games/color/test_main.py` | Cálculo de color con manos arriba/abajo |
+| `unit/domain/games/gestures/test_detection.py` | Los 6 detectores + activación anti-ruido por frames consecutivos |
+| `unit/domain/games/gestures/test_state.py` | Estado inicial, contadores, `stats`, `game_id` |
+| `unit/domain/games/particles/test_geometry.py` | `Workspace`, `detect_collisions` |
+| `unit/domain/games/particles/test_geometry_ecs.py` | `detect_collisions_ecs` |
+| `unit/domain/games/particles/test_main.py` | `ParticlesGame`: spawn, update, reset, render |
+| `unit/domain/games/particles/test_scoring.py` | `color_for_score`, `particles_per_round`, `is_winner` |
+| `unit/domain/games/particles/test_spawn.py` | `spawn_particles` legacy |
+| `unit/domain/games/particles/test_spawn_ecs.py` | `spawn_particles_ecs` |
+| `unit/domain/services/test_collision_handler.py` | `CentroidCollisionHandler` |
+| `unit/domain/services/test_pose_interaction_facade.py` | `PoseInteractionFacade`: EMA, timeout, multi-cursor, `is_touching` |
+| `unit/infrastructure/assets/test_sprite_sheet_parser.py` | `SpriteSheetParser` (JSON robusto) |
+| `unit/infrastructure/auth/test_jwt_service.py` | Token válido/expirado/inválido/secret incorrecto |
+| `unit/infrastructure/logging/test_console_formatter.py` | Formato ANSI con/sin color |
+| `unit/infrastructure/test_paths.py` | `PROJECT_ROOT`, `ASSETS_DIR` |
 | `integration/test_auth_endpoints.py` | Login, `/me`, 401/403, `/health` público, aislamiento de secrets |
 | `integration/test_user_endpoints.py` | CRUD `/users` completo + guardas de seguridad admin |
 | `integration/test_plugin_system_e2e.py` | Container crea Particles/ColorGame; error si juego desconocido |
 | `integration/test_gestures_plugin_e2e.py` | GesturesGame + snapshot inicial |
-| `integration/test_webcam_with_mediapipe.py` | E2E webcam + mediapipe (cámara real) |
-| `integration/test_webcam_with_mock_pose.py` | Webcam + pose mock (`skip`: requiere cámara) |
+| `integration/test_particles_ecs_integration.py` | Frame con sprite animado ECS |
 | `integration/pose/test_mediapipe_adapter.py` | Validación de frames y resultados (`@pytest.mark.slow`) |
 | `property/test_rgb_color_properties.py` | Canales, hex, `interpolate` acotado y simétrico |
 | `property/test_pose_landmark_properties.py` | Distancia: simétrica, no negativa, cota; visibilidad |
-| `property/test_particle_properties.py` | `update` baja `life`; `create_burst` produce N |
+| `property/test_particle_properties.py` | `update` baja `life`; `create_burst` produce N (legacy ECS) |
 | `property/test_user_properties.py` | `with_*` inmutables; `has_role`/`is_admin` consistentes |
 | `property/test_identity_properties.py` | `is_password`, `with_last_login` inmutable |
 | `property/test_password_hasher_properties.py` | Roundtrip hash/verify, unicidad, bcrypt 72 bytes |
 | `property/test_plugin_registry_properties.py` | Invariantes del registry |
-| `manual/test_webcam.py` | ⚠️ No es test pytest: smoke de 100 frames con `cv2.imshow` |
+| `manual/webcam_capture.py` | Smoke de captura de cámara con `cv2.imshow` (script, no pytest) |
+| `manual/webcam_mediapipe.py` | Cámara + Mediapipe en ventana OpenCV (script) |
+| `manual/webcam_mock_pose.py` | Cámara real + pose mock + render mock por 2 s (script) |
 
 ## 5.14 `scripts/` y archivos de raíz
 
@@ -1188,10 +1425,12 @@ TokenError(AppError)  (definida en src/pose_app/infrastructure/auth/jwt_service.
 
 ### `check_structure.py`
 Fitness function de arquitectura (se corre a mano, no con pytest):
-- `REQUIRED_FILES: list[str]` (46 rutas) → `check_structure() -> bool`.
-- 17 pares `(módulo, clase)` → `check_imports() -> bool`.
+- `REQUIRED_FILES: list[str]` (**74 rutas**) → `check_structure() -> bool`. Cubre: domain (entities, particles ECS, services, ports, events, games), app (plugins, registries), adapters (camera, pose, render, api, mock), infrastructure (di, events, errors, logging, auth, assets, paths) y config.
+- **28 pares** `(módulo, clase)` → `check_imports() -> bool`. Valida la cadena completa de puertos, entidades, juegos, adaptadores y servicios.
 - `check_plugin_registry() -> bool` → comprueba `{"particles","color","gestures"}`.
 - Sale con `sys.exit(0/1)`. **Ejecútalo si creas/mueves módulos estructurales.**
+
+**Historial**: en v0.5 se amplió de 54 → 74 archivos y de 17 → 28 imports para cubrir el sistema de cursores, los servicios de dominio y el paquete ECS de partículas.
 
 ### `directory_tree_generator.py`
 Genera `<dir>_directory_structure.md`. `DirectoryTreeGenerator(root_dir, output_file)`, `generate_tree()`, `_generate_tree_recursive(...)`, `main()`. Sirve para regenerar `docs/directory_structure.md`.
@@ -1244,17 +1483,20 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | **Dependency Injection** | `Container`, `GameContext`, constructores de juegos | Nadie instancia sus dependencias: se las entregan. |
 | **Composition Root** | `src/pose_app/app/main.py`, `FastAPIAdapter._build_app`, plugins | Un único lugar ensambla todo. |
 | **Abstract Factory** | `GamePlugin.create_game/create_state` | Una fábrica que crea familias completas (juego + estado). |
-| **Strategy** | `_create_renderer` (elige mock/pygame), `_detectors` (elige regla de gesto) | El algoritmo se intercambia en tiempo de construcción. |
+| **Strategy** | `_create_renderer` (mock/pygame), `spawn_strategy`, `_detectors` | El algoritmo se intercambia en tiempo de construcción. |
 | **Observer / Pub-Sub** | `EventBusPort` + `AsyncEventBus` | API y juegos no se conocen: hablan por eventos. |
 | **Decorator** | `PoseDebugOverlay` | Añade el esqueleto de debug sin que el renderer lo sepa. |
 | **Composite / SceneManager** | `ScenePort` + `PygameSceneManager` | Muchas capacidades y overlays actuando como una sola escena. |
+| **Facade** | `PoseInteractionFacade` | Oculta multi-cursor + EMA + timeout detrás de `update / is_touching / get_all_cursors`. |
+| **Capability** (patrón del sistema) | `RenderCapability`, `LifespanCapability`, `PygameParticlesRenderer` | Unidad componible con `set_*` + `render_*` que el `SceneManager` orquesta. |
 | **Registry** | `PluginRegistry`, `StateRegistry` | Diccionarios thread-safe de cosas registrables. |
 | **Repository** | `InMemoryUserRepository`, `InMemoryIdentityRepository` | Acceso a datos escondido detrás de un puerto CRUD. |
 | **Template Method** | `run_async` de los juegos, `PygameBaseAdapter` | Esqueleto fijo, pasos concretos en subclases. |
-| **Value Object / Dataclass frozen** | `RGBColor`, `PoseLandmark`, `User`, `Identity`, eventos | Inmutabilidad por defecto; copias con `with_*`. |
+| **Value Object / Dataclass frozen** | `RGBColor`, `PoseLandmark`, `User`, `Identity`, `HandLandmarkConfig`, eventos | Inmutabilidad por defecto; copias con `with_*`. |
 | **Singleton** | `get_settings()` | Una única instancia de configuración por proceso. |
 | **DTO / Anti-corruption layer** | `*_schemas.py`, `_user_to_response` | Los tipos HTTP nunca se cuelan en el dominio. |
-| **Protocol (duck typing tipado)** | `GameProtocol`, `PygameRenderable` | Contrato estructural sin herencia. |
+| **Protocol (duck typing tipado)** | `GameProtocol`, `SpawnStrategy`, `CollisionHandler` | Contrato estructural sin herencia. |
+| **Protocol `@runtime_checkable`** | `SpawnStrategy`, `ArchetypeSelector`, `PositionStrategy` | Protocol que permite `isinstance` para validación estructural. |
 | **Spy / Mock (Test Double)** | `src/pose_app/adapters/mock/*` | Dobles deterministas con contadores para asserts. |
 | **Context Manager** | Cámaras, renderers, `Container` | `with X()` garantiza `start/stop` o `close`. |
 | **Graceful Shutdown** | `src/pose_app/app/main.py` | Señales → espera 5 s → cancel → `finally` cleanup. |
@@ -1271,6 +1513,8 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 **Antes de cada tarea**: pytest verde → leer docs → resumir → tocar ≤4 archivos → pytest + `ruff` + `mypy` al final.
 
+**Al añadir un test**: respeta el espejo `src/` ↔ `tests/unit/`. Si `src/pose_app/domain/services/collision_handler.py` tiene test, debe vivir en `tests/unit/domain/services/test_collision_handler.py` (no en `tests/unit/` plano).
+
 **Cuando añadas algo nuevo**:
 
 | Qué añades | Qué debes tocar |
@@ -1278,7 +1522,7 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | Archivo en una carpeta existente | Solo el archivo + sus tests (verifica con `check_structure.py` si es estructural) |
 | Puerto nuevo | `src/pose_app/domain/ports/...` + `docs/ports_contract.md` (versión/changelog) + adaptador + tests |
 | Juego nuevo | `src/pose_app/domain/games/<id>/` + `src/pose_app/app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/adding_a_game_plugin.md` |
-| Setting nuevo | sub-clase de `Settings` + `.env.example` + `tests/unit/test_settings.py` |
+| Setting nuevo | sub-clase de `Settings` + `.env.example` + `tests/unit/config/test_settings.py` |
 | Evento nuevo | `src/pose_app/domain/events/...` + publicador + suscriptor + `docs/ports_contract.md` |
 | Endpoint nuevo | router + schema + (¿auth?) + test de integración |
 
@@ -1291,4 +1535,11 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 ---
 
-> **Mantenimiento de este documento**: si añades una carpeta, archivo, puerto o endpoint nuevo, actualiza la sección correspondiente. Última actualización: v1.0.
+> **Mantenimiento de este documento**: si añades una carpeta, archivo, puerto o endpoint nuevo, actualiza la sección correspondiente.
+
+## 🔄 Changelog
+
+| Versión | Fecha | Cambios |
+|---|---|---|
+| 1.1 | 07-11-2026 | Actualización estructural completa: `tests/unit/` espeja `src/`; `domain/capabilities/` y `domain/use_cases/` eliminadas (notas históricas); `domain/entities/particles/` ECS documentado (archetype, components, lifespan, systems, spawn); `domain/services/` (collision_handler, pose_interaction_facade); nuevos ports (`pose_interaction_port`, `render/input_cursor_render_port`, `render/render_capability`); `PygameInputCursorRenderer`; `infrastructure/assets/` + `paths.py`; `config/game_profile.py`; `check_structure.py` 74 archivos / 28 imports; §5.13 reescrita con estructura espejo. |
+| 1.0 | 04-10-2026 | Versión inicial. |
