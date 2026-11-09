@@ -60,7 +60,18 @@ class ComposedSpawnStrategy:
 
         Returns:
             Lista con las partículas creadas.
+
+        Raises:
+            ValueError: Si ``count`` es negativo, ``screen_w`` o ``screen_h``
+                son no positivos.
         """
+        if count < 0:
+            raise ValueError(f"count must be >= 0, got {count}")
+        if screen_w <= 0:
+            raise ValueError(f"screen_w must be > 0, got {screen_w}")
+        if screen_h <= 0:
+            raise ValueError(f"screen_h must be > 0, got {screen_h}")
+
         particles: list[Particle] = []
         existing_particles: list[Particle] = []
 

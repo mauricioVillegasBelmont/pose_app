@@ -204,3 +204,61 @@ class TestComposedSpawnStrategy:
         assert particles[0].appearance is appearance  # misma instancia
         assert particles[0].appearance.padding_x == 5.0
         assert particles[0].appearance.padding_y == 5.0
+
+
+class TestComposedSpawnValidation:
+    """Validaciones portadas del legacy spawn_particles."""
+
+    def test_negative_count_raises(self) -> None:
+        """count < 0 lanza ValueError."""
+        strategy = ComposedSpawnStrategy(
+            archetype_selector=WeightedSelector(),
+            position_strategy=RandomPositionStrategy(min_distance=0.0),
+        )
+        arch = ParticleArchetype(name="x")
+
+        with pytest.raises(ValueError, match="count must be >= 0"):
+            strategy.spawn(
+                count=-1,
+                archetypes=[arch],
+                workspace=Workspace(),
+                screen_w=800,
+                screen_h=600,
+                rng=random.Random(42),
+            )
+
+    def test_zero_screen_width_raises(self) -> None:
+        """screen_w <= 0 lanza ValueError."""
+        strategy = ComposedSpawnStrategy(
+            archetype_selector=WeightedSelector(),
+            position_strategy=RandomPositionStrategy(min_distance=0.0),
+        )
+        arch = ParticleArchetype(name="x")
+
+        with pytest.raises(ValueError, match="screen_w must be > 0"):
+            strategy.spawn(
+                count=1,
+                archetypes=[arch],
+                workspace=Workspace(),
+                screen_w=0,
+                screen_h=600,
+                rng=random.Random(42),
+            )
+
+    def test_zero_screen_height_raises(self) -> None:
+        """screen_h <= 0 lanza ValueError."""
+        strategy = ComposedSpawnStrategy(
+            archetype_selector=WeightedSelector(),
+            position_strategy=RandomPositionStrategy(min_distance=0.0),
+        )
+        arch = ParticleArchetype(name="x")
+
+        with pytest.raises(ValueError, match="screen_h must be > 0"):
+            strategy.spawn(
+                count=1,
+                archetypes=[arch],
+                workspace=Workspace(),
+                screen_w=800,
+                screen_h=0,
+                rng=random.Random(42),
+            )
