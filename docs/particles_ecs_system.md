@@ -1,8 +1,8 @@
 # Documentación del Sistema de Partículas ECS-lite
 
 **Estado**: 🟢 Activo
-**Versión**: 1.0
-**Última actualización**: Octubre 2026
+**Versión**: 1.1
+**Última actualización**: Noviembre 2026
 **Ubicación**: `docs/particles_ecs_system.md`
 
 ---
@@ -126,22 +126,41 @@ Un `ParticleArchetype` es un **Value Object inmutable** que define las propiedad
 class ParticleArchetype:
     """ADN de un tipo de partícula."""
 
-    name: str  # Identificador único
-    weight: float = 1.0  # Peso para spawn aleatorio
-    size: float = 20.0  # Tamaño visual en píxeles
-    color: tuple[int, int, int] = (255, 200, 50)  # Color RGB
+    name: str  # Identificador único. Debe ser no vacío.
+    weight: float = 1.0  # Peso para spawn aleatorio. Debe ser >= 0.
+    appearance: Appearance = field(default_factory=Appearance)  # Composición
     sprite_config: SpriteConfig | None = None  # Sprite animado opcional
 ```
+
+### ¿Por qué compone `Appearance` en lugar de duplicar `size`/`color`?
+
+Antes (v0.5) `ParticleArchetype` tenía `size: float` y `color: tuple[int, int, int]` como campos top-level. `ComposedSpawnStrategy.spawn` los copiaba uno a uno en `Appearance(size=archetype.size, color=archetype.color)`. Esto creaba **dos fuentes de verdad** para la apariencia visual: cualquier campo nuevo de `Appearance` (e.g. `padding_x`, `padding_y`) obligaba a:
+
+1. Añadirlo a `ParticleArchetype`.
+2. Añadirlo al cableado en `ComposedSpawnStrategy.spawn`.
+
+Si te olvidabas del paso 2, el campo **se quedaba en su default** en la partícula (bug silencioso). Fue exactamente lo que pasó con `padding_x`/`padding_y`: el renderer los usa, `Appearance` los soporta, pero nadie los cableaba desde el JSON → código muerto durante varias versiones.
+
+**Solución (v1.1)**: `ParticleArchetype` **compone un `Appearance` completo**. Como `Appearance` es `frozen=True`, se puede compartir entre todas las partículas del mismo arquetipo sin defensa. El spawn hace `Particle(appearance=archetype.appearance, ...)` — una línea, cero duplicación.
+
+**Añadir un campo nuevo a `Appearance`** (e.g. `border_radius`) ahora **no requiere tocar `ParticleArchetype` ni el spawn**. El campo fluye del JSON al renderer sin código intermedio.
 
 ### Ejemplo de uso
 
 ```python
+from pose_app.domain.entities.particles.archetype import ParticleArchetype
+from pose_app.domain.entities.particles.components import Appearance, SpriteConfig
+
 # Partícula de fuego con sprite animado
 fire_archetype = ParticleArchetype(
     name="fire",
     weight=0.7,
-    size=25.0,
-    color=(255, 100, 0),
+    appearance=Appearance(
+        size=25.0,
+        color=(255, 100, 0),
+        padding_x=2.0,
+        padding_y=2.0,
+    ),
     sprite_config=SpriteConfig(
         path="fire.png",
         frame_width=64.0,
@@ -152,21 +171,21 @@ fire_archetype = ParticleArchetype(
     ),
 )
 
-# Partícula de hielo simple (sin sprite)
+# Partícula de hielo simple (sin sprite → círculo)
 ice_archetype = ParticleArchetype(
     name="ice",
     weight=0.3,
-    size=20.0,
-    color=(100, 200, 255),
+    appearance=Appearance(size=20.0, color=(100, 200, 255)),
 )
 ```
 
 ### Principios de diseño
 
 1. **Inmutabilidad**: `@dataclass(frozen=True)` garantiza que no puede modificarse después de creado.
-2. **Validación estricta**: `__post_init__` valida que `name` no esté vacío, `weight >= 0`, `size > 0`, y `color` sea RGB válido (0-255).
-3. **Separación de responsabilidades**: El archetype NO contiene reglas de spawn (como `min_distance`). Esas reglas viven en las estrategias de posicionamiento.
-4. **Composición ECS**: El campo `sprite_config` es opcional. Si es `None`, la partícula se renderiza como círculo sólido.
+2. **Composición sobre duplicación**: `appearance` es un `Appearance` completo; no se duplican sus campos.
+3. **Validación mínima propia**: `__post_init__` solo valida lo intrínseco del arquetipo: `name` no vacío y `weight >= 0`. La validación de `size`/`color`/`padding` **delega en `Appearance.__post_init__`**.
+4. **Separación de responsabilidades**: el archetype NO contiene reglas de spawn (como `min_distance`). Esas reglas viven en las estrategias de posicionamiento.
+5. **Sprite opcional**: si `sprite_config is None`, la partícula se renderiza como círculo sólido (fallback del renderer).
 
 ---
 
@@ -258,9 +277,14 @@ class SpawnStrategy(Protocol):
 ### Ejemplo: Estrategia compuesta
 
 ```python
-from pose_app.domain.entities.particles.spawn.selectors import WeightedSelector
+import random
+
+from pose_app.domain.entities.particles.archetype import ParticleArchetype
+from pose_app.domain.entities.particles.components import Appearance
 from pose_app.domain.entities.particles.spawn.positions import RandomPositionStrategy
+from pose_app.domain.entities.particles.spawn.selectors import WeightedSelector
 from pose_app.domain.entities.particles.spawn.strategies import ComposedSpawnStrategy
+from pose_app.domain.games.particles.geometry import Workspace
 
 # Crear estrategia: 70% fuego, 30% hielo, con distancia mínima de 0.15
 spawn_strategy = ComposedSpawnStrategy(
@@ -268,13 +292,22 @@ spawn_strategy = ComposedSpawnStrategy(
     position_strategy=RandomPositionStrategy(min_distance=0.15),
 )
 
-# Definir archetypes
+# Definir archetypes (cada uno compone su propio Appearance)
 archetypes = [
-    ParticleArchetype(name="fire", weight=0.7, size=25.0, color=(255, 100, 0)),
-    ParticleArchetype(name="ice", weight=0.3, size=20.0, color=(100, 200, 255)),
+    ParticleArchetype(
+        name="fire",
+        weight=0.7,
+        appearance=Appearance(size=25.0, color=(255, 100, 0)),
+    ),
+    ParticleArchetype(
+        name="ice",
+        weight=0.3,
+        appearance=Appearance(size=20.0, color=(100, 200, 255)),
+    ),
 ]
 
 # Generar 10 partículas
+# ComposedSpawnStrategy.spawn valida count >= 0, screen_w > 0, screen_h > 0
 particles = spawn_strategy.spawn(
     count=10,
     archetypes=archetypes,
@@ -300,14 +333,25 @@ El plugin lee la configuración de spawn desde el JSON:
       {
         "name": "fire",
         "weight": 0.7,
-        "size": 25.0,
-        "color": [255, 100, 0]
+        "appearance": {
+          "size": 25.0,
+          "color": [255, 100, 0],
+          "padding_x": 2.0,
+          "padding_y": 2.0
+        },
+        "sprite_config": {
+          "sprite_name": "fire",
+          "fps": 12.0,
+          "animation_mode": "loop"
+        }
       },
       {
         "name": "ice",
         "weight": 0.3,
-        "size": 20.0,
-        "color": [100, 200, 255]
+        "appearance": {
+          "size": 20.0,
+          "color": [100, 200, 255]
+        }
       }
     ],
     "spawn_config": {
@@ -320,25 +364,61 @@ El plugin lee la configuración de spawn desde el JSON:
 }
 ```
 
-El plugin (`particles_plugin.py`) construye las estrategias automáticamente:
+**Esquema de `particle_archetypes[i]`**:
+
+| Campo | Tipo | Requerido | Default | Notas |
+|---|---|---|---|---|
+| `name` | `str` | ✅ | — | Único en el array; no vacío |
+| `weight` | `float` | ❌ | `1.0` | `>= 0`. Peso relativo en `WeightedSelector` |
+| `appearance` | `object` | ❌ | `Appearance()` (size=5.0, color=(255,255,255)) | Bloque de apariencia visual |
+| `appearance.size` | `float` | ❌ | `20.0` | `> 0` |
+| `appearance.color` | `[r, g, b]` | ❌ | `[255, 200, 50]` | 3 enteros 0-255 |
+| `appearance.padding_x` | `float` | ❌ | `0.0` | `>= 0`. Margen visual horizontal (no afecta colisión) |
+| `appearance.padding_y` | `float` | ❌ | `0.0` | `>= 0`. Margen visual vertical |
+| `sprite_config` | `object` | ❌ | `None` | Si falta → renderer dibuja círculo |
+| `sprite_config.sprite_name` | `str` | ✅ (si el bloque existe) | — | Nombre lógico; `AssetLoader` resuelve a `assets/particles/sprites/<name>.{png,json}` |
+| `sprite_config.fps` | `float` | ❌ | `0.0` | `>= 0`. `0.0` = sprite estático |
+| `sprite_config.animation_mode` | `"loop"` \| `"one_shot"` | ❌ | `"loop"` | Validado por `SpriteConfig.__post_init__` |
+
+El plugin (`particles_plugin.py`) construye los archetypes y las estrategias automáticamente. La lógica de parseo vive en **métodos privados** del plugin (`_build_archetypes`, `_parse_appearance`, `_parse_sprite_config`, `_build_spawn_strategy`), **no inline** en `create_game`. Esto permite:
+
+- Testear cada parser por separado.
+- Envolver cada error en `ConfigurationError` con contexto (`{index}`, `{sprite_name}`).
+- Añadir campos nuevos al JSON sin tocar `create_game`.
+
+Esquema simplificado del flujo:
 
 ```python
-# 1. Leer archetypes del JSON
-archetypes = [
-    ParticleArchetype(
-        name=a["name"],
-        weight=a.get("weight", 1.0),
-        size=a.get("size", 20.0),
-        color=tuple(a.get("color", [255, 200, 50])),
-    )
-    for a in opts.get("particle_archetypes", [])
-]
+# En ParticlesPlugin.create_game:
+archetypes = self._build_archetypes(raw_archetypes, opts)
+spawn_strategy = self._build_spawn_strategy(raw_spawn_config, opts)
 
-# 2. Construir estrategia según spawn_config
-spawn_cfg = opts.get("spawn_config", {})
-selector = WeightedSelector()  # o SequentialSelector
-positioner = RandomPositionStrategy(min_distance=spawn_cfg.get("min_distance", 0.15))
-spawn_strategy = ComposedSpawnStrategy(selector, positioner)
+# Dentro de _build_archetypes:
+for index, item in enumerate(raw_archetypes):
+    name = item.get("name", f"archetype_{index}")
+    weight = float(item.get("weight", 1.0))
+    appearance = self._parse_appearance(item.get("appearance"), index)
+    sprite_config = self._parse_sprite_config(item.get("sprite_config"), index)
+    archetypes.append(ParticleArchetype(
+        name=name,
+        weight=weight,
+        appearance=appearance,
+        sprite_config=sprite_config,
+    ))
+
+# Dentro de _parse_sprite_config (si el bloque existe):
+if raw_sprite is None:
+    return None  # → renderer dibuja círculo
+sprite_name = raw_sprite.get("sprite_name")  # requerido
+asset_loader = AssetLoader()
+return asset_loader.load_sprite_config(
+    category="particles",
+    sprite_name=sprite_name,
+    fps=float(raw_sprite.get("fps", 0.0)),
+    animation_mode=raw_sprite.get("animation_mode", "loop"),
+)
+# AssetLoader resuelve path desde assets/particles/sprites/<sprite_name>.{png,json}
+```
 
 # 3. Inyectar en el juego
 return ParticlesGame(
@@ -592,18 +672,41 @@ assets/
 ### Flujo de carga
 
 ```
-ParticlesPlugin.create_game()
+ParticlesPlugin._build_archetypes(raw_archetypes, opts)
   ↓
-AssetLoader.load_sprite_config(category="particles", sprite_name="demo")
+Por cada archetype con "sprite_config" en JSON:
   ↓
-Lee demo.json → SpriteSheetParser.parse() → dict[int, tuple[x,y,w,h]]
+  _parse_sprite_config(item["sprite_config"], index)
+    ↓
+    AssetLoader.load_sprite_config(
+        category="particles",
+        sprite_name=<sprite_name>,     # ← por archetype, no global
+        fps=<fps>,
+        animation_mode=<mode>,
+    )
+    ↓
+    Lee assets/particles/sprites/<sprite_name>.json
+      → SpriteSheetParser.parse() → dict[int, tuple[x,y,w,h]]
+    ↓
+    Construye SpriteConfig(path=<ruta resuelta>, frame_width=..., ...)
   ↓
-Construye SpriteConfig(path="demo.png", frame_width=256, ...)
+  ParticleArchetype(sprite_config=<SpriteConfig | None>)
   ↓
-Se inyecta al ParticlesGame → pasa al spawn → cada partícula recibe el config
+ComposedSpawnStrategy.spawn(archetypes, ...)
   ↓
-En runtime: PygameParticlesRenderer._load_sprite() carga la imagen y cachea
+  Por cada partícula creada:
+    sprite_config = archetype.sprite_config
+    sprite_state = SpriteState() si sprite_config is not None else None
+    Particle(..., sprite_config=sprite_config, sprite_state=sprite_state)
+  ↓
+PygameParticlesRenderer._draw_particles:
+  - Si (sprite_config + sprite_state) → _draw_sprite (frame animado)
+  - elif appearance → _draw_circle (fallback, si el archetype no declaró sprite)
+  ↓
+En runtime: PygameParticlesRenderer._load_sprite() carga la imagen y la cachea
 ```
+
+**Cambio clave respecto a v0.5**: el sprite ya **no es global**. Antes, `create_game` hardcodeaba un único `sprite_config` (`demo` @ 12 fps) y lo aplicaba a **todos** los archetypes. Ahora cada archetype decide si lleva sprite y cuál. Un archetype sin `sprite_config` en el JSON → `None` → renderer dibuja círculo (comportamiento preservado).
 
 ### Rutas globales
 
@@ -724,6 +827,9 @@ Más ligero, no requiere import, y los type-checkers lo tratan igual. Convenció
 - [x] Configuración driven por JSON (archetypes + spawn_config)
 - [x] Sistema de estrategias de spawn (WeightedSelector, RandomPositionStrategy, etc.)
 - [x] ComposedSpawnStrategy para composición flexible
+- [x] **Composición de `Appearance` en `ParticleArchetype`** (v1.1): sin duplicación de `size`/`color`; padding cableado de extremo a extremo.
+- [x] **`sprite_config` por archetype desde JSON** (v1.1): sprites resueltos vía `AssetLoader` a partir de `sprite_name` lógico; sin hardcode global.
+- [x] **Eliminación del spawn procedural legacy** (v1.1): `spawn_particles` eliminado; `ComposedSpawnStrategy` es la única metodología; validaciones portadas.
 
 ### Próximas capacidades
 - [ ] `FixedPositionStrategy`: posiciones fijas definidas en JSON (orquestación estricta).
