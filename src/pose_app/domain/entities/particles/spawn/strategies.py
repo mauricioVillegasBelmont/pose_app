@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from pose_app.domain.entities.particle import Particle
 from pose_app.domain.entities.particles.archetype import ParticleArchetype
 from pose_app.domain.entities.particles.components import (
-    Appearance,
     CollisionProfile,
     Position,
     SpriteState,
@@ -51,10 +50,6 @@ class ComposedSpawnStrategy:
     ) -> list[Particle]:
         """Crea ``count`` partículas usando las estrategias configuradas.
 
-        Las partículas creadas se acumulan en ``existing_particles`` para que
-        la estrategia de posición pueda evitar solapamientos en las
-        iteraciones siguientes.
-
         Args:
             count: Número de partículas a crear.
             archetypes: Arquetipos disponibles para la selección.
@@ -65,7 +60,18 @@ class ComposedSpawnStrategy:
 
         Returns:
             Lista con las partículas creadas.
+
+        Raises:
+            ValueError: Si ``count`` es negativo, ``screen_w`` o ``screen_h``
+                son no positivos.
         """
+        if count < 0:
+            raise ValueError(f"count must be >= 0, got {count}")
+        if screen_w <= 0:
+            raise ValueError(f"screen_w must be > 0, got {screen_w}")
+        if screen_h <= 0:
+            raise ValueError(f"screen_h must be > 0, got {screen_h}")
+
         particles: list[Particle] = []
         existing_particles: list[Particle] = []
 
@@ -81,9 +87,8 @@ class ComposedSpawnStrategy:
             )
 
             position = Position(x=x, y=y, vx=0.0, vy=0.0)
-            appearance = Appearance(size=archetype.size, color=archetype.color)
             collision = CollisionProfile(
-                radius=archetype.size / 2.0,
+                radius=archetype.appearance.size / 2.0,
                 behavior="destroy",
             )
             sprite_config = archetype.sprite_config
@@ -95,7 +100,7 @@ class ComposedSpawnStrategy:
 
             particle = Particle(
                 position=position,
-                appearance=appearance,
+                appearance=archetype.appearance,  # ← composición directa
                 collision=collision,
                 sprite_config=sprite_config,
                 sprite_state=sprite_state,

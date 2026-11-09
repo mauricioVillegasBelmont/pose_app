@@ -57,12 +57,25 @@
       {
         "name": "default",
         "weight": 1.0,
-        "size": 20.0,
-        "color": [
-          255,
-          200,
-          50
-        ]
+        "appearance": {
+          "size": 20.0,
+          "color": [255, 200, 50]
+        }
+      },
+      {
+        "name": "demo_sprite",
+        "weight": 0.5,
+        "appearance": {
+          "size": 32.0,
+          "color": [255, 255, 255],
+          "padding_x": 10.0,
+          "padding_y": 10.0
+        },
+        "sprite_config": {
+          "sprite_name": "demo",
+          "fps": 12.0,
+          "animation_mode": "loop"
+        }
       }
     ],
     "spawn_config": {

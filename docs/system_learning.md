@@ -312,7 +312,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 
 ### `src/pose_app/domain/entities/particles/` — ECS-lite
 - **Propósito**: la entidad `Particle` vive aquí como **composición de componentes**. El paquete se divide en:
-  - `archetype.py`: `ParticleArchetype` (plantilla para spawn: nombre, peso, tamaño, color, sprite).
+  - `archetype.py`: `ParticleArchetype` (plantilla para spawn: nombre, peso, `Appearance` compuesto, sprite opcional).
   - `components.py`: `Position`, `Appearance`, `Lifespan`, `SpriteConfig`, `SpriteState`, `CollisionProfile`, `Particle`.
   - `lifespan.py`: `LifespanCapability` (ABC), `InfiniteLifespan`, `TimedLifespan`.
   - `systems.py`: `MovementSystem`, `LifespanSystem`, `AnimationSystem` (mutan componentes por tick).
@@ -594,12 +594,15 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 **Propósito**: la entidad `Particle` vive en `entities/particle.py` (archivo suelto, ver arriba). Este **subpaquete** contiene los **componentes** (datos puros), los **sistemas** (lógica por tick) y las **estrategias de spawn**. Es la separación clásica ECS: `entity` (id + componentes) ≠ `component` (datos) ≠ `system` (lógica).
 
 #### `particles/archetype.py` — `ParticleArchetype`
-**Propósito**: plantilla para spawn (nombre, peso, tamaño, color, sprite opcional).
-**Patrones**: Dataclass `frozen=True`, validación en `__post_init__`.
+**Propósito**: plantilla para spawn. **Compone un `Appearance`** completo (frozen, compartible entre todas las partículas del mismo arquetipo) en lugar de duplicar `size`/`color` como campos top-level.
+**Patrones**: Dataclass `frozen=True`, composición, validación en `__post_init__`.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
-| `ParticleArchetype` | `frozen: name:str`, `weight:float=1.0`, `size:float`, `color:tuple[int,int,int]`, `sprite_config:SpriteConfig\|None=None` | Valida nombre no vacío, `weight>=0`, `size>0`, color 0-255, `sprite_config` válido | Creado por `ParticlesPlugin._build_archetypes` desde `game_options.archetypes`; consumido por `WeightedSelector` y `ComposedSpawnStrategy` |
+| `ParticleArchetype` | `frozen: name:str`, `weight:float=1.0`, `appearance:Appearance=field(default_factory=Appearance)`, `sprite_config:SpriteConfig\|None=None` | Valida `name` no vacío y `weight>=0` (el resto lo valida `Appearance`). Comparte `appearance` entre todas las partículas que salgan de este archetype | Creado por `ParticlesPlugin._build_archetypes` desde `game_options.particle_archetypes` (JSON); consumido por `WeightedSelector` y `ComposedSpawnStrategy.spawn` |
+| `__post_init__` | `(self) -> None` | `ValueError` si `name` vacío o `weight < 0` | Se ejecuta en cada construcción |
+
+**Nota de diseño**: la composición de `Appearance` (en lugar de duplicar `size`/`color`) evita el problema clásico de "olvidé cablear `padding_x` en el spawn". Añadir un campo nuevo a `Appearance` (e.g. `border_radius`) **no requiere tocar `ParticleArchetype` ni `ComposedSpawnStrategy`**.
 
 #### `particles/components.py` — componentes ECS
 **Propósito**: componentes puros. La inmutabilidad (`frozen=True`) se usa siempre que sea posible; los mutables (`Position`, `SpriteState`) existen por rendimiento en tiempo real.
@@ -650,7 +653,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 | `spawn/positions.py` | `GridPositionStrategy()` | Posiciones en grid uniforme (predecible) | Idem |
 | `spawn/selectors.py` | `WeightedSelector()` | Selecciona archetype por peso (respeta `weight`); valida suma > 0 | Construido por `ParticlesPlugin._build_spawn_strategy` según `game_options.selector` |
 | `spawn/selectors.py` | `SequentialSelector(sequence: list[str])` | Recorre archetypes en orden cíclico; valida nombres existentes | Idem |
-| `spawn/strategies.py` | `ComposedSpawnStrategy(archetype_selector, position_strategy)` | Combina selector + positioner; genera `count` partículas con componentes inicializados | Inyectado en `ParticlesGame.__init__` |
+| `spawn/strategies.py` | `ComposedSpawnStrategy(archetype_selector, position_strategy)` | Combina selector + positioner; transfiere `archetype.appearance` **directo a `Particle`** (sin copiar campo a campo); valida `count >= 0`, `screen_w > 0`, `screen_h > 0` (`ValueError`) | Inyectado en `ParticlesGame.__init__` |
 
 ---
 
@@ -927,13 +930,20 @@ Los plugins importan de `src/pose_app/domain/plugins/game_plugin.py`, que es la 
 `register_builtin_plugins(registry: PluginRegistry) -> None`: registra `ColorPlugin`, `GesturesPlugin`, `ParticlesPlugin` (imports locales para evitar ciclos). Invocado por `Container.plugin_registry` (lazy, primera vez).
 
 ### `src/pose_app/app/plugins/particles_plugin.py` — `ParticlesPlugin` 🟢 nueva arquitectura
-**Patrones**: Plugin, Factory Method, Composition (capacidades + overlays).
+**Patrones**: Plugin, Factory Method, Composition (capacidades + overlays), Strategy (builders privados).
 
 | Método | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
 | `game_id / display_name / description` | `@property -> str` | `"particles"`, `"Particles Game"`, texto | `PluginRegistry` |
 | `create_state` | `(self) -> GameStatePort` | `ParticlesState()` | Contrato/tests |
-| `create_game` | `(self, context: GameContext) -> GameProtocol` | Crea `PygameParticlesRenderer` (+`_initialize` con try/except), overlays si `RENDER_DEBUG_OVERLAY` (`PoseOverlay`, `FpsOverlay`), `PygameSceneManager(surface, capabilities, overlays)`, y devuelve `ParticlesGame(renderer=None, scene=..., particles_capability=..., gravity=..., burst_count=..., max_particles=...)` desde `settings.game.*` | 🟢 `Container.create_game()` |
+| `create_game` | `(self, context: GameContext) -> GameProtocol` | Construye el juego completo: `_build_cursors` → `PoseInteractionFacade` → `_build_archetypes` → `_build_spawn_strategy` → capacidades pygame (`PygameColorRenderer`, `PygameInputCursorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`) → `PygameSceneManager` → `ParticlesGame(...)`. **No hardcodea sprite**: el sprite se resuelve por archetype dentro de `_build_archetypes` | 🟢 `Container.create_game()` |
+| `_build_archetypes` | `(self, raw_archetypes: Any, opts: dict) -> list[ParticleArchetype]` | Parsea cada archetype del JSON: `name`, `weight`, `appearance` (vía `_parse_appearance`), `sprite_config` (vía `_parse_sprite_config`). Si no hay archetypes → `_default_archetype` (sin sprite). `ConfigurationError` con `{index}` | `create_game` |
+| `_parse_appearance` | `(self, raw: Any, index: int) -> Appearance` | Parsea el bloque `appearance` (size, color, padding_x, padding_y) y delega validación a `Appearance`. Si `raw is None` → `Appearance()` (defaults) | `_build_archetypes` |
+| `_parse_sprite_config` | `(self, raw: Any, index: int) -> SpriteConfig \| None` | Si no hay bloque → `None` (renderer dibuja círculo). Si hay: exige `sprite_name` (str no vacío) y delega resolución a `AssetLoader.load_sprite_config(category="particles", sprite_name=..., fps=..., animation_mode=...)`. Envuelve errores en `ConfigurationError` con `{index, sprite_name}` | `_build_archetypes` |
+| `_default_archetype` | `(self, opts: dict) -> ParticleArchetype` | Archetype por defecto sin sprite (`sprite_config=None`); `appearance` desde `opts.get("particle_size", 20.0)` / `opts.get("particle_color", [255,200,50])` | `_build_archetypes` |
+| `_build_spawn_strategy` | `(self, raw_spawn_config: Any, opts: dict) -> ComposedSpawnStrategy` | Construye `WeightedSelector` + `RandomPositionStrategy(min_distance)`. Valida `archetype_selector == "weighted"` y `position_strategy == "random"`; `ConfigurationError` si no | `create_game` |
+| `_build_cursors` | `(self, raw_cursors: Any, opts: dict) -> tuple[dict[str, HandLandmarkConfig], list[InputCursor]]` | Parsea cursores del JSON (landmark_names, offsets, appearance, collision). Defaults: `left_hand` y `right_hand` con wrist único | `create_game` |
+| `_parse_color` | `@staticmethod (raw_color: Any) -> tuple[int,int,int]` | Valida que sea secuencia de 3 enteros | `_build_archetypes`, `_default_archetype` |
 
 ### `src/pose_app/app/plugins/color_plugin.py` — `ColorPlugin` 🔴 legacy
 `create_game(context)` → `_create_renderer(context)`: `RENDER_PROVIDER=mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter`; si `debug_overlay` y es `PygameBaseAdapter`, envuelve con **`PoseDebugOverlay`** (Decorator). `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(...)`.
@@ -1523,6 +1533,7 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | Puerto nuevo | `src/pose_app/domain/ports/...` + `docs/ports_contract.md` (versión/changelog) + adaptador + tests |
 | Juego nuevo | `src/pose_app/domain/games/<id>/` + `src/pose_app/app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/adding_a_game_plugin.md` |
 | Setting nuevo | sub-clase de `Settings` + `.env.example` + `tests/unit/config/test_settings.py` |
+| Archetype nuevo con sprite | `game_profiles/<game>/<profile>.json`: añadir entrada en `particle_archetypes` con `appearance: {size, color, padding_x?, padding_y?}` y `sprite_config: {sprite_name, fps?, animation_mode?}`. El sprite se resuelve vía `AssetLoader` desde `assets/particles/sprites/<sprite_name>.{png,json}` |
 | Evento nuevo | `src/pose_app/domain/events/...` + publicador + suscriptor + `docs/ports_contract.md` |
 | Endpoint nuevo | router + schema + (¿auth?) + test de integración |
 

@@ -3,8 +3,8 @@
 > **Audiencia**: desarrolladores que quieren añadir un juego nuevo a Pose AR
 > sin conocer los detalles internos de la plataforma.
 >
-> **Versión del documento**: 1.0
-> **Última actualización**: [fecha]
+> **Versión del documento**: 1.1
+> **Última actualización**: Noviembre 2026
 > **Compatible con**: arquitectura hexagonal v0.5+
 
 ---
@@ -98,7 +98,7 @@ te ayudarán:
 
 ## Anatomía de un plugin
 
-Un plugin completo son **4 archivos**:
+Un plugin completo son **3 archivos** (+ opcionalmente entidades/eventos):
 
 ```
 app/plugins/
@@ -107,10 +107,9 @@ app/plugins/
 
 domain/games/
 └── tu_juego/
+    ├── __init__.py
+    ├── main.py              ← Tu juego (implementa GameProtocol)
     └── state.py             ← Tu estado (implementa GameStatePort)
-
-domain/use_cases/
-└── tu_juego.py              ← Tu juego (implementa GameProtocol)
 ```
 
 **Opcional pero recomendado**:
@@ -121,7 +120,12 @@ domain/entities/                ← Entidades específicas de tu juego
 
 domain/events/                  ← Eventos que tu juego publica/escucha
 └── tu_juego_events.py
+
+game_profiles/tu_juego/         ← Configuración JSON del juego
+└── normal.json
 ```
+
+> **Nota**: hasta v0.4 existió `domain/use_cases/` para alojar la lógica de cada juego. Fue eliminado en v0.5: los juegos viven en `domain/games/<id>/main.py` y los servicios de dominio en `domain/services/`. No reintroduzcas `use_cases/`.
 
 ### 🧩 Los 4 contratos que debes cumplir
 
@@ -194,7 +198,7 @@ cabeza (un "saludo") y cambia el color de fondo a verde.
 
 ### Paso 1: Definir el estado
 
-**Archivo**: `domain/games/saludo/state.py`
+**Archivo**: `src/pose_app/domain/games/saludo/state.py`
 
 ```python
 """
@@ -204,8 +208,8 @@ Estado del juego de saludo.
 from threading import Lock
 from typing import Any
 
-from domain.entities.color import RGBColor
-from domain.state.game_state_port import GameStatePort
+from pose_app.domain.entities.color import RGBColor
+from pose_app.domain.state.game_state_port import GameStatePort
 
 
 class SaludoState(GameStatePort):
@@ -253,7 +257,7 @@ class SaludoState(GameStatePort):
 
 ### Paso 2: Definir el juego
 
-**Archivo**: `domain/use_cases/saludo_game.py`
+**Archivo**: `domain/games/saludo/main.py`
 
 ```python
 """
@@ -266,16 +270,18 @@ y cambia el color de fondo a verde.
 import asyncio
 from collections.abc import Callable
 
-from domain.entities.color import RGBColor
-from domain.entities.pose_landmark import PoseLandmark
-from domain.games.saludo.state import SaludoState
-from domain.ports.camera_port import CameraPort
-from domain.ports.event_bus_port import EventBusPort
-from domain.ports.pose_estimator_port import PoseEstimatorPort
-from domain.ports.render_port import ColorRenderPort
-from infrastructure.logging.logger import get_logger
+from pose_app.domain.entities.color import RGBColor
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.games.saludo.state import SaludoState
+from pose_app.domain.ports.camera_port import CameraPort
+from pose_app.domain.ports.event_bus_port import EventBusPort
+from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
+# Renderer legacy: si tu juego es simple y usa ColorGame-style, sigue válido.
+# Para la nueva arquitectura (SceneManager + capacidades), ver docs/render_architecture.md.
+from pose_app.domain.ports.render_port import ColorRenderPort
+from pose_app.infrastructure.logging.logger import get_logger
 
-logger = get_logger("use_cases.saludo")
+logger = get_logger("pose_app.domain.games.saludo")
 
 
 class SaludoGame:
@@ -396,13 +402,13 @@ class SaludoGame:
 Plugin del juego de saludo.
 """
 
-from app.game_context import GameContext
-from domain.games.saludo.state import SaludoState
-from domain.plugins.game_plugin import GamePlugin, GameProtocol
-from domain.state.game_state_port import GameStatePort
-from domain.use_cases.saludo_game import SaludoGame
-from infrastructure.errors.exceptions import ConfigurationError
-from infrastructure.logging.logger import get_logger
+from pose_app.app.game_context import GameContext
+from pose_app.domain.games.saludo.main import SaludoGame
+from pose_app.domain.games.saludo.state import SaludoState
+from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.state.game_state_port import GameStatePort
+from pose_app.infrastructure.errors.exceptions import ConfigurationError
+from pose_app.infrastructure.logging.logger import get_logger
 
 logger = get_logger("app.plugins.saludo")
 
@@ -441,12 +447,12 @@ class SaludoPlugin(GamePlugin):
         cfg = context.settings.render
 
         if cfg.provider == "mock":
-            from adapters.mock.mock_render import MockColorRenderAdapter
+            from pose_app.adapters.mock.mock_render import MockColorRenderAdapter
 
             return MockColorRenderAdapter()
 
         if cfg.provider == "pygame":
-            from adapters.render.pygame_color_adapter import PygameColorAdapter
+            from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
 
             return PygameColorAdapter(
                 width=cfg.width,
@@ -489,7 +495,7 @@ Deberías ver en logs:
 ```
 [HH:MM:SS.mmm] INFO  pose_ar.app.plugins | Plugin registrado: saludo (Saludo Game)
 [HH:MM:SS.mmm] INFO  pose_ar.di          | Creando juego desde plugin: saludo
-[HH:MM:SS.mmm] INFO  pose_ar.use_cases.saludo | Juego de saludo iniciado
+[HH:MM:SS.mmm] INFO  pose_ar.domain.games.saludo | Juego de saludo iniciado
 ```
 
 Y en otra terminal:
@@ -514,11 +520,18 @@ curl http://localhost:8000/api/v1/state
 
 ### Puertos de salida
 
-| Puerto | Método principal | Uso |
-|--------|------------------|-----|
-| `ParticlesRenderPort` | `render_particles(particles)` | Dibujar partículas |
-| `ColorRenderPort` | `render_background(color, landmarks)` | Fondo + esqueleto |
-| `LandmarkAwareRenderPort` | `update_landmarks(landmarks)` | Recibir landmarks (opcional) |
+| Puerto | Método principal | Uso | Arquitectura |
+|--------|------------------|-----|--------------|
+| `ParticlesRenderPort` (nuevo) | `set_particles(particles)` + `render_particles()` | Dibujar partículas ECS | 🟢 Nueva (capacidad) |
+| `ColorRenderPort` (nuevo) | `set_color(color)` + `render_color()` | Fondo | 🟢 Nueva (capacidad) |
+| `HudRenderPort` | `set_hud(...)` + `render_hud()` | HUD (score, rondas, timer) | 🟢 Nueva (capacidad) |
+| `InputCursorRenderPort` | `set_cursors(cursors)` + `render_cursors()` | Cursores de interacción | 🟢 Nueva (capacidad) |
+| `OverlayPort` | `draw(surface, landmarks)` | Overlays (pose, FPS) | 🟢 Nueva (overlay) |
+| `ScenePort` | `add_capability(...)` + `add_overlay(...)` + `render_frame(landmarks)` | Orquesta capacidades + overlays | 🟢 Nueva (SceneManager) |
+| `ParticlesRenderPort` (legacy) | `render_particles(particles)` | Dibujar partículas (pre-v0.5) | 🔴 Legacy |
+| `ColorRenderPort` (legacy) | `render_background(color, landmarks)` | Fondo + esqueleto (pre-v0.5) | 🔴 Legacy |
+
+**Recomendación**: los juegos nuevos deben usar la **nueva arquitectura** (`ScenePort` + capacidades). El legacy se mantiene para `ColorGame` y `GesturesGame`, no para código nuevo.
 
 ### Puertos de comunicación
 
@@ -532,8 +545,11 @@ curl http://localhost:8000/api/v1/state
 | Entidad | Campos clave | Uso |
 |---------|--------------|-----|
 | `PoseLandmark` | `x, y, z, visibility, name` | Un punto de la pose |
-| `Particle` | `x, y, vx, vy, life, size, color` | Una partícula |
+| `Particle` (ECS-lite) | `position: Position`, `appearance: Appearance`, `lifespan: Lifespan\|None`, `collision: CollisionProfile\|None`, `sprite_config: SpriteConfig\|None`, `sprite_state: SpriteState\|None` | Una partícula compuesta (ver `docs/particles_ecs_system.md`) |
+| `ParticleArchetype` (ECS-lite) | `name`, `weight`, `appearance: Appearance`, `sprite_config: SpriteConfig\|None` | Plantilla para spawnear partículas |
+| `Appearance` (componente) | `size`, `color`, `padding_x`, `padding_y` | Config visual inmutable |
 | `RGBColor` | `r, g, b` | Color RGB inmutable |
+| `InputCursor` | `cursor_id`, `position`, `is_visible`, `appearance`, `collision` | Cursor de interacción (ver `docs/cursor_system.md`) |
 
 ---
 
@@ -654,8 +670,8 @@ async def run_async(self, should_stop=None):
 ```python
 # tests/unit/test_saludo_rules.py
 
-from domain.entities.pose_landmark import PoseLandmark
-from domain.use_cases.saludo_game import SaludoGame
+from pose_app.domain.entities.pose_landmark import PoseLandmark
+from pose_app.domain.games.saludo.main import SaludoGame
 
 
 def test_greeting_detected_when_hand_near_head():
@@ -726,7 +742,7 @@ Antes de considerar tu plugin terminado:
 ### ❓ ¿Cómo publico un evento?
 
 ```python
-from domain.events.base import DomainEvent
+from pose_app.domain.events.base import DomainEvent
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -778,8 +794,24 @@ assets/
     └── sound.wav
 ```
 
-Referéncialos con `Path(__file__).parent / "assets"` y usa `importlib.resources`
-si empaquetas como librería.
+**Acceso recomendado** (vía `paths.py`, no hardcodees rutas):
+
+```python
+from pose_app.infrastructure.paths import ASSETS_DIR
+
+sprite_path = ASSETS_DIR / "tu_juego" / "sprite.png"
+
+from pose_app.infrastructure.assets.asset_loader import AssetLoader
+
+loader = AssetLoader()
+sprite_config = loader.load_sprite_config(
+    category="tu_juego",
+    sprite_name="sprite",
+    fps=12.0,
+    animation_mode="loop",
+)
+```
+Para empaquetar como librería, usa `importlib.resources` en lugar de `ASSETS_DIR`.
 
 ### ❓ ¿Cómo depuro mi juego?
 
@@ -827,10 +859,13 @@ Si añades un juego útil, considera:
 
 ```
 docs/
-├── ports_contract.md          ← Ya existe
-├── adding_a_game_plugin.md    ← Este nuevo
-├── architecture.md            ← Documento general
-└── games/                     ← Futuro: un .md por juego
+├── ports_contract.md ← Ya existe
+├── adding_a_game_plugin.md ← Este documento
+├── architecture.md ← Documento general
+├── particles_ecs_system.md ← Sistema ECS de partículas
+├── render_architecture.md ← Nueva arquitectura de render
+├── cursor_system.md ← Sistema de cursores
+└── games/ ← (opcional, futuro) un .md por juego
     ├── particles.md
     ├── color.md
     └── saludo.md
