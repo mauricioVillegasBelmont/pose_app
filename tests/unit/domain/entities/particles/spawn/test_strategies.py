@@ -67,8 +67,10 @@ class TestComposedSpawnStrategy:
         )
         archetype = ParticleArchetype(
             name="spark",
-            size=40.0,
-            color=(10, 20, 30),
+            appearance=Appearance(
+                size=40.0,
+                color=(10, 20, 30),
+            ),
             sprite_config=sprite_config,
         )
         strategy = ComposedSpawnStrategy(
@@ -133,12 +135,16 @@ class TestComposedSpawnStrategy:
         common = ParticleArchetype(
             name="common",
             weight=90.0,
-            color=(255, 0, 0),
+            appearance=Appearance(
+                color=(255, 0, 0),
+            ),
         )
         rare = ParticleArchetype(
             name="rare",
             weight=10.0,
-            color=(0, 0, 255),
+            appearance=Appearance(
+                color=(0, 0, 255),
+            ),
         )
         strategy = ComposedSpawnStrategy(
             archetype_selector=WeightedSelector(),
@@ -160,3 +166,41 @@ class TestComposedSpawnStrategy:
         common_ratio = common_count / len(particles)
 
         assert common_ratio == pytest.approx(0.9, abs=0.05)
+
+    def test_spawn_uses_archetype_appearance_directly(self) -> None:
+        """El spawn usa archetype.appearance tal cual (incluye padding)."""
+        import random
+
+        from pose_app.domain.entities.particles.archetype import ParticleArchetype
+        from pose_app.domain.entities.particles.components import Appearance
+        from pose_app.domain.entities.particles.spawn.positions import (
+            RandomPositionStrategy,
+        )
+        from pose_app.domain.entities.particles.spawn.selectors import WeightedSelector
+        from pose_app.domain.entities.particles.spawn.strategies import (
+            ComposedSpawnStrategy,
+        )
+        from pose_app.domain.games.particles.geometry import Workspace
+
+        appearance = Appearance(
+            size=25.0, color=(10, 20, 30), padding_x=5.0, padding_y=5.0
+        )
+        arch = ParticleArchetype(name="x", appearance=appearance)
+        strategy = ComposedSpawnStrategy(
+            archetype_selector=WeightedSelector(),
+            position_strategy=RandomPositionStrategy(min_distance=0.0),
+        )
+
+        particles = strategy.spawn(
+            count=1,
+            archetypes=[arch],
+            workspace=Workspace(),
+            screen_w=800,
+            screen_h=600,
+            rng=random.Random(42),
+        )
+
+        assert len(particles) == 1
+        assert particles[0].appearance is appearance  # misma instancia
+        assert particles[0].appearance.padding_x == 5.0
+        assert particles[0].appearance.padding_y == 5.0

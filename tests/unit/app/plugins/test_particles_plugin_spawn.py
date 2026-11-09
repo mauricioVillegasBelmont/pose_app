@@ -122,14 +122,12 @@ def test_plugin_creates_game_with_custom_archetypes(
         {
             "name": "fire",
             "weight": 3.0,
-            "size": 32.0,
-            "color": [255, 80, 0],
+            "appearance": {"size": 32.0, "color": [255, 80, 0]},
         },
         {
             "name": "ice",
             "weight": 1.0,
-            "size": 16.0,
-            "color": [0, 200, 255],
+            "appearance": {"size": 16.0, "color": [0, 200, 255]},
         },
     ]
     game = plugin.create_game(context_factory({"particle_archetypes": archetypes_data}))
@@ -137,8 +135,8 @@ def test_plugin_creates_game_with_custom_archetypes(
     assert isinstance(game, ParticlesGame)
     assert [archetype.name for archetype in game._archetypes] == ["fire", "ice"]
     assert [archetype.weight for archetype in game._archetypes] == [3.0, 1.0]
-    assert [archetype.size for archetype in game._archetypes] == [32.0, 16.0]
-    assert [archetype.color for archetype in game._archetypes] == [
+    assert [archetype.appearance.size for archetype in game._archetypes] == [32.0, 16.0]
+    assert [archetype.appearance.color for archetype in game._archetypes] == [
         (255, 80, 0),
         (0, 200, 255),
     ]
@@ -202,3 +200,27 @@ def test_plugin_raises_on_unknown_positioner(
 
     with pytest.raises(ConfigurationError, match="Unknown position_strategy"):
         plugin.create_game(context)
+
+
+def test_plugin_builds_archetype_with_padding_from_json(
+    plugin: ParticlesPlugin,
+    context_factory: Callable[[dict[str, Any] | None], GameContext],
+) -> None:
+    """El JSON puede declarar padding_x/padding_y en appearance."""
+    archetypes_data = [
+        {
+            "name": "padded",
+            "appearance": {
+                "size": 20.0,
+                "color": [255, 0, 0],
+                "padding_x": 4.0,
+                "padding_y": 6.0,
+            },
+        }
+    ]
+    game = plugin.create_game(context_factory({"particle_archetypes": archetypes_data}))
+
+    arch = game._archetypes[0]
+    assert arch.appearance.size == 20.0
+    assert arch.appearance.padding_x == 4.0
+    assert arch.appearance.padding_y == 6.0

@@ -16,7 +16,7 @@ from pose_app.domain.entities.input_cursor import (
     InputCursor,
 )
 from pose_app.domain.entities.particles.archetype import ParticleArchetype
-from pose_app.domain.entities.particles.components import SpriteConfig
+from pose_app.domain.entities.particles.components import Appearance, SpriteConfig
 from pose_app.domain.entities.particles.spawn.ports import (
     ArchetypeSelector,
     PositionStrategy,
@@ -249,15 +249,13 @@ class ParticlesPlugin(GamePlugin):
                     raise ValueError("name must be a non-empty string")
 
                 weight = float(item.get("weight", 1.0))
-                size = float(item.get("size", 20.0))
-                color = self._parse_color(item.get("color", [255, 200, 50]))
+                appearance = self._parse_appearance(item.get("appearance"), index)
 
                 archetypes.append(
                     ParticleArchetype(
                         name=name,
                         weight=weight,
-                        size=size,
-                        color=color,
+                        appearance=appearance,
                         sprite_config=sprite_config,
                     )
                 )
@@ -290,6 +288,7 @@ class ParticlesPlugin(GamePlugin):
         try:
             size = float(opts.get("particle_size", 20.0))
             color = self._parse_color(opts.get("particle_color", [255, 200, 50]))
+            appearance = Appearance(size=size, color=color)
         except (TypeError, ValueError) as e:
             raise ConfigurationError(
                 "Invalid default particle archetype configuration",
@@ -298,10 +297,53 @@ class ParticlesPlugin(GamePlugin):
 
         return ParticleArchetype(
             name="default",
-            size=size,
-            color=color,
+            appearance=appearance,
             sprite_config=sprite_config,
         )
+
+    def _parse_appearance(
+        self,
+        raw_appearance: Any,
+        index: int,
+    ) -> Appearance:
+        """Parsea el bloque ``appearance`` de un arquetipo del JSON.
+
+        Args:
+            raw_appearance: Bloque appearance en bruto o ``None`` para defaults.
+            index: Índice del arquetipo (para contexto de error).
+
+        Returns:
+            ``Appearance`` validado.
+
+        Raises:
+            ConfigurationError: Si el bloque es inválido.
+        """
+        if raw_appearance is None:
+            return Appearance()
+
+        if not isinstance(raw_appearance, dict):
+            raise ConfigurationError(
+                f"particle_archetypes[{index}].appearance must be an object",
+                context={"index": index},
+            )
+
+        try:
+            size = float(raw_appearance.get("size", 20.0))
+            color = self._parse_color(raw_appearance.get("color", [255, 200, 50]))
+            padding_x = float(raw_appearance.get("padding_x", 0.0))
+            padding_y = float(raw_appearance.get("padding_y", 0.0))
+
+            return Appearance(
+                size=size,
+                color=color,
+                padding_x=padding_x,
+                padding_y=padding_y,
+            )
+        except (TypeError, ValueError) as e:
+            raise ConfigurationError(
+                f"Invalid appearance for archetype {index}: {e}",
+                context={"index": index},
+            ) from e
 
     def _build_spawn_strategy(
         self,

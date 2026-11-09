@@ -57,12 +57,10 @@
       {
         "name": "default",
         "weight": 1.0,
-        "size": 20.0,
-        "color": [
-          255,
-          200,
-          50
-        ]
+        "appearance": {
+          "size": 20.0,
+          "color": [255, 200, 50]
+        }
       }
     ],
     "spawn_config": {

@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from pose_app.domain.entities.particle import Particle
 from pose_app.domain.entities.particles.archetype import ParticleArchetype
 from pose_app.domain.entities.particles.components import (
-    Appearance,
     CollisionProfile,
     Position,
     SpriteState,
@@ -51,10 +50,6 @@ class ComposedSpawnStrategy:
     ) -> list[Particle]:
         """Crea ``count`` partículas usando las estrategias configuradas.
 
-        Las partículas creadas se acumulan en ``existing_particles`` para que
-        la estrategia de posición pueda evitar solapamientos en las
-        iteraciones siguientes.
-
         Args:
             count: Número de partículas a crear.
             archetypes: Arquetipos disponibles para la selección.
@@ -81,9 +76,8 @@ class ComposedSpawnStrategy:
             )
 
             position = Position(x=x, y=y, vx=0.0, vy=0.0)
-            appearance = Appearance(size=archetype.size, color=archetype.color)
             collision = CollisionProfile(
-                radius=archetype.size / 2.0,
+                radius=archetype.appearance.size / 2.0,
                 behavior="destroy",
             )
             sprite_config = archetype.sprite_config
@@ -95,7 +89,7 @@ class ComposedSpawnStrategy:
 
             particle = Particle(
                 position=position,
-                appearance=appearance,
+                appearance=archetype.appearance,  # ← composición directa
                 collision=collision,
                 sprite_config=sprite_config,
                 sprite_state=sprite_state,
