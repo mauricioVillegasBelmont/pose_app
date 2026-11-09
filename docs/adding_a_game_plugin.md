@@ -276,6 +276,7 @@ from pose_app.domain.games.saludo.state import SaludoState
 from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
+
 # Renderer legacy: si tu juego es simple y usa ColorGame-style, sigue válido.
 # Para la nueva arquitectura (SceneManager + capacidades), ver docs/render_architecture.md.
 from pose_app.domain.ports.render_port import ColorRenderPort

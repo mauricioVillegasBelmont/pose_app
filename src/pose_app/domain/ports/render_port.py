@@ -1,17 +1,16 @@
 """
-Puertos de render, segregados por tipo de juego.
+Puertos de render legacy, segregados por tipo de juego.
 
-Siguiendo el principio ISP (Interface Segregation Principle), cada juego
-declara explícitamente QUÉ tipo de render necesita:
+🔴 DEPRECADO: este módulo se mantiene mientras ColorGame y GesturesGame
+usan la arquitectura legacy (pre-v0.5). Los juegos nuevos deben usar
+`domain/ports/render/` (capacidades + SceneManager).
 
-- ParticlesGame → ParticlesRenderPort
-- ColorGame     → ColorRenderPort
-
-Esto permite tener adaptadores especializados (Pygame, WebSocket, Null, ...)
-sin obligarlos a implementar métodos que no usan.
+El ciclo de vida de pygame (init, set_mode, set_caption, quit) NO es
+responsabilidad de estos puertos: lo gestiona el bootstrap del plugin
++ el SceneManager (Fase fix-pygame-single-window).
 
 Jerarquía:
-    BaseRenderPort (común: show, close)
+    BaseRenderPort (común: close)
         ├── ParticlesRenderPort (render_particles)
         └── ColorRenderPort     (render_background)
 """
@@ -25,11 +24,7 @@ from pose_app.domain.entities.pose_landmark import PoseLandmark
 
 
 class BaseRenderPort(ABC):
-    """Puerto de salida: visualización de escenas."""
-
-    @abstractmethod
-    def show(self) -> None:
-        """Muestra la ventana/visualización (bloquea hasta cerrar)."""
+    """Puerto legacy de salida: visualización de escenas por frame."""
 
     @abstractmethod
     def close(self) -> None:
@@ -57,18 +52,17 @@ class ColorRenderPort(BaseRenderPort):
 
     @abstractmethod
     def render_background(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None:
-        """
-        Renderiza un fondo sólido + esqueleto superpuesto.
-        """
+        """Renderiza un fondo sólido + esqueleto superpuesto."""
 
 
 class LandmarkAwareRenderPort(ABC):
     """
-    Puerto opcional para renderers que quieren recibir landmarks
+    Mixin opcional para renderers que quieren recibir landmarks
     además de su input principal.
 
-    No todos los renderers lo implementan. Los juegos pueden checarlo
-    con isinstance() si quieren ser explícitos.
+    🔴 DEPRECADO: en la nueva arquitectura, los landmarks llegan al
+    `SceneManager.render_frame(landmarks)` y este los pasa a cada
+    capacidad que los necesite. Se elimina en Fase 4.
     """
 
     @abstractmethod

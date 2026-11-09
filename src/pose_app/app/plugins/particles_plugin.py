@@ -57,6 +57,10 @@ class ParticlesPlugin(GamePlugin):
     def create_game(self, context: GameContext) -> GameProtocol:
         """Construye el juego con SceneManager + capacidades + overlays.
 
+        Bootstrap de pygame centralizado: UNA sola ventana por proceso,
+        independientemente del número de capacidades. El caption final
+        es el del ``render_cfg.title``, no el del último renderer.
+
         Args:
             context: dependencias compartidas y configuración del perfil.
 
@@ -67,6 +71,8 @@ class ParticlesPlugin(GamePlugin):
             ConfigurationError: Si la configuración de spawn es inválida o
                 usa estrategias desconocidas.
         """
+        import pygame
+
         from pose_app.adapters.render.pygame_color import PygameColorRenderer
         from pose_app.adapters.render.pygame_hud import PygameHudRenderer
         from pose_app.adapters.render.pygame_particles import PygameParticlesRenderer
@@ -74,7 +80,6 @@ class ParticlesPlugin(GamePlugin):
 
         settings = context.settings
         render_cfg = settings.render
-        _pose_cfg = settings.pose
 
         profile_config = context.gameplay_config
         opts = profile_config.game_options
@@ -98,7 +103,6 @@ class ParticlesPlugin(GamePlugin):
         cursor_timeout = float(opts.get("cursor_timeout", 2.0))
         cursor_configs, cursors = self._build_cursors(raw_cursors, opts)
 
-        # Reconstruir pose_interaction con cursor_configs
         pose_interaction = PoseInteractionFacade(
             smoothing_factor=profile_config.pose_smoothing_factor,
             hand_timeout=cursor_timeout,
@@ -106,61 +110,64 @@ class ParticlesPlugin(GamePlugin):
             cursors=cursors,
         )
 
-        # Leer mirror del config
         mirror = render_cfg.mirror
 
-        # 1. Capacidades
-        color_capability = PygameColorRenderer(
-            width=render_cfg.width,
-            height=render_cfg.height,
-            title=render_cfg.title,
-            target_fps=render_cfg.target_fps,
-            # color NO se espeja
+        # ==========================================
+        # 1. Bootstrap de pygame: UNA sola ventana
+        # ==========================================
+        pygame.init()
+        window = pygame.display.set_mode(
+            (render_cfg.width, render_cfg.height),
+            pygame.RESIZABLE,
         )
-        color_capability._initialize()
+        pygame.display.set_caption(render_cfg.title)
+
+        # ==========================================
+        # 2. Capacidades (todas sobre `window`)
+        # ==========================================
+        color_capability = PygameColorRenderer(
+            surface=window,
+            target_fps=render_cfg.target_fps,
+            title=render_cfg.title,
+        )
 
         cursor_capability = PygameInputCursorRenderer(
-            width=render_cfg.width,
-            height=render_cfg.height,
-            title="cursors",
+            surface=window,
             target_fps=render_cfg.target_fps,
+            title="cursors",
             mirror=mirror,
         )
         cursor_capability.set_cursors(cursors)
 
         particles_capability = PygameParticlesRenderer(
-            width=render_cfg.width,
-            height=render_cfg.height,
-            title="Particles",
+            surface=window,
             target_fps=render_cfg.target_fps,
-            mirror=mirror,  # ← AÑADIR
+            title="Particles",
+            mirror=mirror,
         )
 
         hud_capability = PygameHudRenderer(
-            width=render_cfg.width,
-            height=render_cfg.height,
-            title="HUD",
+            surface=window,
             target_fps=render_cfg.target_fps,
-            # HUD NO se espeja
+            title="HUD",
         )
 
-        # 2. Overlays
+        # ==========================================
+        # 3. Overlays
+        # ==========================================
         overlays: list = []
         if render_cfg.debug_overlay:
             from pose_app.adapters.render.overlays.fps_overlay import FpsOverlay
             from pose_app.adapters.render.overlays.pose_overlay import PoseOverlay
 
-            overlays.append(
-                PoseOverlay(mirror=mirror)  # ← AÑADIR
-            )
-            overlays.append(
-                FpsOverlay()
-                # FPS NO se espeja
-            )
+            overlays.append(PoseOverlay(mirror=mirror))
+            overlays.append(FpsOverlay())
 
-        # 3. SceneManager
+        # ==========================================
+        # 4. SceneManager (único dueño del ciclo de vida de pygame)
+        # ==========================================
         scene = PygameSceneManager(
-            surface=color_capability.screen,
+            surface=window,
             capabilities=[
                 color_capability,
                 particles_capability,
@@ -171,7 +178,9 @@ class ParticlesPlugin(GamePlugin):
             target_fps=render_cfg.target_fps,
         )
 
-        # 4. Juego
+        # ==========================================
+        # 5. Juego
+        # ==========================================
         return ParticlesGame(
             camera=context.camera,
             pose_estimator=context.pose_estimator,

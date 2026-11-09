@@ -1,3 +1,12 @@
+"""
+Adaptador Pygame legacy que renderiza un fondo sólido + esqueleto.
+
+🔴 DEPRECADO: será reemplazado por capacidades en Fase 4 (ColorGame y
+GesturesGame migrarán a la nueva arquitectura de render).
+"""
+
+import pygame
+
 from pose_app.adapters.render.overlays.pose_overlay import PoseOverlayRenderer
 from pose_app.adapters.render.pygame_base import PygameBaseAdapter
 from pose_app.domain.entities.color import RGBColor
@@ -5,35 +14,24 @@ from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.ports.render_port import ColorRenderPort
 from pose_app.infrastructure.logging.logger import get_logger
 
-logger = get_logger("adapters.render.pygame_color")
+logger = get_logger("adapters.render.pygame_color_adapter")
 
 
 class PygameColorAdapter(PygameBaseAdapter, ColorRenderPort):
-    """
-    Adaptador Pygame que renderiza un fondo sólido + esqueleto.
-
-    Características:
-    - Fondo dinámico (color calculado por el juego).
-    - Esqueleto superpuesto usando PoseOverlayRenderer.
-
-    NOTA: El esqueleto es parte de la FEATURE del juego (no es debug).
-    Usa composición con PoseOverlayRenderer para evitar duplicación.
-    """
+    """Adaptador Pygame que renderiza un fondo sólido + esqueleto."""
 
     def __init__(
         self,
-        width: int = 800,
-        height: int = 600,
-        title: str = "Color Game",
+        surface: pygame.Surface,
         target_fps: int = 60,
+        title: str = "Color Game",
         pose_overlay: PoseOverlayRenderer | None = None,
-    ):
+    ) -> None:
         PygameBaseAdapter.__init__(
             self,
-            width=width,
-            height=height,
-            title=title,
+            surface=surface,
             target_fps=target_fps,
+            title=title,
         )
         self._pose_overlay = pose_overlay or PoseOverlayRenderer()
 
@@ -59,8 +57,12 @@ class PygameColorAdapter(PygameBaseAdapter, ColorRenderPort):
                 window_size=(self.width, self.height),
             )
 
-        # 3. Actualiza pantalla + FPS
-        self.flush()
+        # 3. Flip + FPS
+        pygame.display.flip()
 
         # 4. Eventos
         self._handle_events()
+
+    def close(self) -> None:
+        """Cierra el adaptador. NO cierra pygame (lo hace el SceneManager)."""
+        super().close()

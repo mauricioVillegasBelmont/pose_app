@@ -4,12 +4,22 @@ Base común para adaptadores de render con Pygame.
 NO es un puerto, es un detalle de implementación. Vive en `adapters/`
 porque solo aplica a adaptadores Pygame (no a WebSocket, Null, etc.).
 
-Responsabilidades:
-- Inicializar Pygame (ventana, reloj).
-- Manejar eventos comunes (cerrar ventana, redimensionar).
-- Proveer acceso thread-safe a la superficie de dibujo.
-- Cerrar limpiamente.
+Responsabilidades (post-refactor):
+- Marcar el renderer como "listo" (idempotente).
+- Mantener el FPS objetivo.
+- Exponer la surface inyectada por el bootstrap.
+
+NO es responsable de:
+- Crear la ventana (`pygame.display.set_mode`).
+- Cambiar el caption (`pygame.display.set_caption`).
+- Cerrar pygame (`pygame.quit`).
+
+Esos son responsabilidad del composition root del plugin (bootstrap) y del
+`PygameSceneManager` (shutdown). Esto garantiza UNA sola ventana por proceso,
+independientemente de cuántas capacidades se registren.
 """
+
+from typing import Self
 
 import pygame
 
@@ -22,26 +32,34 @@ class PygameBaseAdapter:
     """
     Clase base para adaptadores de Pygame.
 
+    La surface es inyectada por el bootstrap del plugin (una sola ventana
+    compartida por todas las capacidades). El adapter no crea ventana ni
+    cierra pygame.
+
     NOTA: No hereda de ningún puerto. Los adaptadores concretos
-    (PygameParticlesAdapter, PygameColorAdapter) heredan de esta
+    (PygameColorRenderer, PygameParticlesRenderer) heredan de esta
     Y del puerto correspondiente.
     """
 
     def __init__(
         self,
-        width: int = 800,
-        height: int = 600,
-        title: str = "Pose AR",
+        surface: pygame.Surface,
         target_fps: int = 60,
-    ):
-        self._width = width
-        self._height = height
-        self._title = title
-        self._target_fps = target_fps
+        title: str = "",
+    ) -> None:
+        """
+        Inicializa el adapter sobre una surface ya existente.
 
-        self._screen: pygame.Surface | None = None
-        self._clock: pygame.time.Clock | None = None
-        self._running: bool = False
+        Args:
+            surface: Superficie de Pygame donde dibujar. Inyectada por el
+                bootstrap del plugin. NO se crea aquí.
+            target_fps: FPS objetivo para el Clock interno.
+            title: Nombre legible para logs (NO se aplica a la ventana).
+        """
+        self._surface = surface
+        self._target_fps = target_fps
+        self._title = title
+        self._running = False
 
     # ==========================================
     # Ciclo de vida
@@ -49,92 +67,56 @@ class PygameBaseAdapter:
 
     def _initialize(self) -> None:
         """
-        Inicializa Pygame si no está inicializado.
+        Marca el adapter como listo. Idempotente.
 
-        Es idempotente: llamarlo varias veces no hace nada extra.
+        Asegura que pygame está inicializado (pygame.init es idempotente).
+        NO crea ventana. La surface ya fue inyectada por el bootstrap.
         """
-        if self._screen is not None:
+        if self._running:
             return
 
         pygame.init()
-        self._screen = pygame.display.set_mode(
-            (self._width, self._height),
-            pygame.RESIZABLE,
-        )
-        pygame.display.set_caption(self._title)
-        self._clock = pygame.time.Clock()
         self._running = True
 
-        logger.info(
-            f"Pygame iniciado: {self._width}x{self._height} "
+        logger.debug(
+            f"Renderer listo | surface={self.width}x{self.height} "
             f"@ {self._target_fps} FPS | {self._title}"
         )
 
-    def show(self) -> None:
-        """
-        Mantiene la ventana activa hasta que se cierre.
-
-        Útil cuando el juego NO está corriendo en un loop propio,
-        pero quieres que la ventana siga visible.
-        """
-        self._initialize()
-
-        while self._running:
-            self._handle_events()
-            if self._clock is not None:
-                self._clock.tick(self._target_fps)
-
     def close(self) -> None:
         """
-        Cierra la ventana y libera recursos de Pygame.
+        Marca el adapter como cerrado. Idempotente.
 
-        Idempotente: llamarlo varias veces no falla.
+        NO llama pygame.quit(): el shutdown de pygame lo gestiona el
+        SceneManager (único dueño del ciclo de vida de pygame).
         """
         self._running = False
-
-        if self._screen is not None:
-            pygame.quit()
-            self._screen = None
-            self._clock = None
-            logger.info(f"Pygame cerrado: {self._title}")
 
     # ==========================================
     # API para subclases
     # ==========================================
 
     @property
-    def screen(self) -> pygame.Surface:
-        """
-        Superficie principal de dibujo.
+    def surface(self) -> pygame.Surface:
+        """Surface de dibujo compartida (inyectada por el bootstrap)."""
+        return self._surface
 
-        Raises:
-            RuntimeError: si se llama antes de `_initialize()`.
-        """
-        if self._screen is None:
-            raise RuntimeError("Pygame no inicializado. Llama a _initialize() primero.")
-        return self._screen
+    @property
+    def screen(self) -> pygame.Surface:
+        """Alias de ``surface`` (retrocompatibilidad con código existente)."""
+        return self._surface
 
     @property
     def width(self) -> int:
-        return self._width
+        return self._surface.get_width()
 
     @property
     def height(self) -> int:
-        return self._height
+        return self._surface.get_height()
 
     @property
     def is_running(self) -> bool:
         return self._running
-
-    def flush(self) -> None:
-        """
-        Actualiza la pantalla y aplica el límite de FPS.
-
-        Debe llamarse al final de cada render.
-        """
-        pygame.display.flip()
-        if self._clock is not None:
-            self._clock.tick(self._target_fps)
 
     # ==========================================
     # Manejo de eventos
@@ -155,20 +137,19 @@ class PygameBaseAdapter:
 
     def _on_resize(self, new_size: tuple[int, int]) -> None:
         """
-        Maneja el redimensionado de la ventana.
+        Hook de redimensionado. Subclases pueden sobrescribir para
+        recrear buffers internos.
 
-        Subclases pueden sobrescribir si necesitan recrear buffers.
+        La ventana compartida (``self._surface``) es gestionada por pygame:
+        no hay que llamar a ``set_mode`` aquí.
         """
-        self._width, self._height = new_size
-        if self._screen is not None:
-            self._screen = pygame.display.set_mode(new_size, pygame.RESIZABLE)
         logger.debug(f"Ventana redimensionada: {new_size}")
 
     # ==========================================
     # Context manager
     # ==========================================
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self._initialize()
         return self
 

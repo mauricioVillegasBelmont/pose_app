@@ -298,7 +298,7 @@ class MiClase: ...
 | Privados | prefijo `_` | `_particles`, `_initialize` |
 | Puertos | sufijo `Port` | `CameraPort`, `RenderPort` |
 | Adaptadores | sufijo `Adapter` | `PygameParticlesAdapter` |
-| Decoradores | sufijo `Decorator` o `Overlay` | `PoseDebugOverlay` |
+| Decoradores / Overlays | sufijo `Decorator` o `Overlay` | `PoseOverlay`, `FpsOverlay` |
 | Plugins | sufijo `Plugin` | `ParticlesPlugin` |
 | Estados | sufijo `State` | `ParticlesState` |
 
@@ -481,8 +481,8 @@ def test_particles_are_cleared_on_reset(game: ParticlesGame) -> None:
 # comportamiento no documentado entre versiones.
 password_bytes = password.encode("utf-8")[:72]
 
-# TODO(refactor-render): PoseDebugOverlay será reemplazado por PoseOverlay.
-return PoseDebugOverlay(base)  # type: ignore[arg-type]
+# TODO(perf): cachear el font en vez de recrearlo por frame.
+self._font = pygame.font.SysFont(None, 24)
 
 # ❌ MAL: comenta el qué
 x = x + 1  # incrementa x

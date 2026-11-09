@@ -26,6 +26,12 @@ def init_pygame():
     pygame.quit()
 
 
+@pytest.fixture
+def surface() -> pygame.Surface:
+    """Surface de prueba (no requiere display real)."""
+    return pygame.Surface((800, 600))
+
+
 def make_particle_with_circle(x: float, y: float, life: float = 1.0) -> Particle:
     """Factory para partícula con círculo (sin sprite)."""
     return Particle(
@@ -58,77 +64,67 @@ def make_particle_with_sprite(
 class TestPygameParticlesRendererECS:
     """El renderer debe dibujar círculos y sprites según los componentes."""
 
-    def test_renders_circle_for_particle_without_sprite(self) -> None:
+    def test_renders_circle_for_particle_without_sprite(
+        self, surface: pygame.Surface
+    ) -> None:
         """Si no hay sprite, dibuja un círculo."""
-        # Arrange
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = make_particle_with_circle(400.0, 300.0)
         renderer.set_particles([particle])
 
-        # Act
         renderer.render_particles()
 
-        # Assert: verificar que se dibujó algo en el buffer
-        # (En un test real, usaríamos un mock de surface o verificaríamos el color del píxel)
         assert renderer._particle_surface is not None
 
-    def test_renders_sprite_for_particle_with_sprite(self) -> None:
+    def test_renders_sprite_for_particle_with_sprite(
+        self, surface: pygame.Surface
+    ) -> None:
         """Si hay sprite_config y sprite_state, dibuja el sprite."""
-        # Arrange
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = make_particle_with_sprite(400.0, 300.0, frame=0)
         renderer.set_particles([particle])
 
-        # Act
         renderer.render_particles()
 
-        # Assert
         assert renderer._particle_surface is not None
-        # Aquí verificaríamos que el sprite se dibujó en (400, 300)
 
-    def test_renders_correct_frame_for_animated_sprite(self) -> None:
+    def test_renders_correct_frame_for_animated_sprite(
+        self, surface: pygame.Surface
+    ) -> None:
         """Para sprite animado, dibuja el frame actual de sprite_state."""
-        # Arrange
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = make_particle_with_sprite(400.0, 300.0, frame=5, fps=12.0)
         renderer.set_particles([particle])
 
-        # Act
         renderer.render_particles()
 
-        # Assert
         assert renderer._particle_surface is not None
-        # Verificar que se dibujó el frame 5 del sprite sheet
 
-    def test_handles_particle_with_lifespan(self) -> None:
+    def test_handles_particle_with_lifespan(self, surface: pygame.Surface) -> None:
         """Partículas con lifespan ajustan alpha/tamaño."""
-        # Arrange
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = make_particle_with_circle(400.0, 300.0, life=0.5)
         renderer.set_particles([particle])
 
-        # Act
         renderer.render_particles()
 
-        # Assert
         assert renderer._particle_surface is not None
 
-    def test_ignores_dead_particles(self) -> None:
+    def test_ignores_dead_particles(self, surface: pygame.Surface) -> None:
         """Partículas con life <= 0.01 no se dibujan."""
-        # Arrange
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = make_particle_with_circle(400.0, 300.0, life=0.0)
         renderer.set_particles([particle])
 
-        # Act
         renderer.render_particles()
 
-        # Assert: el buffer debe estar vacío (solo transparente)
         assert renderer._particle_surface is not None
 
-    def test_zero_size_particle_not_rendered_even_with_padding(self) -> None:
+    def test_zero_size_particle_not_rendered_even_with_padding(
+        self, surface: pygame.Surface
+    ) -> None:
         """Si size=0, la partícula no se renderiza aunque tenga padding."""
-        renderer = PygameParticlesRenderer(width=800, height=600)
+        renderer = PygameParticlesRenderer(surface=surface)
         particle = Particle(
             position=Position(x=400.0, y=300.0),
             appearance=Appearance(size=0.0, padding_x=10.0, padding_y=10.0),
@@ -136,6 +132,4 @@ class TestPygameParticlesRendererECS:
         renderer.set_particles([particle])
         renderer.render_particles()
 
-        # Verificar que el buffer está vacío (solo transparente)
-        # (En un test real, verificarías que no se llamó a pygame.draw.circle)
         assert renderer._particle_surface is not None

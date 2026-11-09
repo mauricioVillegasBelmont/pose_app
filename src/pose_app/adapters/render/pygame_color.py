@@ -6,6 +6,8 @@ Reutiliza lógica base de PygameBaseAdapter. No dibuja esqueleto
 (el esqueleto se gestiona como OverlayPort).
 """
 
+import pygame
+
 from pose_app.adapters.render.pygame_base import PygameBaseAdapter
 from pose_app.domain.entities.color import RGBColor
 from pose_app.domain.ports.render.color_render_port import ColorRenderPort
@@ -19,17 +21,15 @@ class PygameColorRenderer(PygameBaseAdapter, ColorRenderPort):
 
     def __init__(
         self,
-        width: int = 800,
-        height: int = 600,
-        title: str = "Color Game",
+        surface: pygame.Surface,
         target_fps: int = 60,
+        title: str = "Color Game",
     ) -> None:
         PygameBaseAdapter.__init__(
             self,
-            width=width,
-            height=height,
-            title=title,
+            surface=surface,
             target_fps=target_fps,
+            title=title,
         )
         self._color: RGBColor | None = None
 
@@ -52,7 +52,7 @@ class PygameColorRenderer(PygameBaseAdapter, ColorRenderPort):
         color = self._color if self._color is not None else RGBColor(0, 0, 0)
         self.screen.fill(color.to_rgb_tuple())
 
-    def render(self):
+    def render(self) -> None:
         """Método unificado de RenderCapability.
         Delega al método específico del puerto.
         """

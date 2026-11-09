@@ -54,7 +54,12 @@ def game() -> ParticlesGame:
         position_strategy=RandomPositionStrategy(min_distance=0.15),
     )
 
-    archetypes = [ParticleArchetype(name="test", size=20.0, color=(255, 200, 50))]
+    archetypes = [
+        ParticleArchetype(
+            name="test",
+            appearance=Appearance(size=20.0, color=(255, 200, 50)),
+        )
+    ]
 
     return ParticlesGame(
         camera=Mock(),
@@ -163,7 +168,6 @@ class TestParticlesGameRender:
         game._start_new_round()
         await game._render_frame(landmarks=[])
 
-        # <--- CORRECCIÓN: Verificar que los métodos set_* fueron llamados
         game._color_capability.set_color.assert_called()
         game._particles_capability.set_particles.assert_called()
         game._hud_capability.set_hud.assert_called()

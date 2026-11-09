@@ -90,7 +90,6 @@ REQUIRED_FILES = [
     "src/pose_app/adapters/render/pygame_input_cursor.py",
     "src/pose_app/adapters/render/overlays/pose_overlay.py",
     "src/pose_app/adapters/render/overlays/fps_overlay.py",
-    "src/pose_app/adapters/render/decorators/pose_debug_overlay.py",
     # Adaptadores - api
     "src/pose_app/adapters/api/fastapi_adapter.py",
     "src/pose_app/adapters/api/routes.py",
@@ -177,10 +176,6 @@ def check_imports() -> bool:
         (
             "pose_app.adapters.render.pygame_input_cursor",
             "PygameInputCursorRenderer",
-        ),
-        (
-            "pose_app.adapters.render.decorators.pose_debug_overlay",
-            "PoseDebugOverlay",
         ),
         ("pose_app.adapters.mock.mock_render", "MockParticlesRenderAdapter"),
         ("pose_app.adapters.mock.mock_render", "MockColorRenderAdapter"),

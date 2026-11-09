@@ -203,10 +203,6 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 #### Métodos
 
-##### `show() -> None`
-
-- **Propósito**: Mantener la visualización activa (bloqueante hasta cerrar).
-
 ##### `close() -> None`
 
 - **Propósito**: Cerrar y liberar recursos.
@@ -216,6 +212,8 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 - **Propósito**: Soportar `with renderer as r:`.
 - **Contrato**: `__exit__` llama a `close()`.
+
+> **Nota post-refactor** (`feature/fix#pygame-single-window`): `show()` fue **eliminado** del contrato. Nadie lo llamaba en producción: el ciclo de vida de la ventana lo gestiona el bootstrap del plugin + `SceneManager`. Si necesitas mantener una ventana abierta, usa el loop del juego (`run_async`), no un método del puerto.
 
 ---
 
@@ -242,7 +240,7 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `PygameParticlesAdapter` | ✅ Implementado | `adapters/render/pygame_particles_adapter.py` |
+| `PygameParticlesAdapter` | 🔴 Eliminado | (nunca existió como archivo; el adapter real fue `PygameParticlesRenderer` en `adapters/render/pygame_particles.py`, que implementa la **nueva** `ParticlesRenderPort` en `domain/ports/render/`) |
 | `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
 | `NullParticlesRenderAdapter` | ⏳ Planeado | (headless) |
 | `WebSocketParticlesAdapter` | ⏳ Futuro | (frontend web) |
@@ -289,7 +287,7 @@ además de su input principal (uso: overlay de debug).
 
 **Ubicación**: `domain/ports/render_port.py`
 
-**Quién lo usa**: decoradores de debug (`PoseDebugOverlay`).
+**Quién lo usa**: 🔴 **nadie en producción** post-refactor. Antes lo usaba `PoseDebugOverlay`, eliminado en `feature/fix#pygame-single-window` (reemplazado por `OverlayPort`/`PoseOverlay`). Ver §5.11 de `system_learning.md`.
 
 #### Métodos
 
@@ -303,7 +301,9 @@ además de su input principal (uso: overlay de debug).
 |-----------|--------|-----------|
 | `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
 | `MockColorRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
-| `PoseDebugOverlay` | ✅ Implementado | `adapters/render/decorators/pose_debug_overlay.py` |
+| `PoseDebugOverlay` | 🔴 Eliminado | (era `adapters/render/decorators/pose_debug_overlay.py`, borrado en `feature/fix#pygame-single-window`) |
+
+> **Nota**: en la nueva arquitectura, el "mixin" opcional se reemplaza por `OverlayPort` (`domain/ports/render/overlay_port.py`). Los overlays **no** reciben landmarks por un mixin: el `SceneManager.render_frame(landmarks)` los pasa a `ov.draw(surface, landmarks)`.
 
 ---
 

@@ -43,8 +43,9 @@ def test_frame_with_animated_sprite() -> None:
 
     assert particle.sprite_state.current_frame == 1  # Debería avanzar
 
-    # 3. Renderizar
-    renderer = PygameParticlesRenderer(width=800, height=600)
+    # 3. Renderizar (surface inyectada, no width/height)
+    surface = pygame.Surface((800, 600))
+    renderer = PygameParticlesRenderer(surface=surface)
     renderer.set_particles([particle])
     renderer.render_particles()
 

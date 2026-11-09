@@ -50,40 +50,53 @@ class ColorPlugin(GamePlugin):
     # Helpers privados
     # ==========================================
 
-    def _create_renderer(self, context: GameContext):
-        from pose_app.adapters.render.pygame_base import PygameBaseAdapter
-
+    def _create_renderer(self, context: GameContext) -> ColorRenderPort:
         cfg = context.settings.render
 
-        base: ColorRenderPort
+        if cfg.debug_overlay:
+            # NOTE(refactor-render): PoseDebugOverlay fue eliminado en favor
+            # de OverlayPort (PoseOverlay) en la nueva arquitectura. ColorPlugin
+            # es legacy: el overlay se habilitará cuando migre al SceneManager
+            # (Fase 4). Mientras tanto se ignora con warning.
+            logger.warning(
+                "RENDER_DEBUG_OVERLAY=true ignorado en ColorPlugin (legacy). "
+                "El overlay solo está disponible para el juego 'particles' "
+                "hasta la migración de ColorPlugin a la nueva arquitectura."
+            )
+
         if cfg.provider == "mock":
             from pose_app.adapters.mock.mock_render import MockColorRenderAdapter
 
-            base = MockColorRenderAdapter()
-        elif cfg.provider == "pygame":
-            from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
+            return MockColorRenderAdapter()
 
-            base = PygameColorAdapter(
-                width=cfg.width,
-                height=cfg.height,
+        if cfg.provider == "pygame":
+            import pygame
+
+            from pose_app.adapters.render.pygame_color_adapter import (
+                PygameColorAdapter,
+            )
+
+            # NOTE(refactor-render): bootstrap mínimo de pygame para no romper
+            # el arranque del juego 'color' hasta su migración completa a
+            # SceneManager (Fase 4). NO es el patrón canónico: ver
+            # ParticlesPlugin para el bootstrap correcto (centralizado, con
+            # SceneManager dueño del ciclo de vida).
+            pygame.init()
+            surface = pygame.display.get_surface()
+            if surface is None:
+                surface = pygame.display.set_mode(
+                    (cfg.width, cfg.height),
+                    pygame.RESIZABLE,
+                )
+                pygame.display.set_caption(cfg.title)
+
+            return PygameColorAdapter(
+                surface=surface,
                 title=cfg.title,
                 target_fps=cfg.target_fps,
             )
-        else:
-            raise ConfigurationError(
-                f"Proveedor de render desconocido: {cfg.provider}",
-                context={"provider": cfg.provider, "plugin": self.game_id},
-            )
 
-        if cfg.debug_overlay and isinstance(base, PygameBaseAdapter):
-            from pose_app.adapters.render.decorators.pose_debug_overlay import (
-                PoseDebugOverlay,
-            )
-
-            logger.info("Activando PoseDebugOverlay sobre Color")
-            # TODO(refactor-render): PoseDebugOverlay será reemplazado por PoseOverlay.
-            # Ignoramos el error de tipo porque PygameColorAdapter no implementa
-            # render_particles (que el Protocol actual exige).
-            return PoseDebugOverlay(base)  # type: ignore[arg-type]
-
-        return base
+        raise ConfigurationError(
+            f"Proveedor de render desconocido: {cfg.provider}",
+            context={"provider": cfg.provider, "plugin": self.game_id},
+        )

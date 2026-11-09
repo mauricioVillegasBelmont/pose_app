@@ -399,12 +399,14 @@ for index, item in enumerate(raw_archetypes):
     weight = float(item.get("weight", 1.0))
     appearance = self._parse_appearance(item.get("appearance"), index)
     sprite_config = self._parse_sprite_config(item.get("sprite_config"), index)
-    archetypes.append(ParticleArchetype(
-        name=name,
-        weight=weight,
-        appearance=appearance,
-        sprite_config=sprite_config,
-    ))
+    archetypes.append(
+        ParticleArchetype(
+            name=name,
+            weight=weight,
+            appearance=appearance,
+            sprite_config=sprite_config,
+        )
+    )
 
 # Dentro de _parse_sprite_config (si el bloque existe):
 if raw_sprite is None:

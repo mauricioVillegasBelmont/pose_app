@@ -35,7 +35,7 @@ que va a morir.
 | `GesturesGame` | Legacy | Rehacer con nueva arquitectura |
 | `PygameColorAdapter` | Legacy vivo | Eliminar cuando los juegos usen `PygameColorRenderer` |
 | `PygameParticlesAdapter` | Legacy vivo | Eliminar cuando los juegos usen `PygameParticlesRenderer` |
-| `PoseDebugOverlay` | Decorador | Eliminar cuando `PoseOverlay` lo reemplace |
+| ~~`PoseDebugOverlay`~~ | ~~Decorador~~ | ✅ **Eliminado** en `feature/fix#pygame-single-window`. `PoseOverlay` ya lo reemplaza. |
 | `render_port.py` | Legacy vivo | Eliminar cuando todos los juegos migren |
 
 ## Qué está disponible en `main`
@@ -54,9 +54,12 @@ que va a morir.
 
 ## Qué NO tocar (mientras esté congelado)
 
-- NO modificar `PygameParticlesAdapter`, `PygameColorAdapter`,
-  `PoseDebugOverlay`, `render_port.py` sin coordinar.
+- NO modificar `PygameParticlesAdapter`, `PygameColorAdapter` hasta su migración a `SceneManager` (Fase 4).
 - NO completar Fases 6-8 sin decidir primero si los mockups van a reescribirse.
+
+**Histórico (ya coordinado en `feature/fix#pygame-single-window`)**:
+- `PoseDebugOverlay` — 🔴 eliminado. `PoseOverlay` (`OverlayPort`) lo reemplaza.
+- `render_port.py` — 🔴 `BaseRenderPort.show()` eliminado. `render_port.py` queda como legacy sin `show()`.
 
 ## Próximos pasos sugeridos
 

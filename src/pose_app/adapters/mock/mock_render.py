@@ -34,7 +34,7 @@ class MockParticlesRenderAdapter(ParticlesRenderPort, LandmarkAwareRenderPort):
 
     No dibuja nada. Solo guarda el estado para inspección en tests.
     También implementa LandmarkAwareRenderPort para permitir que el
-    juego notifique landmarks (útil al probar con PoseDebugOverlay).
+    juego notifique landmarks (útil al probar con OverlayPort / SceneManager).
     """
 
     def __init__(self):

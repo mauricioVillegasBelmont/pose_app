@@ -26,29 +26,28 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
 
     def __init__(
         self,
-        width: int = 800,
-        height: int = 600,
-        title: str = "cursors",
+        surface: pygame.Surface,
         target_fps: int = 60,
+        title: str = "cursors",
         mirror: bool = False,
     ) -> None:
         """
         Inicializa el renderer.
 
         Args:
-            surface: Superficie Pygame donde dibujar (la pantalla principal).
+            surface: Superficie de Pygame donde dibujar (inyectada por el
+                bootstrap del plugin).
+            target_fps: FPS objetivo.
+            title: Nombre legible para logs.
             mirror: Si se debe espejar el cursor.
         """
         PygameBaseAdapter.__init__(
             self,
-            width=width,
-            height=height,
-            title=title,
+            surface=surface,
             target_fps=target_fps,
+            title=title,
         )
-
-        # self._surface = surface
-        self._surface: pygame.Surface | None = None
+        self._buffer: pygame.Surface | None = None
         self._cursors: list[InputCursor] = []
         self._sprite_cache: dict[str, pygame.Surface] = {}
         self._mirror = mirror
@@ -63,20 +62,14 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
         if not self.is_running:
             return
 
-        surface = self._ensure_surface()
-        surface.fill((0, 0, 0, 0))
+        buffer = self._ensure_buffer()
+        buffer.fill((0, 0, 0, 0))
 
         for cursor in self._cursors:
             if not cursor.is_visible or cursor.position is None:
                 continue
 
-            # Convertir posición a píxeles
-            pos_pixels = cursor.get_position_pixels(
-                # self._surface.get_width(),
-                # self._surface.get_height(),
-                self.width,
-                self.height,
-            )
+            pos_pixels = cursor.get_position_pixels(self.width, self.height)
             if pos_pixels is None:
                 continue
 
@@ -85,39 +78,44 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
             if self._mirror:
                 x = self.width - x
 
-            # Dibujar sprite o círculo
             if cursor.sprite_config is not None and cursor.sprite_state is not None:
                 self._draw_sprite(cursor, x, y)
             else:
                 self._draw_circle(cursor, x, y)
 
-        self.screen.blit(surface, (0, 0))
+        self.screen.blit(buffer, (0, 0))
 
-    def render(self):
+    def render(self) -> None:
         """Método unificado de RenderCapability.
         Delega al método específico del puerto.
         """
         self.render_cursors()
 
+    def close(self) -> None:
+        """Limpia recursos del renderer. NO cierra pygame (lo hace el SceneManager)."""
+        self._sprite_cache.clear()
+        self._buffer = None
+        super().close()
+
     # ==========================================
     # Helpers privados
     # ==========================================
 
-    def _ensure_surface(self) -> pygame.Surface:
-        """Crea o recrea el buffer de partículas si es necesario."""
-        if self._surface is None or self._surface.get_size() != (
+    def _ensure_buffer(self) -> pygame.Surface:
+        """Crea o recrea el buffer interno SRCALPHA si es necesario."""
+        if self._buffer is None or self._buffer.get_size() != (
             self.width,
             self.height,
         ):
-            self._surface = pygame.Surface(
+            self._buffer = pygame.Surface(
                 (self.width, self.height),
                 pygame.SRCALPHA,
             )
-        return self._surface
+        return self._buffer
 
     def _draw_circle(self, cursor: InputCursor, x: float, y: float) -> None:
         """Dibuja el cursor como un círculo con borde y relleno translúcido."""
-        if self._surface is None:
+        if self._buffer is None:
             return
 
         appearance = cursor.appearance
@@ -127,28 +125,26 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
         if radius <= 0:
             return
 
-        # Dibujar círculo con borde
         pygame.draw.circle(
-            self._surface,
+            self._buffer,
             appearance.color,
             (int(x), int(y)),
             radius,
-            width=3,  # Borde de 3 píxeles
+            width=3,
         )
 
-        # Dibujar círculo interno (relleno con alpha)
         inner_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
         pygame.draw.circle(
             inner_surface,
-            (*appearance.color, 80),  # Alpha 80 (translúcido)
+            (*appearance.color, 80),
             (radius, radius),
             radius,
         )
-        self._surface.blit(inner_surface, (int(x - radius), int(y - radius)))
+        self._buffer.blit(inner_surface, (int(x - radius), int(y - radius)))
 
     def _draw_sprite(self, cursor: InputCursor, x: float, y: float) -> None:
         """Dibuja el cursor como un sprite animado."""
-        if self._surface is None:
+        if self._buffer is None:
             return
 
         if cursor.sprite_config is None or cursor.sprite_state is None:
@@ -157,7 +153,6 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
         config = cursor.sprite_config
         state = cursor.sprite_state
 
-        # Cargar sprite sheet (cacheado)
         cache_key = config.path
         if cache_key not in self._sprite_cache:
             try:
@@ -165,19 +160,16 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
                     config.path
                 ).convert_alpha()
             except pygame.error:
-                # Fallback a círculo si no se puede cargar el sprite
                 self._draw_circle(cursor, x, y)
                 return
 
         sprite_sheet = self._sprite_cache[cache_key]
 
-        # Obtener frame actual (asume grid uniforme)
         frame_index = state.current_frame % config.frame_count
         cols = int(sprite_sheet.get_width() / config.frame_width)
         frame_x = (frame_index % cols) * config.frame_width
         frame_y = (frame_index // cols) * config.frame_height
 
-        # Extraer frame
         frame_rect = pygame.Rect(
             int(frame_x),
             int(frame_y),
@@ -186,7 +178,6 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
         )
         frame_surface = sprite_sheet.subsurface(frame_rect)
 
-        # Escalar al tamaño del cursor
         appearance = cursor.appearance
         target_width = int(appearance.size + appearance.padding_x)
         target_height = int(appearance.size + appearance.padding_y)
@@ -196,11 +187,6 @@ class PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort):
                 frame_surface, (target_width, target_height)
             )
 
-            # Centrar en la posición del cursor
             blit_x = int(x - target_width / 2)
             blit_y = int(y - target_height / 2)
-            self._surface.blit(frame_surface, (blit_x, blit_y))
-
-    def close(self) -> None:
-        """Libera recursos del renderer."""
-        self._sprite_cache.clear()
+            self._buffer.blit(frame_surface, (blit_x, blit_y))

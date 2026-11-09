@@ -236,18 +236,7 @@ flowchart TD
         L3 --> L4["PoseOverlayRenderer.draw(esqueleto)"]
         L5["ParticlesGame (si renderer no None)"] --> L6["ParticlesRenderPort.render_particles(particles)"]
         L6 --> L7["PygameParticlesAdapter"]
-        DBG["PoseDebugOverlay (Decorator)"] -. envuelve .-> L3
-    end
-
-    subgraph NUEVA["🟢 NUEVA (src/pose_app/domain/ports/render/)"]
-        direction TB
-        N1["ParticlesGame"] -->|"set_particles(list)"| CAP["Capability"]
-        N1 -->|"render_frame(landmarks)"| SC["PygameSceneManager"]
-        CAP --> SC
-        OV["PoseOverlay / FpsOverlay"] --> SC
-        SC -->|"render_color / render_particles / render_hud"| SURF["pygame.Surface"]
-        SC -->|"draw(surface, landmarks)"| OV
-        SC -->|"pygame.display.flip()"| SURF
+        NOTE["🔴 PoseDebugOverlay eliminado<br/>(ver §5.11)"]
     end
 ```
 
@@ -411,9 +400,9 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 |---|---|
 | `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`: captura en hilo + FourCC configurable) |
 | `src/pose_app/adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
-| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameSceneManager`, `PygameInputCursorRenderer`, overlays y `PoseDebugOverlay` |
+| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameSceneManager`, `PygameInputCursorRenderer`, `PygameColorAdapter` (legacy), overlays (`PoseOverlay`, `FpsOverlay`) |
 | `src/pose_app/adapters/render/overlays/` | `PoseOverlay` (esqueleto) y `FpsOverlay` (contador FPS), ambos implementan `OverlayPort` |
-| `src/pose_app/adapters/render/decorators/` | `PoseDebugOverlay` (Decorator de renderer legacy, inyecta el overlay de pose) |
+| ~~`src/pose_app/adapters/render/decorators/`~~ | 🔴 **Eliminado** en `feature/fix#pygame-single-window`. `PoseOverlay` (`OverlayPort`) reemplaza al `PoseDebugOverlay`. Ver §5.11. |
 | `src/pose_app/adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
 | `src/pose_app/adapters/api/` | Routers FastAPI + DTOs (puertos de entrada HTTP) |
 | `src/pose_app/adapters/mock/` | Dobles de test: mocks y spies deterministas |
@@ -765,9 +754,12 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 ### 🔴 `src/pose_app/domain/ports/render_port.py` (LEGACY)
 **Propósito**: puertos de render antiguos segregados por juego. Sustituidos por `src/pose_app/domain/ports/render/`.
 
+**Nota post-refactor (feature/fix#pygame-single-window)**: `BaseRenderPort.show()` fue eliminado. Nadie lo llamaba en producción (el ciclo de vida lo gestiona el `SceneManager`). El contrato ahora solo exige `close()`.
+
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
-| `BaseRenderPort.show / close` | `(self) -> None` | Mantener ventana / liberar | `close()` llamado en `finally` de los 3 juegos |
+| `BaseRenderPort.close` | `(self) -> None` | Liberar recursos del renderer. Idempotente | `finally` de los 3 juegos |
+| `BaseRenderPort.__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | `with renderer: ...` → `close()` al salir | Tests manuales |
 | `ParticlesRenderPort.render_particles` | `(self, particles: list[Particle]) -> None` | Dibujar partículas | `ParticlesGame._render_legacy` (solo si `renderer is not None`; el plugin actual pasa `None`) 🟡 |
 | `ColorRenderPort.render_background` | `(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None` | Fondo + esqueleto | 🟢 `ColorGame.run_async` y `GesturesGame.run_async` |
 | `LandmarkAwareRenderPort.update_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | Guarda landmarks para el próximo render | `ParticlesGame._render_legacy` vía `isinstance(...)` |
@@ -946,7 +938,7 @@ Los plugins importan de `src/pose_app/domain/plugins/game_plugin.py`, que es la 
 | `_parse_color` | `@staticmethod (raw_color: Any) -> tuple[int,int,int]` | Valida que sea secuencia de 3 enteros | `_build_archetypes`, `_default_archetype` |
 
 ### `src/pose_app/app/plugins/color_plugin.py` — `ColorPlugin` 🔴 legacy
-`create_game(context)` → `_create_renderer(context)`: `RENDER_PROVIDER=mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter`; si `debug_overlay` y es `PygameBaseAdapter`, envuelve con **`PoseDebugOverlay`** (Decorator). `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(...)`.
+`create_game(context)` → `_create_renderer(context)`: `RENDER_PROVIDER=mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter` (con bootstrap mínimo de pygame en el plugin, ver `NOTE(refactor-render)`). Si `debug_overlay=true`, emite **warning** y **omite el overlay** (legacy no soporta `OverlayPort`; se habilitará tras migración a `SceneManager` en Fase 4). `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(...)`.
 
 ### `src/pose_app/app/plugins/gestures_plugin.py` — `GesturesPlugin` 🔴 legacy
 Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter(title="Gestures Game")`. Devuelve `GesturesGame(camera, pose_estimator, renderer, state, event_bus)`.
@@ -1133,76 +1125,67 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 
 ## 5.11 `src/pose_app/adapters/render/`
 
+**Nota post-refactor (feature/fix#pygame-single-window)**:
+- `PygameBaseAdapter` ya **no crea la ventana** ni llama `pygame.quit()`. Recibe una `Surface` inyectada por el bootstrap del plugin.
+- `pygame.init()` + `pygame.display.set_mode()` + `pygame.display.set_caption()` se llaman **una sola vez** en `ParticlesPlugin.create_game` (y, como fallback legacy, en `ColorPlugin`/`GesturesPlugin`).
+- `PygameSceneManager.close()` es el **único** punto del proceso que llama `pygame.quit()`.
+- El `flush()` fue eliminado: el `SceneManager.render_frame` hace `pygame.display.flip()`.
+
 ### 🔴 `pygame_base.py` — `PygameBaseAdapter`
-**Propósito**: base común de ventana pygame (no es un puerto; es detalle).
-**Patrones**: Template Method (`_handle_events`, `_on_resize`), Context Manager, lazy `_initialize()`.
+**Propósito**: base común de renderers pygame. **NO** crea ventana; la recibe inyectada.
+**Patrones**: Template Method (`_handle_events`, `_on_resize`), Context Manager, lazy `_initialize()` (idempotente).
 
 | Método / propiedad | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
-| `__init__` | `(self, width=800, height=600, title="Pose AR", target_fps=60)` | Config ventana | Subclases |
-| `_initialize` | `(self) -> None` | Idempotente: crea `_screen`, `_clock` | `show`, `render_*` de subclases, `ParticlesPlugin` |
-| `show` | `(self) -> None` | Bucle bloqueante de ventana | 🟡 (los juegos no lo usan; render por frame) |
-| `close` | `(self) -> None` | Idempotente; `pygame.quit()` | `finally` de juegos |
-| `screen / width / height / is_running` | `@property` | Acceso a estado | Renderers, overlays, plugins |
-| `flush` | `(self) -> None` | `display.flip()` + `tick` | Adaptadores legacy, `PoseDebugOverlay` |
-| `_handle_events / _on_resize` | `(self, ...) -> None` | QUIT / VIDEORESIZE | `show` y `render_*` |
-| `__enter__ / __exit__` | — | `with` → init/close | Tests |
+| `__init__` | `(self, surface: pygame.Surface, target_fps: int = 60, title: str = "") -> None` | Guarda surface inyectada + target_fps + title (solo logs) | Subclases |
+| `_initialize` | `(self) -> None` | Idempotente: `pygame.init()` + `_running = True`. **NO crea ventana** | `render_*` de subclases |
+| `close` | `(self) -> None` | Idempotente: `_running = False`. **NO llama `pygame.quit()`** | `finally` de juegos (vía `SceneManager.close`) |
+| `surface` | `@property -> pygame.Surface` | Surface inyectada | Renderers, `SceneManager`, overlays |
+| `screen` | `@property -> pygame.Surface` | Alias de `surface` (retrocompatibilidad) | Adaptadores legacy, tests |
+| `width / height` | `@property -> int` | Derivadas de `surface.get_size()` | Renderers, overlays |
+| `is_running` | `@property -> bool` | `_running` | Renderers |
+| `_handle_events / _on_resize` | `(self, ...) -> None` | QUIT / VIDEORESIZE. `_on_resize` **no llama `set_mode`** (pygame gestiona resize de la ventana compartida) | Renderers |
+| `__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | `with` → init/close | Tests |
 
 ### 🟢 `pygame_color.py` — `PygameColorRenderer(ColorRenderPort)`
-Capacidad: `set_color(color: RGBColor)` (asigna `_color`; 🟡 sin invocadores aún) y `render_color()` (fill de pantalla; invocado por `PygameSceneManager.render_frame`). `close()` hereda de la base.
+`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Color Game")`. Capacidad: `set_color(color: RGBColor)` (declara) + `render_color()` (fill de pantalla) + `render()` (delega). `close()` hereda de la base.
 
 ### 🔴 `pygame_color_adapter.py` — `PygameColorAdapter(ColorRenderPort legacy)`
-`__init__(width, height, title, target_fps, pose_overlay: PoseOverlayRenderer | None = None)` y `render_background(color: RGBColor, landmarks: list[PoseLandmark]) -> None` (fill + esqueleto + flush + eventos).
-Invocado por `ColorGame.run_async` y `GesturesGame.run_async` (vía `asyncio.to_thread`); creado por `ColorPlugin`/`GesturesPlugin`.
+`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Color Game", pose_overlay: PoseOverlayRenderer | None = None)`. `render_background(color, landmarks)` → fill + esqueleto + `pygame.display.flip()` + `_handle_events()`. `show()` fue eliminado (no se usa). Creado por `ColorPlugin`/`GesturesPlugin` (legacy). **Será eliminado en Fase 4** cuando esos plugins migren a `SceneManager`.
 
 ### 🟢 `pygame_particles.py` — `PygameParticlesRenderer(ParticlesRenderPort nuevo)`
-| Método | Firma | Responsabilidad | Proveniencia |
-|---|---|---|---|
-| `__init__` | `(..., background_color: RGBColor \| None = None)` | Default `RGBColor(20,20,30)` | `ParticlesPlugin.create_game` |
-| `set_particles` | `(self, particles: list[Particle]) -> None` | Copia a `_particles` | 🟢 `ParticlesGame._render_frame` |
-| `render_particles` | `(self) -> None` | Fondo + buffer SRCALPHA + blit. **Soporta sprite**: si `particle.sprite_config` y `particle.sprite_state` están presentes, dibuja el frame animado; si no, dibuja círculo. | `PygameSceneManager.render_frame` |
-| `close` | `(self) -> None` | Libera buffer + cierra pygame | `PygameSceneManager.close` |
-| `_ensure_particle_surface / _draw_particles / _draw_sprite / _on_resize` | privados | Buffer, culling, sprite cache, alpha por `life` | Internos |
-
-### 🔴 `pygame_particles_adapter.py` — `PygameParticlesAdapter(ParticlesRenderPort legacy)`
-Misma lógica que `PygameParticlesRenderer` pero en un solo `render_particles(particles)`. 🟡 Sin invocadores en producción (solo `tests/unit/adapters/render/test_render_adapters.py` y `test_pygame_particles_ecs.py`).
+`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Particles", mirror: bool = False, assets_dir: Path | None = None)`. `set_particles` / `render_particles()` (fondo + buffer SRCALPHA + blit) / `close` (limpia buffer y cache, NO cierra pygame) / `render()` (delega).
 
 ### 🟢 `pygame_hud.py` — `PygameHudRenderer(HudRenderPort)`
-`set_hud(score:int, rounds:int, timer:float, extra:dict[str,str]|None=None)` (🟡) y `render_hud()` (fuente lazy + panel translúcido; invocado por el SceneManager). Listo para juegos con puntuación.
+`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "HUD", font_size: int = 24, text_color: tuple[int,int,int] = (255,255,255), background_alpha: int = 128)`. `set_hud(...)` (declara) + `render_hud()` (fuente lazy + panel) + `render()` (delega). `close()` limpia la fuente (NO cierra pygame).
 
-### 🟢 `pygame_scene.py` — `PygameSceneManager(ScenePort)`
+### 🟢 `pygame_scene.py` — `PygameSceneManager(ScenePort)` — **dueño del ciclo de vida de pygame**
 **Patrón**: Composite/SceneManager.
 
 | Método | Firma | Responsabilidad | Proveniencia |
 |---|---|---|---|
-| `__init__` | `(self, surface: Any, capabilities: Iterable[object] \| None = None, overlays: Iterable[OverlayPort] \| None = None, target_fps: int = 60) -> None` | Registra todo | `ParticlesPlugin.create_game` |
+| `__init__` | `(self, surface: pygame.Surface, capabilities: Iterable[object] \| None = None, overlays: Iterable[OverlayPort] \| None = None, target_fps: int = 60) -> None` | Registra surface + capabilities + overlays + Clock | `ParticlesPlugin.create_game` |
 | `add_capability` | `(self, capability: object) -> None` | Append preservando orden | Constructor y plugin |
 | `add_overlay` | `(self, overlay: OverlayPort) -> None` | Append | Constructor y plugin |
-| `render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Llama `cap.render()` para cada `RenderCapability`, luego `ov.draw(surface, landmarks)`, luego `flip`+`tick` | 🟢 `ParticlesGame._render_frame` |
-| `close` | `(self) -> None` | Cierra capacidades y overlays (idempotente) | `ParticlesGame.run_async` `finally` |
+| `render_frame` | `(self, landmarks: list[PoseLandmark]) -> None` | Llama `cap.render()` para cada `RenderCapability`, `ov.draw(surface, landmarks)` para cada overlay, luego `pygame.display.flip()` + `clock.tick()` | `ParticlesGame._render_frame` |
+| `close` | `(self) -> None` | Cierra capacidades + overlays + **`pygame.quit()`** (único punto del proceso) | `ParticlesGame.run_async` `finally` |
 
 ### 🟢 `pygame_input_cursor.py` — `PygameInputCursorRenderer(PygameBaseAdapter, InputCursorRenderPort)`
-**Propósito**: capacidad de render de cursores de interacción. **No es un overlay**: afecta la jugabilidad y se registra como capacidad en el `SceneManager`.
-**Patrones**: Adapter, Strategy (círculo vs sprite), cache.
-
-| Método | Firma | Responsabilidad | Proveniencia |
-|---|---|---|---|
-| `__init__` | `(self, width:int=800, height:int=600, title:str="cursors", target_fps:int=60, mirror:bool=False) -> None` | Config ventana + cache de sprites | `ParticlesPlugin.create_game` |
-| `set_cursors` | `(self, cursors: list[InputCursor]) -> None` | Declara cursores a dibujar | `ParticlesPlugin` y `ParticlesGame._render_frame` |
-| `render_cursors` | `(self) -> None` | Dibuja cursores visibles (buffer SRCALPHA + blit) | `render()` / SceneManager |
-| `render` | `(self) -> None` | Método unificado de `RenderCapability`; delega en `render_cursors()` | `PygameSceneManager.render_frame` |
-| `_draw_circle` | `(self, cursor: InputCursor, x: float, y: float) -> None` | Borde de 3 px + relleno translúcido (`alpha=80`) | Interno |
-| `_draw_sprite` | `(self, cursor: InputCursor, x: float, y: float) -> None` | Frame animado desde sprite sheet; fallback a círculo si falla la carga | Interno |
-| `close` | `(self) -> None` | Limpia `_sprite_cache` | `PygameSceneManager.close` |
-
-### 🔴 `decorators/pose_debug_overlay.py` — `PoseDebugOverlay`
-**Patrón**: **Decorator** (+ `Protocol` `PygameRenderable`).
-`__init__(wrapped: PygameRenderable, pose_overlay: PoseOverlayRenderer | None = None)`.
-Métodos: `update_landmarks(landmarks)`, `render_particles(particles)`, `render_background(color, landmarks)`, `show()`, `close()` — todos **delegan** al wrapped y luego `_draw_overlay_if_any()`.
-Creado por `ColorPlugin._create_renderer` cuando `RENDER_DEBUG_OVERLAY=true`.
+**Propósito**: capacidad de render de cursores. **No es overlay**: se registra como capacidad en el `SceneManager`.
+`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "cursors", mirror: bool = False)`. Buffer interno renombrado `_buffer` (era `_surface`) para no colisionar con la surface inyectada. `set_cursors` / `render_cursors()` / `render()` (delega) / `close` (limpia cache + buffer, NO cierra pygame).
 
 ### 🟢 `overlays/pose_overlay.py`
-- `PoseOverlayRenderer`: `DEFAULT_CONNECTIONS` (tuplas de nombres), `__init__(connections, line_color, line_width, joint_color, joint_radius, min_visibility=0.5)`, `draw(surface, landmarks, window_size)`, `_to_pixels(landmark, width, height) -> tuple[int,int]` (staticmethod). Invocado por `PygameColorAdapter`, `PoseDebugOverlay`, `PoseOverlay`.
+- `PoseOverlayRenderer`: utilidad reutilizable (`DEFAULT_CONNECTIONS`, `draw(surface, landmarks, window_size)`). Usada por `PoseOverlay` (capacidad) y, en legacy, por `PygameColorAdapter`.
+- `PoseOverlay(OverlayPort)`: `draw(surface, landmarks|None)` + `close()`. Creado por `ParticlesPlugin` cuando `RENDER_DEBUG_OVERLAY=true` y registrado en el `SceneManager`.
+
+### 🟢 `overlays/fps_overlay.py` — `FpsOverlay(OverlayPort)`
+`__init__(font_size, text_color, background_alpha, position)` + `draw(surface, landmarks|None)` (mide FPS) + `close()`. Creado por `ParticlesPlugin` si `RENDER_DEBUG_OVERLAY`.
+
+### 🔴 `decorators/` — eliminado (nota histórica)
+Ver §5.11 (sección histórica) en el bloque de "eliminados". Resumen: `PoseDebugOverlay` fue eliminado en `feature/fix#pygame-single-window`; reemplazado por `PoseOverlay` (`OverlayPort`).
+
+### 🟢 `overlays/pose_overlay.py`
+- `PoseOverlayRenderer`: `DEFAULT_CONNECTIONS` (tuplas de nombres), `__init__(connections, line_color, line_width, joint_color, joint_radius, min_visibility=0.5)`, `draw(surface, landmarks, window_size)`, `_to_pixels(landmark, width, height) -> tuple[int,int]` (staticmethod). Invocado por `PygameColorAdapter` (legacy) y `PoseOverlay` (capacidad nueva).
 - `PoseOverlay(OverlayPort)`: `draw(surface, landmarks|None)` delegando a su renderer; creado por `ParticlesPlugin` y registrado en el SceneManager.
 
 ### 🟢 `overlays/fps_overlay.py` — `FpsOverlay(OverlayPort)`
@@ -1495,7 +1478,7 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | **Abstract Factory** | `GamePlugin.create_game/create_state` | Una fábrica que crea familias completas (juego + estado). |
 | **Strategy** | `_create_renderer` (mock/pygame), `spawn_strategy`, `_detectors` | El algoritmo se intercambia en tiempo de construcción. |
 | **Observer / Pub-Sub** | `EventBusPort` + `AsyncEventBus` | API y juegos no se conocen: hablan por eventos. |
-| **Decorator** | `PoseDebugOverlay` | Añade el esqueleto de debug sin que el renderer lo sepa. |
+| ~~**Decorator**~~ | — | 🔴 El patrón `Decorator` (usado por `PoseDebugOverlay`) fue reemplazado por `OverlayPort`/`PoseOverlay`. Eliminado en `feature/fix#pygame-single-window`. |
 | **Composite / SceneManager** | `ScenePort` + `PygameSceneManager` | Muchas capacidades y overlays actuando como una sola escena. |
 | **Facade** | `PoseInteractionFacade` | Oculta multi-cursor + EMA + timeout detrás de `update / is_touching / get_all_cursors`. |
 | **Capability** (patrón del sistema) | `RenderCapability`, `LifespanCapability`, `PygameParticlesRenderer` | Unidad componible con `set_*` + `render_*` que el `SceneManager` orquesta. |

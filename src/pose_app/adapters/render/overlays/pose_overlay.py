@@ -2,7 +2,7 @@
 Renderer auxiliar para dibujar la pose (esqueleto) sobre una superficie Pygame.
 
 Es una utilidad reutilizable, NO un puerto ni un adaptador completo.
-Se usa por composición desde el decorador PoseDebugOverlay.
+Se usa por composición desde el SceneManager (patrón OverlayPort).
 """
 
 from typing import Any

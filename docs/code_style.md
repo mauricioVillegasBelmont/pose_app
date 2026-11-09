@@ -238,7 +238,7 @@ class MyClass:
 | Privados | `_prefijo` | `_particles` |
 | Puertos | sufijo `Port` | `CameraPort` |
 | Adaptadores | sufijo `Adapter` | `PygameParticlesAdapter` |
-| Decoradores | sufijo `Decorator` o `Overlay` | `PoseDebugOverlay` |
+| Overlays / Decoradores | sufijo `Overlay` o `Decorator` | `PoseOverlay`, `FpsOverlay` |
 | Plugins | sufijo `Plugin` | `ParticlesPlugin` |
 | Estados | sufijo `State` | `ParticlesState` |
 | Eventos | pasado (`Updated`, `Changed`) | `PoseUpdated` |
@@ -429,8 +429,8 @@ async def test_game_runs() -> None: ...
 password_bytes = password.encode()[:72]
 
 # ✅ TODO con contexto
-# TODO(refactor-render): reemplazar por PoseOverlay.
-return PoseDebugOverlay(base)  # type: ignore[arg-type]
+# TODO(particles-cleanup): extraer el cálculo de colisión a una función pura.
+hits = self._compute_hits(particles, cursors)
 
 # ❌ Qué (malo)
 x = x + 1  # incrementa x

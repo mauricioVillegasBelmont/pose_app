@@ -6,6 +6,7 @@ from pose_app.app.game_context import GameContext
 from pose_app.domain.games.gestures.main import GesturesGame
 from pose_app.domain.games.gestures.state import GesturesState
 from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.ports.render_port import ColorRenderPort
 from pose_app.domain.state.game_state_port import GameStatePort
 from pose_app.infrastructure.errors.exceptions import ConfigurationError
 from pose_app.infrastructure.logging.logger import get_logger
@@ -46,8 +47,23 @@ class GesturesPlugin(GamePlugin):
             event_bus=context.event_bus,
         )
 
-    def _create_renderer(self, context: GameContext):
+    # ==========================================
+    # Helpers privados
+    # ==========================================
+
+    def _create_renderer(self, context: GameContext) -> ColorRenderPort:
         cfg = context.settings.render
+
+        if cfg.debug_overlay:
+            # NOTE(refactor-render): PoseDebugOverlay fue eliminado en favor
+            # de OverlayPort (PoseOverlay) en la nueva arquitectura. GesturesPlugin
+            # es legacy: el overlay se habilitará cuando migre al SceneManager
+            # (Fase 4). Mientras tanto se ignora con warning.
+            logger.warning(
+                "RENDER_DEBUG_OVERLAY=true ignorado en GesturesPlugin (legacy). "
+                "El overlay solo está disponible para el juego 'particles' "
+                "hasta la migración de GesturesPlugin a la nueva arquitectura."
+            )
 
         if cfg.provider == "mock":
             from pose_app.adapters.mock.mock_render import MockColorRenderAdapter
@@ -55,11 +71,27 @@ class GesturesPlugin(GamePlugin):
             return MockColorRenderAdapter()
 
         if cfg.provider == "pygame":
-            from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
+            import pygame
+
+            from pose_app.adapters.render.pygame_color_adapter import (
+                PygameColorAdapter,
+            )
+
+            # NOTE(refactor-render): bootstrap mínimo de pygame para no romper
+            # el arranque del juego 'gestures' hasta su migración completa a
+            # SceneManager (Fase 4). NO es el patrón canónico: ver
+            # ParticlesPlugin para el bootstrap correcto.
+            pygame.init()
+            surface = pygame.display.get_surface()
+            if surface is None:
+                surface = pygame.display.set_mode(
+                    (cfg.width, cfg.height),
+                    pygame.RESIZABLE,
+                )
+                pygame.display.set_caption("Gestures Game")
 
             return PygameColorAdapter(
-                width=cfg.width,
-                height=cfg.height,
+                surface=surface,
                 title="Gestures Game",
                 target_fps=cfg.target_fps,
             )

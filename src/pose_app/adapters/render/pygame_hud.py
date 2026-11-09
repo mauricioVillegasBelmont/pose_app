@@ -19,20 +19,18 @@ class PygameHudRenderer(PygameBaseAdapter, HudRenderPort):
 
     def __init__(
         self,
-        width: int = 800,
-        height: int = 600,
-        title: str = "HUD",
+        surface: pygame.Surface,
         target_fps: int = 60,
+        title: str = "HUD",
         font_size: int = 24,
         text_color: tuple[int, int, int] = (255, 255, 255),
         background_alpha: int = 128,
     ) -> None:
         PygameBaseAdapter.__init__(
             self,
-            width=width,
-            height=height,
-            title=title,
+            surface=surface,
             target_fps=target_fps,
+            title=title,
         )
         self._font_size = font_size
         self._text_color = text_color
@@ -99,14 +97,14 @@ class PygameHudRenderer(PygameBaseAdapter, HudRenderPort):
             text_surface = font.render(line, True, self._text_color)
             self.screen.blit(text_surface, (padding * 2, padding + i * line_height))
 
-    def render(self):
+    def render(self) -> None:
         """Método unificado de RenderCapability.
         Delega al método específico del puerto.
         """
         self.render_hud()
 
     def close(self) -> None:
-        """Limpia recursos del HUD."""
+        """Limpia recursos del HUD. NO cierra pygame (lo hace el SceneManager)."""
         self._font = None
         super().close()
 

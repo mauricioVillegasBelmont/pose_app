@@ -26,7 +26,6 @@ El diseño actual mezcla **responsabilidades de render** en pocos componentes:
 
 - `PygameParticlesAdapter`: dibuja partículas.
 - `PygameColorAdapter`: dibuja fondo.
-- `PoseDebugOverlay`: **decorador** que superpone el esqueleto.
 
 **Problemas detectados**:
 
