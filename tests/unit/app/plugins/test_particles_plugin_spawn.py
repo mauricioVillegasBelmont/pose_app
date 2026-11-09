@@ -42,8 +42,23 @@ class _FakeSceneManager:
 
 
 class _FakeAssetLoader:
-    def load_sprite_config(self, **kwargs: Any) -> None:
-        return None
+    """Fake configurable de AssetLoader para tests de sprite_config."""
+
+    # Controlado por el test via monkeypatch: si está seteado, load_sprite_config lo usa
+    next_result: object = None
+    next_exception: Exception | None = None
+
+    def load_sprite_config(self, **kwargs: Any) -> Any:
+        if _FakeAssetLoader.next_exception is not None:
+            raise _FakeAssetLoader.next_exception
+        return _FakeAssetLoader.next_result
+
+
+@pytest.fixture(autouse=True)
+def _reset_fake_asset_loader() -> None:
+    """Resetea el estado del fake entre tests."""
+    _FakeAssetLoader.next_result = None
+    _FakeAssetLoader.next_exception = None
 
 
 @pytest.fixture(autouse=True)
@@ -224,3 +239,164 @@ def test_plugin_builds_archetype_with_padding_from_json(
     assert arch.appearance.size == 20.0
     assert arch.appearance.padding_x == 4.0
     assert arch.appearance.padding_y == 6.0
+
+
+class TestSpriteConfigFromJson:
+    """sprite_config se lee por archetype desde el JSON (o None si no se declara)."""
+
+    def test_build_archetypes_with_sprite_config_from_json(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """Un archetype con sprite_config construye SpriteConfig via AssetLoader."""
+        from pose_app.domain.entities.particles.components import SpriteConfig
+
+        sprite = SpriteConfig(
+            path="/abs/demo.png",
+            frame_width=32,
+            frame_height=32,
+            frame_count=4,
+            fps=12.0,
+            animation_mode="loop",
+        )
+        _FakeAssetLoader.next_result = sprite
+        _FakeAssetLoader.next_exception = None
+
+        archetypes_data = [
+            {
+                "name": "bomb",
+                "weight": 1.0,
+                "appearance": {"size": 32.0, "color": [255, 100, 100]},
+                "sprite_config": {
+                    "sprite_name": "demo",
+                    "fps": 12.0,
+                    "animation_mode": "loop",
+                },
+            }
+        ]
+        game = plugin.create_game(
+            context_factory({"particle_archetypes": archetypes_data})
+        )
+
+        arch = game._archetypes[0]
+        assert arch.sprite_config is not None
+        assert arch.sprite_config.path == "/abs/demo.png"
+        assert arch.sprite_config.fps == 12.0
+        assert arch.sprite_config.animation_mode == "loop"
+
+    def test_build_archetypes_without_sprite_config_returns_none(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """Sin sprite_config en el JSON, el archetype queda con None."""
+        _FakeAssetLoader.next_result = None
+        _FakeAssetLoader.next_exception = None
+
+        archetypes_data = [
+            {
+                "name": "default",
+                "weight": 1.0,
+                "appearance": {"size": 20.0, "color": [255, 200, 50]},
+            }
+        ]
+        game = plugin.create_game(
+            context_factory({"particle_archetypes": archetypes_data})
+        )
+
+        assert game._archetypes[0].sprite_config is None
+
+    def test_build_archetypes_with_invalid_sprite_name_raises(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """Si AssetLoader falla, se envuelve en ConfigurationError con contexto."""
+        _FakeAssetLoader.next_result = None
+        _FakeAssetLoader.next_exception = ValueError("sprite not found")
+
+        archetypes_data = [
+            {
+                "name": "bad",
+                "appearance": {"size": 20.0, "color": [255, 0, 0]},
+                "sprite_config": {"sprite_name": "nonexistent"},
+            }
+        ]
+        with pytest.raises(ConfigurationError, match="Invalid sprite_config"):
+            plugin.create_game(
+                context_factory({"particle_archetypes": archetypes_data})
+            )
+
+    def test_build_archetypes_with_missing_sprite_name_raises(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """sprite_config sin sprite_name lanza ConfigurationError."""
+        _FakeAssetLoader.next_result = None
+        _FakeAssetLoader.next_exception = None
+
+        archetypes_data = [
+            {
+                "name": "bad",
+                "appearance": {"size": 20.0, "color": [255, 0, 0]},
+                "sprite_config": {"fps": 10.0},
+            }
+        ]
+        with pytest.raises(ConfigurationError, match="sprite_name is required"):
+            plugin.create_game(
+                context_factory({"particle_archetypes": archetypes_data})
+            )
+
+    def test_build_archetypes_mixed_sprite_configs(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """Unos archetypes con sprite, otros sin sprite, conviven."""
+        from pose_app.domain.entities.particles.components import SpriteConfig
+
+        sprite = SpriteConfig(
+            path="/abs/demo.png",
+            frame_width=32,
+            frame_height=32,
+            frame_count=4,
+            fps=12.0,
+            animation_mode="loop",
+        )
+        _FakeAssetLoader.next_result = sprite
+        _FakeAssetLoader.next_exception = None
+
+        archetypes_data = [
+            {
+                "name": "bomb",
+                "appearance": {"size": 32.0, "color": [255, 0, 0]},
+                "sprite_config": {"sprite_name": "demo"},
+            },
+            {
+                "name": "coin",
+                "appearance": {"size": 16.0, "color": [255, 255, 0]},
+            },
+        ]
+        game = plugin.create_game(
+            context_factory({"particle_archetypes": archetypes_data})
+        )
+
+        assert game._archetypes[0].sprite_config is not None
+        assert game._archetypes[1].sprite_config is None
+
+    def test_default_archetype_has_no_sprite_config(
+        self,
+        plugin: ParticlesPlugin,
+        context_factory: Callable[[dict[str, Any] | None], GameContext],
+    ) -> None:
+        """Sin particle_archetypes en el JSON, el default no lleva sprite."""
+        _FakeAssetLoader.next_result = None
+        _FakeAssetLoader.next_exception = None
+
+        game = plugin.create_game(context_factory())
+
+        assert len(game._archetypes) == 1
+        assert game._archetypes[0].name == "default"
+        assert game._archetypes[0].sprite_config is None

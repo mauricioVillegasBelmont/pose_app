@@ -88,6 +88,8 @@ class ParticlesPlugin(GamePlugin):
             "spawn_config",
             opts.get("spawn_config"),
         )
+        archetypes = self._build_archetypes(raw_archetypes, opts)
+        spawn_strategy = self._build_spawn_strategy(raw_spawn_config, opts)
 
         # ==========================================
         # Construir cursores de interacción
@@ -103,21 +105,6 @@ class ParticlesPlugin(GamePlugin):
             cursor_configs=cursor_configs,
             cursors=cursors,
         )
-
-        asset_loader = AssetLoader()
-        sprite_config = asset_loader.load_sprite_config(
-            category="particles",
-            sprite_name="demo",
-            fps=12.0,
-            animation_mode="loop",
-        )
-
-        archetypes = self._build_archetypes(
-            raw_archetypes,
-            opts,
-            sprite_config,
-        )
-        spawn_strategy = self._build_spawn_strategy(raw_spawn_config, opts)
 
         # Leer mirror del config
         mirror = render_cfg.mirror
@@ -209,7 +196,6 @@ class ParticlesPlugin(GamePlugin):
         self,
         raw_archetypes: Any,
         opts: dict[str, Any],
-        sprite_config: SpriteConfig | None,
     ) -> list[ParticleArchetype]:
         """Construye los arquetipos declarados en la configuración JSON.
 
@@ -217,17 +203,17 @@ class ParticlesPlugin(GamePlugin):
             raw_archetypes: Lista de arquetipos en bruto o ``None`` para usar
                 el arquetipo por defecto.
             opts: Opciones del juego usadas como fallback.
-            sprite_config: Configuración de sprite compartida por arquetipos.
 
         Returns:
             Lista de ``ParticleArchetype`` validados.
 
         Raises:
-            ConfigurationError: Si la sección no es una lista o algún
-                arquetipo contiene valores inválidos.
+            ConfigurationError: Si la sección no es una lista, algún
+                arquetipo contiene valores inválidos o su ``sprite_config``
+                no se puede resolver.
         """
         if raw_archetypes is None or raw_archetypes == []:
-            return [self._default_archetype(opts, sprite_config)]
+            return [self._default_archetype(opts)]
 
         if not isinstance(raw_archetypes, list):
             raise ConfigurationError(
@@ -250,6 +236,9 @@ class ParticlesPlugin(GamePlugin):
 
                 weight = float(item.get("weight", 1.0))
                 appearance = self._parse_appearance(item.get("appearance"), index)
+                sprite_config = self._parse_sprite_config(
+                    item.get("sprite_config"), index
+                )
 
                 archetypes.append(
                     ParticleArchetype(
@@ -267,20 +256,64 @@ class ParticlesPlugin(GamePlugin):
 
         return archetypes
 
-    def _default_archetype(
+    def _parse_sprite_config(
         self,
-        opts: dict[str, Any],
-        sprite_config: SpriteConfig | None,
-    ) -> ParticleArchetype:
+        raw_sprite: Any,
+        index: int,
+    ) -> SpriteConfig | None:
+        """Parsea el bloque ``sprite_config`` de un arquetipo del JSON.
+
+        Args:
+            raw_sprite: Bloque sprite_config en bruto o ``None`` si el
+                arquetipo no declara sprite.
+            index: Índice del arquetipo (para contexto de error).
+
+        Returns:
+            ``SpriteConfig`` validado o ``None`` si no se declaró sprite.
+
+        Raises:
+            ConfigurationError: Si el bloque es inválido, falta
+                ``sprite_name`` o ``AssetLoader`` no puede resolverlo.
+        """
+        if raw_sprite is None:
+            return None
+
+        if not isinstance(raw_sprite, dict):
+            raise ConfigurationError(
+                f"particle_archetypes[{index}].sprite_config must be an object",
+                context={"index": index},
+            )
+
+        sprite_name = raw_sprite.get("sprite_name")
+        if not isinstance(sprite_name, str) or not sprite_name:
+            raise ConfigurationError(
+                f"particle_archetypes[{index}].sprite_config.sprite_name is required",
+                context={"index": index},
+            )
+
+        try:
+            asset_loader = AssetLoader()
+            return asset_loader.load_sprite_config(
+                category="particles",
+                sprite_name=sprite_name,
+                fps=float(raw_sprite.get("fps", 0.0)),
+                animation_mode=raw_sprite.get("animation_mode", "loop"),
+            )
+        except (TypeError, ValueError) as e:
+            raise ConfigurationError(
+                f"Invalid sprite_config for archetype {index}: {e}",
+                context={"index": index, "sprite_name": sprite_name},
+            ) from e
+
+    def _default_archetype(self, opts: dict[str, Any]) -> ParticleArchetype:
         """Crea el arquetipo por defecto a partir de las opciones del juego.
 
         Args:
             opts: Opciones del juego con posibles ``particle_size`` y
                 ``particle_color``.
-            sprite_config: Configuración de sprite compartida.
 
         Returns:
-            Arquetipo por defecto validado.
+            Arquetipo por defecto validado (sin sprite).
 
         Raises:
             ConfigurationError: Si el tamaño o color por defecto son inválidos.
@@ -298,7 +331,7 @@ class ParticlesPlugin(GamePlugin):
         return ParticleArchetype(
             name="default",
             appearance=appearance,
-            sprite_config=sprite_config,
+            sprite_config=None,
         )
 
     def _parse_appearance(
