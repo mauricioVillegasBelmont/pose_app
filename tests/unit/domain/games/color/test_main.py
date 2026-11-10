@@ -8,6 +8,8 @@ from pose_app.domain.entities.color import RGBColor
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.color.main import ColorGame
 from pose_app.domain.games.color.state import ColorState
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.scene_port import ScenePort
 
 
 @pytest.fixture
@@ -16,7 +18,8 @@ def color_game() -> ColorGame:
     return ColorGame(
         camera=Mock(),
         pose_estimator=Mock(),
-        renderer=Mock(),
+        scene=Mock(spec=ScenePort),
+        color_capability=Mock(spec=ColorRenderPort),
         state=ColorState(palette_name="fire"),
         event_bus=Mock(),
         palette_name="fire",

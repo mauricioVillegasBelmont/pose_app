@@ -45,7 +45,6 @@ REQUIRED_FILES = [
     "src/pose_app/domain/ports/camera_port.py",
     "src/pose_app/domain/ports/pose_estimator_port.py",
     "src/pose_app/domain/ports/pose_interaction_port.py",
-    "src/pose_app/domain/ports/render_port.py",
     "src/pose_app/domain/ports/render/color_render_port.py",
     "src/pose_app/domain/ports/render/particles_render_port.py",
     "src/pose_app/domain/ports/render/hud_render_port.py",
@@ -82,7 +81,6 @@ REQUIRED_FILES = [
     "src/pose_app/adapters/mock/mock_render.py",
     # Adaptadores - render
     "src/pose_app/adapters/render/pygame_base.py",
-    "src/pose_app/adapters/render/pygame_color_adapter.py",
     "src/pose_app/adapters/render/pygame_color.py",
     "src/pose_app/adapters/render/pygame_particles.py",
     "src/pose_app/adapters/render/pygame_hud.py",
@@ -160,7 +158,6 @@ def check_imports() -> bool:
         ("pose_app.domain.state.game_state_port", "GameStatePort"),
         ("pose_app.domain.plugins.game_plugin", "GamePlugin"),
         # Domain - ports
-        ("pose_app.domain.ports.render_port", "ParticlesRenderPort"),
         ("pose_app.domain.ports.render.render_capability", "RenderCapability"),
         ("pose_app.domain.ports.event_bus_port", "EventBusPort"),
         # Games
@@ -172,7 +169,6 @@ def check_imports() -> bool:
         ("pose_app.app.plugin_registry", "PluginRegistry"),
         ("pose_app.app.state_registry", "StateRegistry"),
         # Adapters
-        ("pose_app.adapters.render.pygame_color_adapter", "PygameColorAdapter"),
         (
             "pose_app.adapters.render.pygame_input_cursor",
             "PygameInputCursorRenderer",
