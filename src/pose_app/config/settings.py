@@ -28,6 +28,31 @@ class CameraSettings(BaseSettings):
     height: int = Field(default=480, ge=120, le=1080, description="Alto de captura")
     fps: int = Field(default=30, ge=1, le=120, description="FPS objetivo")
     fourcc: str = Field(default="MJPG", description="FourCC code for video encoding")
+    min_nonzero_ratio: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Heurística de validación de frames: proporción mínima de píxeles "
+            "no-cero para aceptar un frame. Frames con >70% de píxeles en cero "
+            "se descartan como corruptos (típico de pérdida de paquetes MJPG "
+            "por saturación USB). Ajustar solo si tu hardware descarta frames "
+            "válidos de forma consistente."
+        ),
+    )
+    buffer_size: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description=(
+            "Número de frames que el driver V4L2 mantiene en el buffer interno "
+            "(CAP_PROP_BUFFERSIZE). Valor bajo (1) minimiza latencia; valores "
+            "más altos (2-5) pueden absorber picos de pérdida de paquetes USB "
+            "en hardware con saturación de bus, a costa de mayor latencia. "
+            "NOTA: no todos los backends/drivers lo soportan; si el driver lo "
+            "ignora, el valor no tendrá efecto."
+        ),
+    )
 
 
 class PoseSettings(BaseSettings):

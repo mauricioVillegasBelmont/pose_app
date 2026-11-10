@@ -27,7 +27,8 @@ def _make_fake_cap(frames_to_emit: int, frame_delay: float = 0.001):
                 return False, None
             _emitted["n"] += 1
         time.sleep(frame_delay)
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        # Frame con >30% de píxeles no-cero para pasar la validación defensiva.
+        frame = np.full((480, 640, 3), 128, dtype=np.uint8)
         frame[0, 0, 0] = _emitted["n"] % 255
         return True, frame
 

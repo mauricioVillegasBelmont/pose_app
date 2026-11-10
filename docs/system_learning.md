@@ -1090,7 +1090,12 @@ Thread-safe; doble índice `_by_provider[(provider, id)]` y `_by_user_id`. Misma
 | `_get_actual_fourcc` | `(self) -> str` | Decodifica el FourCC real negociado con el dispositivo | `start` |
 | `__enter__/__exit__/__del__` | context manager | `start`/`stop`/`stop` | Tests manuales |
 
-**Nota**: el buffer es de un solo frame: si el consumidor no lee a tiempo, el frame se sobrescribe. El hilo es `daemon` y `stop()` espera hasta 2s a que termine.
+**Notas post-refactor (`feature/fix/webcam-jpeg-corruption`)**:
+- **Validación defensiva de frames**: `_capture_loop` descarta frames corruptos (shape incorrecto, vacíos, o >70% píxeles en cero) antes de publicarlos al buffer. Esto protege a `MediaPipe` y al render de frames MJPG truncados por pérdida de paquetes USB (mensajes `Corrupt JPEG data` de libjpeg, ruido externo al código).
+- **Contador de frames corruptos**: `_corrupt_frame_count` se expone en `get_stats()["frames_corruptos"]`. Útil para diagnosticar saturación del bus USB.
+- **Buffer interno reducido**: `start()` llama `cv2.CAP_PROP_BUFFERSIZE=1` (con try/except si el backend no lo soporta). Evita acumulación de frames viejos.
+- **Setting `CAMERA_MIN_NONZERO_RATIO`** (default `0.3`): umbral configurable de píxeles no-cero para aceptar un frame. Solo ajustar si el hardware descarta frames válidos de forma consistente.
+- **Diagnóstico de corrupción**: si `frames_corruptos` crece rápido, verificar que la cámara esté en un puerto USB directo (no hub). Desconectar/reconectar la cámara resetea el estado del controlador USB y del driver V4L2 (solución canónica a la saturación del bus).
 
 ### `pose/mediapipe_adapter.py` — `MediapipeAdapter(PoseEstimatorPort)`
 **Patrones**: Adapter, Context Manager, cache de nombres, factory `_ensure_model` (descarga el `.task`).

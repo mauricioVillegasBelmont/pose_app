@@ -20,5 +20,23 @@ def test_settings_load():
     print("✅ Configuración cargada correctamente")
 
 
+def test_camera_settings_includes_min_nonzero_ratio() -> None:
+    """CameraSettings expone el umbral de validación de frames."""
+    import pytest
+    from pydantic import ValidationError
+
+    from pose_app.config.settings import CameraSettings
+
+    settings = CameraSettings()
+    assert settings.min_nonzero_ratio == 0.3
+
+    # Validación: fuera de [0.0, 1.0] debe fallar
+    with pytest.raises(ValidationError):
+        CameraSettings(min_nonzero_ratio=1.5)
+
+    with pytest.raises(ValidationError):
+        CameraSettings(min_nonzero_ratio=-0.1)
+
+
 if __name__ == "__main__":
     test_settings_load()

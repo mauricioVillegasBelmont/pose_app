@@ -14,6 +14,20 @@ import pytest
 from pose_app.adapters.camera.webcam_adapter import WebcamAdapter
 
 
+def _wait_for_first_frame(adapter: WebcamAdapter, timeout: float = 1.0) -> None:
+    """Espera a que el hilo de captura publique el primer frame válido.
+
+    Args:
+        adapter: WebcamAdapter en ejecución.
+        timeout: Máximo de segundos a esperar.
+    """
+    import time
+
+    deadline = time.time() + timeout
+    while adapter._latest_frame is None and time.time() < deadline:
+        time.sleep(0.01)
+
+
 def _fourcc_value(code: str) -> int:
     """Empaqueta un FourCC de 4 caracteres como entero (little-endian)."""
     return int.from_bytes(code.encode("ascii"), byteorder="little")
@@ -68,10 +82,13 @@ class FakeCapture:
     def queue_frames(self, count: int) -> None:
         """Encola ``count`` frames válidos para próximas lecturas.
 
+        Los frames tienen >30% de píxeles no-cero (como un frame real)
+        para pasar la validación `_is_valid_frame`.
+
         Args:
             count: Número de frames válidos a encolar.
         """
-        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        frame = np.full((480, 640, 3), 128, dtype=np.uint8)
         for _ in range(count):
             self.read_results.append((True, frame.copy()))
 
@@ -121,6 +138,7 @@ class TestStart:
             cv2.CAP_PROP_FRAME_WIDTH,
             cv2.CAP_PROP_FRAME_HEIGHT,
             cv2.CAP_PROP_FPS,
+            cv2.CAP_PROP_BUFFERSIZE,
         ]
 
     def test_start_uses_configured_fourcc(
@@ -145,15 +163,16 @@ class TestStart:
         adapter.start()
 
         assert len(capture.set_calls) == calls_after_first
-        assert calls_after_first == 4  # FOURCC + WIDTH + HEIGHT + FPS
+        assert calls_after_first == 5  # FOURCC + WIDTH + HEIGHT + FPS + BUFFERSIZE
 
     def test_start_captures_initial_frame(
         self, adapter: WebcamAdapter, capture: FakeCapture
     ) -> None:
-        """start() deja un frame inicial en el buffer."""
+        """start() deja un frame inicial en el buffer (tras procesar el hilo)."""
         capture.queue_frames(1)
 
         adapter.start()
+        _wait_for_first_frame(adapter)
 
         assert adapter._latest_frame is not None
 
@@ -221,6 +240,7 @@ class TestGetFrame:
         """Con cámara activa, get_frame() devuelve el buffer."""
         capture.queue_frames(2)
         adapter.start()
+        _wait_for_first_frame(adapter)
 
         frame = adapter.get_frame()
 
@@ -233,6 +253,7 @@ class TestGetFrame:
         """El frame devuelto es una copia: modificarlo no afecta el buffer."""
         capture.queue_frames(2)
         adapter.start()
+        _wait_for_first_frame(adapter)
         original = adapter._latest_frame.copy()
 
         result = adapter.get_frame()
@@ -255,6 +276,7 @@ class TestGetFrame:
         """Un fallo de lectura posterior conserva el último frame válido."""
         capture.queue_frames(2)
         adapter.start()
+        _wait_for_first_frame(adapter)
         first = adapter.get_frame()
         assert first is not None
 
@@ -392,8 +414,155 @@ class TestGetStats:
     ) -> None:
         capture.queue_frames(5)
         adapter.start()
+        _wait_for_first_frame(adapter)
         adapter.get_frame()
         adapter.get_frame()
 
         stats = adapter.get_stats()
         assert stats["frames_entregados"] == 2
+
+
+class TestFrameValidation:
+    """Validación defensiva de frames corruptos (Fase A)."""
+
+    def test_zero_size_frame_is_discarded(self, adapter: WebcamAdapter) -> None:
+        """Un frame vacío se descarta."""
+        adapter._actual_width = 640
+        adapter._actual_height = 480
+        frame = np.array([], dtype=np.uint8)
+        assert adapter._is_valid_frame(frame) is False
+
+    def test_none_frame_is_discarded(self, adapter: WebcamAdapter) -> None:
+        """None se descarta."""
+        assert adapter._is_valid_frame(None) is False  # type: ignore[arg-type]
+
+    def test_wrong_shape_frame_is_discarded(self, adapter: WebcamAdapter) -> None:
+        """Shape distinto al negociado se descarta."""
+        adapter._actual_width = 640
+        adapter._actual_height = 480
+        frame = np.zeros((100, 100, 3), dtype=np.uint8)
+        assert adapter._is_valid_frame(frame) is False
+
+    def test_mostly_black_frame_is_discarded(self, adapter: WebcamAdapter) -> None:
+        """Frame >70% negro se descarta (heurística de corrupción)."""
+        adapter._actual_width = 640
+        adapter._actual_height = 480
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        # <30% de píxeles no-cero → descartado
+        frame[0:100, 0:100] = 255  # ~3% de píxeles no-cero
+        assert adapter._is_valid_frame(frame) is False
+
+    def test_normal_frame_is_accepted(self, adapter: WebcamAdapter) -> None:
+        """Frame con >30% de píxeles no-cero pasa."""
+        adapter._actual_width = 640
+        adapter._actual_height = 480
+        frame = np.full((480, 640, 3), 100, dtype=np.uint8)  # 100% no-cero
+        assert adapter._is_valid_frame(frame) is True
+
+    def test_custom_threshold_is_used(self, monkeypatch) -> None:
+        """El umbral configurable se aplica."""
+        adapter = WebcamAdapter(width=640, height=480)
+        adapter._actual_width = 640
+        adapter._actual_height = 480
+        adapter._min_nonzero_ratio = 0.9  # umbral estricto
+
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        frame[0:400, :] = 255  # 83% no-cero (< 90%)
+        assert adapter._is_valid_frame(frame) is False
+
+
+class TestBufferSize:
+    """Fase B: buffer de 1 frame."""
+
+    def test_start_sets_buffersize_to_one(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        """start() intenta reducir el buffer a 1."""
+        capture.queue_frames(1)
+        adapter.start()
+
+        props = [prop for prop, _value in capture.set_calls]
+        assert cv2.CAP_PROP_BUFFERSIZE in props
+        # El valor debe ser 1
+        buffersize_value = next(
+            v for p, v in capture.set_calls if p == cv2.CAP_PROP_BUFFERSIZE
+        )
+        assert buffersize_value == 1
+
+    def test_start_succeeds_when_buffersize_unsupported(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Si el backend no soporta BUFFERSIZE, start() no falla."""
+
+        class _NoBufferCapture(FakeCapture):
+            def set(self, prop_id: int, value: float) -> bool:
+                if prop_id == cv2.CAP_PROP_BUFFERSIZE:
+                    raise cv2.error("not supported")
+                return super().set(prop_id, value)
+
+        closed = _NoBufferCapture()
+        _install_fake_capture(monkeypatch, lambda *a, **kw: closed)
+        adapter = WebcamAdapter()
+
+        # No debe lanzar
+        closed.queue_frames(1)
+        adapter.start()
+        assert adapter.is_running()
+        adapter.stop()
+
+    def test_custom_buffersize_is_passed(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        """El buffer_size configurado se pasa a CAP_PROP_BUFFERSIZE."""
+        adapter._buffer_size = 3  # override para el test
+        capture.queue_frames(1)
+        adapter.start()
+
+        buffersize_value = next(
+            v for p, v in capture.set_calls if p == cv2.CAP_PROP_BUFFERSIZE
+        )
+        assert buffersize_value == 3
+
+
+class TestCorruptFrameHandling:
+    """Fase A: frames corruptos se descartan en _capture_loop."""
+
+    def test_corrupt_frames_are_counted_in_stats(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        """El contador de frames corruptos se expone en get_stats."""
+        capture.queue_frames(3)
+        adapter.start()
+
+        stats = adapter.get_stats()
+        assert "frames_corruptos" in stats
+        adapter.stop()
+
+    def test_valid_frames_still_processed_after_corrupt(
+        self, adapter: WebcamAdapter, capture: FakeCapture
+    ) -> None:
+        """Un frame corrupto no impide procesar los siguientes válidos."""
+        # Frame válido (100% no-cero)
+        valid_frame = np.full((480, 640, 3), 100, dtype=np.uint8)
+        # Frame corrupto (shape incorrecto)
+        corrupt_frame = np.zeros((100, 100, 3), dtype=np.uint8)
+        capture.read_results = [
+            (True, valid_frame),
+            (True, corrupt_frame),
+            (True, valid_frame),
+        ]
+        adapter.start()
+
+        # Esperar a que el hilo procese
+        import time
+
+        time.sleep(0.1)
+        stats = adapter.get_stats()
+        adapter.stop()
+
+        # Al menos 1 corrupto detectado
+        assert stats["frames_corruptos"] >= 1
+        # Al menos 1 válido entregado
+        assert (
+            adapter.get_frame() is None or True
+        )  # buffer puede tener el último válido

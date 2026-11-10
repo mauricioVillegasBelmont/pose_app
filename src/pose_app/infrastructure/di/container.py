@@ -106,13 +106,14 @@ class Container:
 
         try:
             logger.info(f"Creando WebcamAdapter (cámara {cfg.id})")
-            print(f"Camara format {cfg.fourcc}")
             return WebcamAdapter(
                 camera_id=cfg.id,
                 width=cfg.width,
                 height=cfg.height,
                 fps=cfg.fps,
                 fourcc=cfg.fourcc,
+                buffer_size=cfg.buffer_size,
+                min_nonzero_ratio=cfg.min_nonzero_ratio,
             )
         except Exception as e:
             raise ConfigurationError(
