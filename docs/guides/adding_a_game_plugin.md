@@ -578,11 +578,11 @@ curl http://localhost:8000/api/v1/state
 | Entidad | Campos clave | Uso |
 |---------|--------------|-----|
 | `PoseLandmark` | `x, y, z, visibility, name` | Un punto de la pose |
-| `Particle` (ECS-lite) | `position: Position`, `appearance: Appearance`, `lifespan: Lifespan\|None`, `collision: CollisionProfile\|None`, `sprite_config: SpriteConfig\|None`, `sprite_state: SpriteState\|None` | Una partícula compuesta (ver `docs/particles_ecs_system.md`) |
+| `Particle` (ECS-lite) | `position: Position`, `appearance: Appearance`, `lifespan: Lifespan\|None`, `collision: CollisionProfile\|None`, `sprite_config: SpriteConfig\|None`, `sprite_state: SpriteState\|None` | Una partícula compuesta (ver `docs/architecture/particles_ecs_system.md`) |
 | `ParticleArchetype` (ECS-lite) | `name`, `weight`, `appearance: Appearance`, `sprite_config: SpriteConfig\|None` | Plantilla para spawnear partículas |
 | `Appearance` (componente) | `size`, `color`, `padding_x`, `padding_y` | Config visual inmutable |
 | `RGBColor` | `r, g, b` | Color RGB inmutable |
-| `InputCursor` | `cursor_id`, `position`, `is_visible`, `appearance`, `collision` | Cursor de interacción (ver `docs/cursor_system.md`) |
+| `InputCursor` | `cursor_id`, `position`, `is_visible`, `appearance`, `collision` | Cursor de interacción (ver `docs/architecture/cursor_system.md`) |
 
 ---
 
@@ -868,7 +868,7 @@ El `run_async` debe:
 
 ## Recursos adicionales
 
-- **Contrato de puertos**: `docs/ports_contract.md`
+- **Contrato de puertos**: `docs/contracts/ports_contract.md`
 - **Arquitectura general**: `architecture.md`
 - **Ejemplos completos**: `app/plugins/particles_plugin.py`, `app/plugins/color_plugin.py`
 

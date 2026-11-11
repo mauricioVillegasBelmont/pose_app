@@ -74,7 +74,7 @@ que va a morir.
    - Usar `PygameSceneManager` directamente.
    - Migrar tests al nuevo patrón.
    - Eliminar el path legacy del juego migrado.
-3. **Cuando todos los juegos migren**: ✅ completado en `feature/refactor/render-migrate-legacy` (adaptadores legacy y `render_port.py` eliminados; `docs/ports_contract.md` actualizado).
+3. **Cuando todos los juegos migren**: ✅ completado en `feature/refactor/render-migrate-legacy` (adaptadores legacy y `render_port.py` eliminados; `docs/contracts/ports_contract.md` actualizado).
 
 ---
 

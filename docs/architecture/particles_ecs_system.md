@@ -3,7 +3,7 @@
 **Estado**: 🟢 Activo
 **Versión**: 1.1
 **Última actualización**: Noviembre 2026
-**Ubicación**: `docs/particles_ecs_system.md`
+**Ubicación**: `docs/architecture/particles_ecs_system.md`
 
 ---
 
@@ -862,15 +862,15 @@ La separación visual/física es la misma: `CursorAppearance.padding_*` no afect
 a `CursorCollision.radius`.
 
 Para el diseño completo (multi-cursor, `CollisionHandler`, timeout y
-configuración JSON), ver `docs/cursor_system.md`.
+configuración JSON), ver `docs/architecture/cursor_system.md`.
 
 ---
 
 ## 📚 Referencias
 
-- **Arquitectura hexagonal**: `docs/ports_contract.md`
-- **Arquitectura de render**: `docs/render_architecture.md`
-- **Cómo añadir un juego**: `docs/adding_a_game_plugin.md`
-- **Guía de estilos**: `docs/code_style.md`
-- **Aprendizaje del sistema**: `docs/system_learning.md`
-- **Sistema de cursores**: `docs/cursor_system.md`
+- **Arquitectura hexagonal**: `docs/contracts/ports_contract.md`
+- **Arquitectura de render**: `docs/architecture/render_architecture.md`
+- **Cómo añadir un juego**: `docs/guides/adding_a_game_plugin.md`
+- **Guía de estilos**: `docs/contracts/code_style.md`
+- **Aprendizaje del sistema**: `docs/guides/system_learning.md`
+- **Sistema de cursores**: `docs/architecture/cursor_system.md`

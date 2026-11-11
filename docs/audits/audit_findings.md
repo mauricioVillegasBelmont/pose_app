@@ -30,7 +30,7 @@ antes de reescribir los juegos mockup.
 8. `state_contract.py` sin efecto — 20 min
 9. Falta `[tool.mypy]` + `[tool.ruff]` en pyproject — 30 min
 10. `ConsoleFormatter` sin detección TTY — 20 min
-11. Falta `docs/render_refactor_status.md` — 30 min
+11. Falta `docs/refactors/render_refactor_status.md` — 30 min
 
 ### 🟢 BAJA (deuda aceptada)
 
@@ -48,7 +48,7 @@ antes de reescribir los juegos mockup.
 - Compat dual en `ParticlesGame`.
 - Los 3 juegos mockup usarán la vieja hasta reescribirse.
 
-**Decisión documentada en** `docs/render_refactor_status.md`.
+**Decisión documentada en** `docs/refactors/render_refactor_status.md`.
 
 ## Plan de ejecución
 
@@ -70,4 +70,4 @@ antes de reescribir los juegos mockup.
 
 - [ ] Fix 9: `[tool.mypy]` + `[tool.ruff]` en `pyproject.toml`
 - [ ] Fix 10: `ConsoleFormatter` con TTY detection
-- [ ] Fix 11: `docs/render_refactor_status.md`
+- [ ] Fix 11: `docs/refactors/render_refactor_status.md`

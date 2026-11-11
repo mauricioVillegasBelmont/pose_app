@@ -207,11 +207,11 @@ puertos y son lo único que sabe de OpenCV, Mediapipe, Pygame o FastAPI.
 
 | Documento | Contenido |
 |-----------|-----------|
-| `docs/ports_contract.md` | Contratos de todos los puertos (fuente de verdad) |
-| `docs/render_architecture.md` | Arquitectura de render (capacidades + SceneManager) |
-| `docs/adding_a_game_plugin.md` | Guía paso a paso para añadir un juego |
-| `docs/code_style.md` | Guía de estilos y tipado |
-| `docs/directory_structure.md` | Estructura detallada del proyecto |
+| `docs/contracts/ports_contract.md` | Contratos de todos los puertos (fuente de verdad) |
+| `docs/architecture/render_architecture.md` | Arquitectura de render (capacidades + SceneManager) |
+| `docs/guides/adding_a_game_plugin.md` | Guía paso a paso para añadir un juego |
+| `docs/contracts/code_style.md` | Guía de estilos y tipado |
+| `docs/reference/directory_structure.md` | Estructura detallada del proyecto |
 | `AGENTS.md` | Reglas y flujo de trabajo del proyecto |
 
 ---

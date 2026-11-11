@@ -1,8 +1,8 @@
 # Guía de Aprendizaje del Sistema — `system_learning.md`
 
 > **Audiencia**: desarrollador nuevo integrado al proyecto.
-> **Tono**: educativo. Este documento no sustituye a `AGENTS.md` ni a `docs/ports_contract.md`: los **complementa** explicando *qué hace cada cosa y por qué*.
-> **Regla de oro**: antes de escribir código, lee `AGENTS.md` + `docs/ports_contract.md`. Si este documento contradice esos dos, **manda la documentación normativa** y avisa.
+> **Tono**: educativo. Este documento no sustituye a `AGENTS.md` ni a `docs/contracts/ports_contract.md`: los **complementa** explicando *qué hace cada cosa y por qué*.
+> **Regla de oro**: antes de escribir código, lee `AGENTS.md` + `docs/contracts/ports_contract.md`. Si este documento contradice esos dos, **manda la documentación normativa** y avisa.
 
 ---
 
@@ -216,31 +216,31 @@ flowchart TD
     RST --> POSE["landmarks = estimate(frame)"]
     POSE --> LOGIC["_spawn / _calculate_color / _process_frame"]
     LOGIC --> ST["state.update_*(...)"]
-    ST --> RENDER["render (legacy o nueva arquitectura)"]
+    ST --> RENDER["set_* en capacidades + scene.render_frame(landmarks)"]
     RENDER --> SLEEP["await asyncio.sleep(0)"]
     SLEEP --> STOP{"should_stop() o CancelledError?"}
     STOP -- no --> FRAME
-    STOP -- sí --> FIN["finally: renderer.close()<br/>camera.stop()"]
+    STOP -- sí --> FIN["finally: scene.close()<br/>camera.stop()"]
 ```
 
-Los tres juegos comparten este esqueleto (**Template Method** implícito); cambian la caja "lógica" y el renderer.
+Los tres juegos comparten este esqueleto (**Template Method** implícito); cambian la caja "lógica" y las capacidades de render.
 
-## 3.4 Módulo: render — doble arquitectura 🔴/🟢
+## 3.4 Módulo: render — nueva arquitectura 🟢
 
 ```mermaid
 flowchart TD
-    subgraph LEGACY["🔴 LEGACY (src/pose_app/domain/ports/render_port.py)"]
+    subgraph NUEVA["🟢 NUEVA (src/pose_app/domain/ports/render/)"]
         direction TB
-        L1["ColorGame / GesturesGame"] --> L2["ColorRenderPort.render_background(color, landmarks)"]
-        L2 --> L3["PygameColorAdapter"]
-        L3 --> L4["PoseOverlayRenderer.draw(esqueleto)"]
-        L5["ParticlesGame (si renderer no None)"] --> L6["ParticlesRenderPort.render_particles(particles)"]
-        L6 --> L7["PygameParticlesAdapter"]
-        NOTE["🔴 PoseDebugOverlay eliminado<br/>(ver §5.11)"]
+        G1["ParticlesGame / ColorGame / GesturesGame"] --> G2["set_* en cada capacidad<br/>(set_color, set_particles, set_cursors, set_hud)"]
+        G2 --> G3["SceneManager.render_frame(landmarks)"]
+        G3 --> G4["cap.render() por capacidad<br/>(Color / Particles / InputCursor / HUD)"]
+        G3 --> G5["overlay.draw(surface, landmarks)<br/>(PoseOverlay / FpsOverlay)"]
+        G4 --> G6["pygame.display.flip() + clock.tick()"]
+        G5 --> G6
     end
 ```
 
-**Estado real hoy**: `ParticlesGame` usa la **nueva** arquitectura; `ColorGame` y `GesturesGame` siguen en **legacy**. Ambas conviven; por eso existen DOS `ColorRenderPort` y DOS `ParticlesRenderPort` (uno en `src/pose_app/domain/ports/render_port.py` y otro en `src/pose_app/domain/ports/render/`). **Importa siempre la ruta completa.**
+**Estado actual**: los 3 juegos (`ParticlesGame`, `ColorGame`, `GesturesGame`) usan la **nueva** arquitectura (SceneManager + capacidades + overlays). Los puertos legacy (`domain/ports/render_port.py`) y los adaptadores legacy (`PygameColorAdapter`) fueron eliminados en `feature/refactor/render-migrate-legacy`. **Importa siempre** desde `domain/ports/render/`.
 
 ## 3.5 Módulo: API + autenticación (`src/pose_app/adapters/api/`, `src/pose_app/adapters/auth/`, `src/pose_app/infrastructure/auth/`)
 
@@ -329,17 +329,17 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   4. Tipado estricto y docstrings Google-style (es lógica de negocio crítica).
 
 ### `src/pose_app/domain/ports/`
-- **Propósito**: contratos (ABC o Protocol) entre dominio y exterior. Son la **fuente de verdad** (ver `docs/ports_contract.md`).
+- **Propósito**: contratos (ABC o Protocol) entre dominio y exterior. Son la **fuente de verdad** (ver `docs/contracts/ports_contract.md`).
 - **Puertos destacados**:
   - `camera_port.py`, `pose_estimator_port.py`: entrada de infraestructura.
   - `pose_interaction_port.py`: `PoseInteractionPort` — interacción multi-cursor (implementado por `PoseInteractionFacade`).
   - `event_bus_port.py`: comunicación pub/sub.
   - `auth_port.py`, `user_repository_port.py`, `identity_repository_port.py`: auth.
-  - `render_port.py` (legacy) y `render/` (nuevo): render.
+  - `render/` (nueva arquitectura; `render_port.py` legacy 🔴 eliminado): render.
 - **Al añadir puerto**:
   1. Puerto **nuevo y pequeño** (una responsabilidad, ISP). No le agregues métodos a un puerto existente si puedes crear otro.
   2. Tipado estricto en cada `@abstractmethod`; docstring Google-style con Args/Returns/Raises.
-  3. **Actualiza `docs/ports_contract.md`** (versión + changelog) — es obligatorio.
+  3. **Actualiza `docs/contracts/ports_contract.md`** (versión + changelog) — es obligatorio.
   4. Los `close()`/`start()`/`stop()` deben ser **idempotentes**.
   5. Un adaptador implementa **un** puerto, nunca varios a la vez.
 
@@ -351,11 +351,11 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   - `scene_port.py`: `ScenePort` — orquesta capacidades + overlays.
   - `input_cursor_render_port.py`: `InputCursorRenderPort` — capacidad de dibujar cursores.
   - `render_capability.py`: `RenderCapability` (ABC) — contrato mínimo `render()` que el `SceneManager` invoca.
-- **Al añadir capacidad**: crea `*_render_port.py` con `set_x()` / `render_x()` / `close()`, y añade su implementación Pygame en `src/pose_app/adapters/render/`. Documenta en `docs/render_architecture.md`.
+- **Al añadir capacidad**: crea `*_render_port.py` con `set_x()` / `render_x()` / `close()`, y añade su implementación Pygame en `src/pose_app/adapters/render/`. Documenta en `docs/architecture/render_architecture.md`.
 
 ### `src/pose_app/domain/events/`
 - **Propósito**: hechos inmutables ya ocurridos (`DomainEvent` base con `occurred_at` automático).
-- **Al añadir evento**: `@dataclass(frozen=True, kw_only=True)`, hereda de `DomainEvent`, nombre en pasado/sustantivo (`PaletteChangeRequested`). Registra quién lo publica y quién lo consume en `docs/ports_contract.md`.
+- **Al añadir evento**: `@dataclass(frozen=True, kw_only=True)`, hereda de `DomainEvent`, nombre en pasado/sustantivo (`PaletteChangeRequested`). Registra quién lo publica y quién lo consume en `docs/contracts/ports_contract.md`.
 
 ### `src/pose_app/domain/state/`
 - **Propósito**: `GameStatePort` (qué expone cada juego a la API) y `AppSnapshot` (DTO agregado).
@@ -373,7 +373,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
   3. `main.py` recibe TODO por constructor (DI) y solo conoce puertos.
   4. Loop: `run_async(should_stop)`, `asyncio.to_thread` para bloqueantes, cleanup en `finally`, re-lanzar `CancelledError`.
   5. Crea su plugin en `src/pose_app/app/plugins/<id>_plugin.py` y regístralo en `src/pose_app/app/plugins/__init__.py`.
-  6. Guía completa: `docs/adding_a_game_plugin.md`.
+  6. Guía completa: `docs/guides/adding_a_game_plugin.md`.
 
 ### 🔴 `src/pose_app/domain/use_cases/` — eliminada (nota histórica)
 - Hasta v0.4 existió como carpeta residual vacía (los juegos migraron a `src/pose_app/domain/games/`). **Fue eliminada en v0.5** junto con `capabilities/`. No la reintroduzcas: los juegos viven en `games/` y los servicios en `services/`.
@@ -400,7 +400,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 |---|---|
 | `src/pose_app/adapters/camera/` | `CameraPort` con OpenCV (`WebcamAdapter`: captura en hilo + FourCC configurable) |
 | `src/pose_app/adapters/pose/` | `PoseEstimatorPort` con MediaPipe (`MediapipeAdapter`) + modelo `.task` |
-| `src/pose_app/adapters/render/` | Puertos de render (legacy y nuevos) con pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameSceneManager`, `PygameInputCursorRenderer`, `PygameColorAdapter` (legacy), overlays (`PoseOverlay`, `FpsOverlay`) |
+| `src/pose_app/adapters/render/` | Puertos de render (nueva arquitectura) con pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameSceneManager`, `PygameInputCursorRenderer`, overlays (`PoseOverlay`, `FpsOverlay`) |
 | `src/pose_app/adapters/render/overlays/` | `PoseOverlay` (esqueleto) y `FpsOverlay` (contador FPS), ambos implementan `OverlayPort` |
 | ~~`src/pose_app/adapters/render/decorators/`~~ | 🔴 **Eliminado** en `feature/fix#pygame-single-window`. `PoseOverlay` (`OverlayPort`) reemplaza al `PoseDebugOverlay`. Ver §5.11. |
 | `src/pose_app/adapters/auth/` | `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort` + bcrypt |
@@ -458,7 +458,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 - **Dónde viven los JSON**: `game_profiles/<game_id>/<profile_name>.json` (p. ej. `game_profiles/particles/normal.json`). `GameSettings` tiene `profile_name: str = "normal"`; `ParticlesPlugin` resuelve la ruta vía `paths.GAME_PROFILES_DIR`.
 - **Al añadir un campo**:
   1. Si es **común a todos los juegos** → campo de primer nivel en `GameProfileConfig` + validación Pydantic.
-  2. Si es **específico de un juego** → `game_options["<mi_juego>"]` (dict anidado); documenta el schema en `docs/adding_a_game_plugin.md`.
+  2. Si es **específico de un juego** → `game_options["<mi_juego>"]` (dict anidado); documenta el schema en `docs/guides/adding_a_game_plugin.md`.
   3. Actualiza `game_profiles/<game_id>/normal.json` de ejemplo.
 - **Al añadir un juego con perfiles**: crea `game_profiles/<game_id>/` con al menos `normal.json`; en el plugin, resuelve la ruta con `load_game_profile(GAME_PROFILES_DIR / "<game_id>" / f"{profile_name}.json")`.
 
@@ -476,7 +476,7 @@ Para cada carpeta: **propósito** y **consideraciones para agregar un archivo o 
 
 - `scripts/check_coverage.py`: gate de cobertura por capa (pre-push).
 - `check_structure.py`: fitness function de arquitectura (existe archivo X, importa clase Y, hay 3 plugins). **Ejecútalo tras mover/crear módulos estructurales.**
-- `directory_tree_generator.py`: regenera `docs/directory_structure.md`.
+- `directory_tree_generator.py`: regenera `docs/reference/directory_structure.md`.
 - `debug_mediapipe_tasks.py`: repro de crashes de Mediapipe fuera de pytest.
 - `AGENTS.md`: reglas del proyecto (**obligatorio**).
 - `docs/`: `ports_contract.md` (contratos), `render_architecture.md` (nueva arquitectura), `adding_a_game_plugin.md` (tutorial de juegos), `code_style.md` (estilo), `directory_structure.md` (árbol), `coverage_baseline.md`, y este `system_learning.md`.
@@ -671,7 +671,7 @@ Paquete vacío (solo marca namespace). Los consumidores importan submódulos dir
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
-| `PoseUpdated` | `frozen: landmarks: tuple[PoseLandmark, ...]`, `frame_id:int=0` | Notifica landmarks detectados | 🟡 previsto por los juegos según `docs/ports_contract.md` |
+| `PoseUpdated` | `frozen: landmarks: tuple[PoseLandmark, ...]`, `frame_id:int=0` | Notifica landmarks detectados | 🟡 previsto por los juegos según `docs/contracts/ports_contract.md` |
 | `PoseLost` | `frozen: frame_id:int=0` | Notifica ausencia de persona | 🟡 igual que `PoseUpdated` |
 
 ---
@@ -751,18 +751,20 @@ Reexporta `BaseRenderPort`, `CameraPort`, `ColorRenderPort`, `ParticlesRenderPor
 | `IdentityRepositoryPort.get_by_user_id` | `(self, user_id: str) -> list[Identity]` | Credenciales de un usuario | `DELETE /users/{id}` |
 | `IdentityRepositoryPort.create / update / delete` | como arriba | CRUD de credenciales | `json_bootstrap`, `change_my_password`, `authenticate` (last_login) |
 
-### 🔴 `src/pose_app/domain/ports/render_port.py` (LEGACY)
+### 🔴 `src/pose_app/domain/ports/render_port.py` (eliminado)
+> 🔴 **ELIMINADO** en `feature/refactor/render-migrate-legacy`. Los puertos nuevos viven en `src/pose_app/domain/ports/render/`. Contenido histórico: referencia solamente.
+
 **Propósito**: puertos de render antiguos segregados por juego. Sustituidos por `src/pose_app/domain/ports/render/`.
 
 **Nota post-refactor (feature/fix#pygame-single-window)**: `BaseRenderPort.show()` fue eliminado. Nadie lo llamaba en producción (el ciclo de vida lo gestiona el `SceneManager`). El contrato ahora solo exige `close()`.
 
 | Objeto / función | Firma (tipado) | Responsabilidad | Valores que modifica / proveniencia |
 |---|---|---|---|
-| `BaseRenderPort.close` | `(self) -> None` | Liberar recursos del renderer. Idempotente | `finally` de los 3 juegos |
-| `BaseRenderPort.__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | `with renderer: ...` → `close()` al salir | Tests manuales |
-| `ParticlesRenderPort.render_particles` | `(self, particles: list[Particle]) -> None` | Dibujar partículas | `ParticlesGame._render_legacy` (solo si `renderer is not None`; el plugin actual pasa `None`) 🟡 |
-| `ColorRenderPort.render_background` | `(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None` | Fondo + esqueleto | 🟢 `ColorGame.run_async` y `GesturesGame.run_async` |
-| `LandmarkAwareRenderPort.update_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | Guarda landmarks para el próximo render | `ParticlesGame._render_legacy` vía `isinstance(...)` |
+| `BaseRenderPort.close` | `(self) -> None` | Liberar recursos del renderer. Idempotente | `finally` de los juegos (histórico) |
+| `BaseRenderPort.__enter__ / __exit__` | `(self) -> Self` / `(...) -> None` | Context manager → `close()` al salir | Tests manuales |
+| `ParticlesRenderPort.render_particles` | `(self, particles: list[Particle]) -> None` | Dibujar partículas | 🟡 histórico: el puerto nuevo es `set_particles` + `render_particles()` |
+| `ColorRenderPort.render_background` | `(self, color: RGBColor, landmarks: list[PoseLandmark]) -> None` | Fondo + esqueleto | 🔴 histórico: eliminado, reemplazado por `set_color` + `render_color()` |
+| `LandmarkAwareRenderPort.update_landmarks` | `(self, landmarks: list[PoseLandmark]) -> None` | Guarda landmarks para el próximo render | 🔴 histórico: eliminado, los landmarks van por `SceneManager.render_frame(landmarks)` |
 
 ### 🟢 `src/pose_app/domain/ports/render/` (nueva arquitectura)
 
@@ -846,11 +848,13 @@ Thread-safe. Métodos: `game_id -> "color"`, `update_color(color: RGBColor)` (po
 | Elemento | Detalle | Proveniencia |
 |---|---|---|
 | `PALETTES: dict[str, list[RGBColor]]` | `fire`, `ocean`, `forest`, `neon` | Constante de clase; usada por `__init__` y `_on_palette_change` |
-| `__init__(camera, pose_estimator, renderer: ColorRenderPort, state, event_bus, palette_name="fire")` | Valida paleta, **suscribe** `PaletteChangeRequested` | `ColorPlugin.create_game` |
+| `__init__(camera, pose_estimator, scene: ScenePort, color_capability: ColorRenderPort, state, event_bus, palette_name="fire")` | Valida paleta, **suscribe** `PaletteChangeRequested` | `ColorPlugin.create_game` |
 | `_on_palette_change(event)` | **Modifica** `_pending_palette` si es válida | `AsyncEventBus.publish` |
-| `run_async(should_stop)` | **Modifica** `_palette_name`, `_palette`, `_frame_count`; llama `state.update_pose/increment_frames/update_color` y `renderer.render_background(color, landmarks)` | `src/pose_app/app/main.py` |
+| `run_async(should_stop)` | **Modifica** `_palette_name`, `_palette`, `_frame_count`; llama `state.update_pose/increment_frames/update_color`, `color_capability.set_color(color)` y `scene.render_frame(landmarks)` | `src/pose_app/app/main.py` |
 | `_calculate_color(landmarks) -> RGBColor` | Interpola según posición de muñeca/nariz | Por `run_async` |
 | `_find(landmarks, name) -> PoseLandmark \| None` | Búsqueda case-insensitive | Por `_calculate_color` |
+
+> **Nota post-migración**: `ColorGame` recibe `scene: ScenePort` + `color_capability: ColorRenderPort` (nuevo). `renderer` (legacy) ya no se usa. En `finally`, cierra con `scene.close()` (no `renderer.close()`).
 
 ### `src/pose_app/domain/games/gestures/state.py` — `GesturesState`
 Thread-safe. `update_active_gestures(newly_activated: set[Gesture], currently_active: set[Gesture])` **muta** `_active_gestures` e **incrementa** `_activation_counts[g]` (invocado por `GesturesGame._process_frame`); `increment_frames()`; `snapshot()` (`active_gestures`, `activation_counts`, `frame_count`); `stats()`.
@@ -861,14 +865,16 @@ Thread-safe. `update_active_gestures(newly_activated: set[Gesture], currently_ac
 | Elemento | Detalle | Proveniencia |
 |---|---|---|
 | Constantes | `MIN_FRAMES_TO_ACTIVATE=8`, `UP_MARGIN=0.05`, `GREETING_MAX_DISTANCE=0.15`, `CROSSED_ARMS_MAX_DISTANCE=0.2`, `SQUAT_MAX_KNEE_ANGLE=130.0`, `ONE_LEG_MARGIN=0.03` | Reglas de negocio; usadas por los `_detect_*` |
-| `__init__(camera, pose_estimator, renderer: ColorRenderPort, state, event_bus)` | Inyecta; crea `_consecutive_frames: dict[Gesture,int]` y `_active: set[Gesture]` | `GesturesPlugin.create_game` |
-| `run_async(should_stop)` | Loop + `state.increment_frames()` + `render_background(RGBColor(20,20,30), landmarks)` | `src/pose_app/app/main.py` |
+| `__init__(camera, pose_estimator, scene: ScenePort, color_capability: ColorRenderPort, state, event_bus)` | Inyecta; crea `_consecutive_frames: dict[Gesture,int]` y `_active: set[Gesture]` | `GesturesPlugin.create_game` |
+| `run_async(should_stop)` | Loop + `state.increment_frames()` + `color_capability.set_color(RGBColor(20,20,30))` + `scene.render_frame(landmarks)` | `src/pose_app/app/main.py` |
 | `_process_frame(landmarks)` | **Muta** `_consecutive_frames` y `_active`; genera `newly_activated` → `state.update_active_gestures(...)` | Por `run_async` |
 | `_detectors` | `dict[Gesture, Callable[[list[PoseLandmark]], bool]]` con 6 detectores | Por `_process_frame` |
 | `_detect_hand_up / _detect_greeting / _detect_arms_crossed / _detect_t_pose / _detect_squat / _detect_one_leg_balance` | `(self, landmarks: list[PoseLandmark]) -> bool` — reglas geométricas | Por `_detectors` |
 | `_find(landmarks, name)` | Búsqueda case-insensitive | Por todos los detectores |
 | `_angle_at(a, vertex, b) -> float` (staticmethod) | Ángulo en grados en `vertex` | Por `_detect_squat` |
 | `_on_gesture_activated / _on_gesture_deactivated(gesture)` | Solo logging (hooks ampliables) | Por `_process_frame` |
+
+> **Nota post-migración**: `GesturesGame` recibe `scene: ScenePort` + `color_capability: ColorRenderPort` (nuevo). En `finally`, cierra con `scene.close()`.
 
 ---
 
@@ -912,7 +918,7 @@ Creado por `Container.create_game()`; consumido por `GamePlugin.create_game(cont
 | `stats_all` | `(self) -> dict[str, Any]` | `id → stats()` | 🟢 `GET /api/v1/stats` |
 | `clear` | `(self) -> None` | Tests | 🟡 |
 
-### `docs/state_contract.md`
+### `docs/contracts/state_contract.md`
 Documento vivo (sin código ejecutable) que lista qué keys publica cada juego y qué comandos soporta. Referencia, no se importa.
 
 ### `src/pose_app/app/plugins/game_plugin.py` — eliminado (nota histórica)
@@ -937,11 +943,11 @@ Los plugins importan de `src/pose_app/domain/plugins/game_plugin.py`, que es la 
 | `_build_cursors` | `(self, raw_cursors: Any, opts: dict) -> tuple[dict[str, HandLandmarkConfig], list[InputCursor]]` | Parsea cursores del JSON (landmark_names, offsets, appearance, collision). Defaults: `left_hand` y `right_hand` con wrist único | `create_game` |
 | `_parse_color` | `@staticmethod (raw_color: Any) -> tuple[int,int,int]` | Valida que sea secuencia de 3 enteros | `_build_archetypes`, `_default_archetype` |
 
-### `src/pose_app/app/plugins/color_plugin.py` — `ColorPlugin` 🔴 legacy
-`create_game(context)` → `_create_renderer(context)`: `RENDER_PROVIDER=mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter` (con bootstrap mínimo de pygame en el plugin, ver `NOTE(refactor-render)`). Si `debug_overlay=true`, emite **warning** y **omite el overlay** (legacy no soporta `OverlayPort`; se habilitará tras migración a `SceneManager` en Fase 4). `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(...)`.
+### `src/pose_app/app/plugins/color_plugin.py` — `ColorPlugin` 🟢 nueva arquitectura
+`create_game(context)` → `_create_scene(context)` (devuelve `tuple[ScenePort, ColorRenderPort]`): `RENDER_PROVIDER=mock` → `MockColorRenderAdapter` + `MockSceneManager(capabilities=[color_capability])`; `pygame` → bootstrap de pygame (`pygame.init()` + `set_mode()` + `set_caption()`) + `PygameColorRenderer` + `PoseOverlay(mirror=cfg.mirror)` si `debug_overlay` + `PygameSceneManager(capabilities=[...], overlays=[...])`. `ConfigurationError` si proveedor desconocido. Devuelve `ColorGame(camera, pose_estimator, scene, color_capability, state, event_bus, palette_name)`.
 
-### `src/pose_app/app/plugins/gestures_plugin.py` — `GesturesPlugin` 🔴 legacy
-Igual que `ColorPlugin` pero sin overlay: `mock` → `MockColorRenderAdapter`, `pygame` → `PygameColorAdapter(title="Gestures Game")`. Devuelve `GesturesGame(camera, pose_estimator, renderer, state, event_bus)`.
+### `src/pose_app/app/plugins/gestures_plugin.py` — `GesturesPlugin` 🟢 nueva arquitectura
+Idéntico a `ColorPlugin` (mock + pygame + `_create_scene`). Devuelve `GesturesGame(camera, pose_estimator, scene, color_capability, state, event_bus)`.
 
 ---
 
@@ -1117,14 +1123,17 @@ Frames negros con círculo animado (sin cámara real). `get_frame()` devuelve `N
 Devuelve **siempre** la misma pose en "T" (7 landmarks: nariz, hombros, muñecas, caderas). Determinista → tests reproducibles. Seleccionado con `POSE_PROVIDER=mock`.
 
 ### `mock/mock_render.py` — spies de render
-**Patrones**: Mock/Spy, herencia múltiple de puertos legacy.
+**Patrones**: Mock/Spy, puertos de la nueva arquitectura.
 
 | Clase | Implementa | Qué captura |
 |---|---|---|
-| `MockParticlesRenderAdapter` | `ParticlesRenderPort` + `LandmarkAwareRenderPort` | `last_particles`, `last_landmarks`, contadores `render_count`, `update_landmarks_count`, `show_count`, `close_count`, `is_closed`; `reset()` limpia |
-| `MockColorRenderAdapter` | `ColorRenderPort` + `LandmarkAwareRenderPort` | `last_color`, `last_landmarks`, mismos contadores |
+| `MockParticlesRenderAdapter` | `ParticlesRenderPort` (nuevo) | `last_particles`, contadores `render_count`, `close_count`, `is_closed`; `reset()` limpia |
+| `MockColorRenderAdapter` | `ColorRenderPort` (nuevo) | `last_color`, contadores `render_count`, `close_count`, `is_closed`; `reset()` limpia |
+| `MockSceneManager` | `ScenePort` (nuevo) | `render_count`, `is_closed`; compone capacidades + overlays headless (sin `reset()`: crea instancia nueva en tests) |
 
-Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integración.
+> **Nota post-migración**: `MockParticlesRenderAdapter` y `MockColorRenderAdapter` migraron a los puertos nuevos (`set_*` + `render_*()` + `close()`). Ya no implementan `LandmarkAwareRenderPort` ni tienen `show()`. `MockSceneManager` es nuevo: implementa `ScenePort` sin pygame para que `RENDER_PROVIDER=mock` sea simétrico con `pygame`.
+
+Usados por `RENDER_PROVIDER=mock` (todos los plugins) y por tests de integración.
 
 ---
 
@@ -1132,7 +1141,7 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 
 **Nota post-refactor (feature/fix#pygame-single-window)**:
 - `PygameBaseAdapter` ya **no crea la ventana** ni llama `pygame.quit()`. Recibe una `Surface` inyectada por el bootstrap del plugin.
-- `pygame.init()` + `pygame.display.set_mode()` + `pygame.display.set_caption()` se llaman **una sola vez** en `ParticlesPlugin.create_game` (y, como fallback legacy, en `ColorPlugin`/`GesturesPlugin`).
+- `pygame.init()` + `pygame.display.set_mode()` + `pygame.display.set_caption()` se llaman **una sola vez** en el plugin del juego (`ParticlesPlugin`, `ColorPlugin` o `GesturesPlugin`).
 - `PygameSceneManager.close()` es el **único** punto del proceso que llama `pygame.quit()`.
 - El `flush()` fue eliminado: el `SceneManager.render_frame` hace `pygame.display.flip()`.
 
@@ -1155,8 +1164,8 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 ### 🟢 `pygame_color.py` — `PygameColorRenderer(ColorRenderPort)`
 `__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Color Game")`. Capacidad: `set_color(color: RGBColor)` (declara) + `render_color()` (fill de pantalla) + `render()` (delega). `close()` hereda de la base.
 
-### 🔴 `pygame_color_adapter.py` — `PygameColorAdapter(ColorRenderPort legacy)`
-`__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Color Game", pose_overlay: PoseOverlayRenderer | None = None)`. `render_background(color, landmarks)` → fill + esqueleto + `pygame.display.flip()` + `_handle_events()`. `show()` fue eliminado (no se usa). Creado por `ColorPlugin`/`GesturesPlugin` (legacy). **Será eliminado en Fase 4** cuando esos plugins migren a `SceneManager`.
+### 🔴 `pygame_color_adapter.py` — `PygameColorAdapter` (eliminado)
+**Eliminado** en `feature/refactor/render-migrate-legacy`. Reemplazado por `PygameColorRenderer` + `PygameSceneManager`. El esqueleto (antes parte de este adapter) ahora lo dibuja `PoseOverlay` (`OverlayPort`) registrado en el `SceneManager`.
 
 ### 🟢 `pygame_particles.py` — `PygameParticlesRenderer(ParticlesRenderPort nuevo)`
 `__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "Particles", mirror: bool = False, assets_dir: Path | None = None)`. `set_particles` / `render_particles()` (fondo + buffer SRCALPHA + blit) / `close` (limpia buffer y cache, NO cierra pygame) / `render()` (delega).
@@ -1180,7 +1189,7 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 `__init__(surface: pygame.Surface, target_fps: int = 60, title: str = "cursors", mirror: bool = False)`. Buffer interno renombrado `_buffer` (era `_surface`) para no colisionar con la surface inyectada. `set_cursors` / `render_cursors()` / `render()` (delega) / `close` (limpia cache + buffer, NO cierra pygame).
 
 ### 🟢 `overlays/pose_overlay.py`
-- `PoseOverlayRenderer`: utilidad reutilizable (`DEFAULT_CONNECTIONS`, `draw(surface, landmarks, window_size)`). Usada por `PoseOverlay` (capacidad) y, en legacy, por `PygameColorAdapter`.
+- `PoseOverlayRenderer`: utilidad reutilizable (`DEFAULT_CONNECTIONS`, `draw(surface, landmarks, window_size)`). Usada por `PoseOverlay` (overlay).
 - `PoseOverlay(OverlayPort)`: `draw(surface, landmarks|None)` + `close()`. Creado por `ParticlesPlugin` cuando `RENDER_DEBUG_OVERLAY=true` y registrado en el `SceneManager`.
 
 ### 🟢 `overlays/fps_overlay.py` — `FpsOverlay(OverlayPort)`
@@ -1188,13 +1197,6 @@ Usados por `RENDER_PROVIDER=mock` (plugins color/gestures) y por tests de integr
 
 ### 🔴 `decorators/` — eliminado (nota histórica)
 Ver §5.11 (sección histórica) en el bloque de "eliminados". Resumen: `PoseDebugOverlay` fue eliminado en `feature/fix#pygame-single-window`; reemplazado por `PoseOverlay` (`OverlayPort`).
-
-### 🟢 `overlays/pose_overlay.py`
-- `PoseOverlayRenderer`: `DEFAULT_CONNECTIONS` (tuplas de nombres), `__init__(connections, line_color, line_width, joint_color, joint_radius, min_visibility=0.5)`, `draw(surface, landmarks, window_size)`, `_to_pixels(landmark, width, height) -> tuple[int,int]` (staticmethod). Invocado por `PygameColorAdapter` (legacy) y `PoseOverlay` (capacidad nueva).
-- `PoseOverlay(OverlayPort)`: `draw(surface, landmarks|None)` delegando a su renderer; creado por `ParticlesPlugin` y registrado en el SceneManager.
-
-### 🟢 `overlays/fps_overlay.py` — `FpsOverlay(OverlayPort)`
-`__init__(font_size, text_color, background_alpha, position)`, `draw(surface, landmarks|None)` (mide FPS con `perf_counter` en ventanas de 1 s), `close()`, `_ensure_font()`. Creado por `ParticlesPlugin` si `RENDER_DEBUG_OVERLAY`.
 
 ---
 
@@ -1423,15 +1425,15 @@ tests/
 
 ### `check_structure.py`
 Fitness function de arquitectura (se corre a mano, no con pytest):
-- `REQUIRED_FILES: list[str]` (**74 rutas**) → `check_structure() -> bool`. Cubre: domain (entities, particles ECS, services, ports, events, games), app (plugins, registries), adapters (camera, pose, render, api, mock), infrastructure (di, events, errors, logging, auth, assets, paths) y config.
-- **28 pares** `(módulo, clase)` → `check_imports() -> bool`. Valida la cadena completa de puertos, entidades, juegos, adaptadores y servicios.
+- `REQUIRED_FILES: list[str]` (**71 rutas**) → `check_structure() -> bool`. Cubre: domain (entities, particles ECS, services, ports, events, games), app (plugins, registries), adapters (camera, pose, render, api, mock), infrastructure (di, events, errors, logging, auth, assets, paths) y config.
+- **24 pares** `(módulo, clase)` → `check_imports() -> bool`. Valida la cadena completa de puertos, entidades, juegos, adaptadores y servicios.
 - `check_plugin_registry() -> bool` → comprueba `{"particles","color","gestures"}`.
 - Sale con `sys.exit(0/1)`. **Ejecútalo si creas/mueves módulos estructurales.**
 
-**Historial**: en v0.5 se amplió de 54 → 74 archivos y de 17 → 28 imports para cubrir el sistema de cursores, los servicios de dominio y el paquete ECS de partículas.
+**Historial**: en v0.5 se amplió de 54 → 74 archivos y de 17 → 28 imports para cubrir el sistema de cursores, los servicios de dominio y el paquete ECS de partículas. En `feature/refactor/render-migrate-legacy` se redujo a **71 archivos / 24 imports** al eliminar `render_port.py` y `pygame_color_adapter.py`.
 
 ### `directory_tree_generator.py`
-Genera `<dir>_directory_structure.md`. `DirectoryTreeGenerator(root_dir, output_file)`, `generate_tree()`, `_generate_tree_recursive(...)`, `main()`. Sirve para regenerar `docs/directory_structure.md`.
+Genera `<dir>_directory_structure.md`. `DirectoryTreeGenerator(root_dir, output_file)`, `generate_tree()`, `_generate_tree_recursive(...)`, `main()`. Sirve para regenerar `docs/reference/directory_structure.md`.
 
 ### `scripts/probe_camera.py`
 **Propósito**: diagnóstico rápido de cámara/FPS sin levantar la app.
@@ -1443,7 +1445,7 @@ Genera `<dir>_directory_structure.md`. `DirectoryTreeGenerator(root_dir, output_
 Script de reproducción de crashes de Mediapipe **fuera de pytest**: crea `MediapipeAdapter`, llama `estimate()` con frames sintéticos e imprime en qué paso falla. Excluido de coverage.
 
 ### `architecture.md`
-Croquis inicial (16 líneas) de puertos/adaptadores/casos de uso. **Está desactualizado**: la fuente de verdad es `docs/ports_contract.md`.
+Croquis inicial (16 líneas) de puertos/adaptadores/casos de uso. **Está desactualizado**: la fuente de verdad es `docs/contracts/ports_contract.md`.
 
 ### `pyproject.toml`
 - `[project]` `pose-app` v0.5.0, Python ≥3.11, ~50 deps runtime.
@@ -1505,7 +1507,7 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 **Primer día**:
 1. `uv sync --extra dev` y luego `uv run pytest -v` (debe estar verde).
-2. Lee `AGENTS.md`, `docs/ports_contract.md`, `docs/directory_structure.md`.
+2. Lee `AGENTS.md`, `docs/contracts/ports_contract.md`, `docs/reference/directory_structure.md`.
 3. Levanta un juego demo: `GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app.main`.
 4. Consulta el estado: `curl http://localhost:8000/api/v1/state`.
 
@@ -1518,15 +1520,15 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 | Qué añades | Qué debes tocar |
 |---|---|
 | Archivo en una carpeta existente | Solo el archivo + sus tests (verifica con `check_structure.py` si es estructural) |
-| Puerto nuevo | `src/pose_app/domain/ports/...` + `docs/ports_contract.md` (versión/changelog) + adaptador + tests |
-| Juego nuevo | `src/pose_app/domain/games/<id>/` + `src/pose_app/app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/adding_a_game_plugin.md` |
+| Puerto nuevo | `src/pose_app/domain/ports/...` + `docs/contracts/ports_contract.md` (versión/changelog) + adaptador + tests |
+| Juego nuevo | `src/pose_app/domain/games/<id>/` + `src/pose_app/app/plugins/<id>_plugin.py` + `register_builtin_plugins` + tests + `docs/guides/adding_a_game_plugin.md` |
 | Setting nuevo | sub-clase de `Settings` + `.env.example` + `tests/unit/config/test_settings.py` |
 | Archetype nuevo con sprite | `game_profiles/<game>/<profile>.json`: añadir entrada en `particle_archetypes` con `appearance: {size, color, padding_x?, padding_y?}` y `sprite_config: {sprite_name, fps?, animation_mode?}`. El sprite se resuelve vía `AssetLoader` desde `assets/particles/sprites/<sprite_name>.{png,json}` |
-| Evento nuevo | `src/pose_app/domain/events/...` + publicador + suscriptor + `docs/ports_contract.md` |
+| Evento nuevo | `src/pose_app/domain/events/...` + publicador + suscriptor + `docs/contracts/ports_contract.md` |
 | Endpoint nuevo | router + schema + (¿auth?) + test de integración |
 
 **Errores más comunes al empezar**:
-1. Importar el `ColorRenderPort`/`ParticlesRenderPort` equivocado (hay dos: legacy en `src/pose_app/domain/ports/render_port.py`, nuevo en `src/pose_app/domain/ports/render/`).
+1. Importar los puertos de render desde la ruta antigua (`src/pose_app/domain/ports/render_port.py`, 🔴 eliminada) en vez de `src/pose_app/domain/ports/render/`.
 2. Mutar el estado sin el `Lock` (rompe `GET /state`).
 3. Llamar código bloqueante (pygame/cv2/mediapipe) sin `asyncio.to_thread`.
 4. Olvidar el `finally` con `close()`/`stop()` en un loop nuevo.
@@ -1540,5 +1542,6 @@ Reglas del proyecto. Resumen: leer docs obligatorias antes de tocar código; **z
 
 | Versión | Fecha | Cambios |
 |---|---|---|
+| 1.2 | 10-11-2026 | Migración completa a la nueva arquitectura de render: `ColorGame` y `GesturesGame` migrados a `SceneManager` + capacidades; `render_port.py` y `pygame_color_adapter.py` eliminados; `MockParticlesRenderAdapter` y `MockColorRenderAdapter` migrados a los puertos nuevos; `MockSceneManager` añadido; `check_structure.py` 71 archivos / 24 imports. Referencias a `render_port.py` y `pygame_color_adapter.py` marcadas como históricas. |
 | 1.1 | 07-11-2026 | Actualización estructural completa: `tests/unit/` espeja `src/`; `domain/capabilities/` y `domain/use_cases/` eliminadas (notas históricas); `domain/entities/particles/` ECS documentado (archetype, components, lifespan, systems, spawn); `domain/services/` (collision_handler, pose_interaction_facade); nuevos ports (`pose_interaction_port`, `render/input_cursor_render_port`, `render/render_capability`); `PygameInputCursorRenderer`; `infrastructure/assets/` + `paths.py`; `config/game_profile.py`; `check_structure.py` 74 archivos / 28 imports; §5.13 reescrita con estructura espejo. |
 | 1.0 | 04-10-2026 | Versión inicial. |

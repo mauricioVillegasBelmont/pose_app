@@ -9,10 +9,10 @@ Cualquier cambio debe respetar esta arquitectura.
 
 Antes de cualquier tarea, **lee estos documentos**:
 
-1. `docs/ports_contract.md` — Contratos de puertos (fuente de verdad).
-2. `docs/render_architecture.md` — Nueva arquitectura de render (si existe).
-3. `docs/render_refactor_status.md` — Estado del refactor de render (si existe).
-4. `docs/particles_ecs_system.md` — Estado del refactor de particles entity (si existe).
+1. `docs/contracts/ports_contract.md` — Contratos de puertos (fuente de verdad).
+2. `docs/architecture/render_architecture.md` — Nueva arquitectura de render (si existe).
+3. `docs/refactors/render_refactor_status.md` — Estado del refactor de render (si existe).
+4. `docs/architecture/particles_ecs_system.md` — Estado del refactor de particles entity (si existe).
 
 Si algo contradice estos documentos, **detente y pregunta**.
 
@@ -20,9 +20,9 @@ Si algo contradice estos documentos, **detente y pregunta**.
 
 ## 📚 Documentación de apoyo
 
-1. `docs/directory_structure.md` — Estrucutra actual del proyecto.
-2. `docs/audit_findings.md` — Lista de hallazgos pendientes (si existe).
-3. `docs/code_style.md` — Guía de estilo y tipado.
+1. `docs/reference/directory_structure.md` — Estrucutra actual del proyecto.
+2. `docs/audits/audit_findings.md` — Lista de hallazgos pendientes (si existe).
+3. `docs/contracts/code_style.md` — Guía de estilo y tipado.
 
 ---
 
@@ -63,7 +63,7 @@ Si algo contradice estos documentos, **detente y pregunta**.
 
 **Para cualquier tarea que toque >1 archivo**, sigue este flujo:
 
-1. **Leer** los archivos relevantes + `AGENTS.md` + `docs/ports_contract.md`.
+1. **Leer** los archivos relevantes + `AGENTS.md` + `docs/contracts/ports_contract.md`.
 2. **Resumir** el estado actual (3-6 puntos).
 3. **Listar** los archivos que vas a tocar (máximo 6 por iteración).
 4. **Describir** los pasos numerados del cambio.
@@ -96,7 +96,7 @@ Si el usuario pide explícitamente "solo hazlo", salta los pasos 3-6 pero **mant
 
 ### Cuando refactorices arquitectura:
 
-- **Lee `docs/render_architecture.md` primero**.
+- **Lee `docs/architecture/render_architecture.md` primero**.
 - Los **puertos nuevos** deben ser **pequeños y específicos** (una sola responsabilidad).
 - **Los puertos viejos** se marcan como deprecados pero **no se eliminan** hasta que todo migre.
 - **Los adaptadores** implementan **un puerto específico**, nunca varios a la vez.
@@ -139,7 +139,7 @@ GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app
 
 ## 🎨 Guía de estilos y tipado
 
-**Referencia extendida**: `docs/code_style.md`.
+**Referencia extendida**: `docs/contracts/code_style.md`.
 
 Esta sección resume las reglas **obligatorias**. Cualquier código nuevo debe cumplirlas.
 

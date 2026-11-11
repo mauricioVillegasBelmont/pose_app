@@ -569,4 +569,4 @@ Si en el futuro los necesitamos, se añaden como **capacidades nuevas**.
 
 ## ✅ Estado post-migración (feature/refactor/render-migrate-legacy)
 
-Implementación completa. Ver `docs/render_refactor_status.md` para el estado detallado.
+Implementación completa. Ver `docs/refactors/render_refactor_status.md` para el estado detallado.

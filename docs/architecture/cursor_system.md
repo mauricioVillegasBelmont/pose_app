@@ -2,7 +2,7 @@
 
 > **Estado**: Implementado (rama `feature/CollisionHandlers`)
 > **Última actualización**: [fecha]
-> **Documentos relacionados**: `docs/render_architecture.md`, `docs/particles_ecs_system.md`
+> **Documentos relacionados**: `docs/architecture/render_architecture.md`, `docs/architecture/particles_ecs_system.md`
 
 ---
 

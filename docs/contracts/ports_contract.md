@@ -317,7 +317,7 @@ además de su input principal (uso: overlay de debug).
 
 > ✅ **Estado**: implementada en `feature/refactor/render-migrate-legacy`. Es la única arquitectura de render; los puertos legacy fueron eliminados.
 >
-> **Referencia**: `docs/render_architecture.md`.
+> **Referencia**: `docs/architecture/render_architecture.md`.
 
 La nueva arquitectura sigue el patrón **"capacidades componibles + SceneManager"**:
 
@@ -734,12 +734,12 @@ componentes (juegos, API, sistema).
 - **Cuando refactorices un puerto**: incrementa versión y anota en changelog.
 - **Si un adaptador necesita un método extra**: considera si es un nuevo puerto.
 - **Nueva arquitectura de render**: los puertos `*RenderPort (actual)` serán reemplazados.
-  El refactor se documenta en `docs/render_architecture.md`.
+  El refactor se documenta en `docs/architecture/render_architecture.md`.
 
 ---
 
 ## 📚 Referencias Cruzadas
 
-- `docs/render_architecture.md` — Diseño detallado de la nueva arquitectura de render.
-- `docs/adding_a_game_plugin.md` — Guía para añadir juegos como plugin.
+- `docs/architecture/render_architecture.md` — Diseño detallado de la nueva arquitectura de render.
+- `docs/guides/adding_a_game_plugin.md` — Guía para añadir juegos como plugin.
 - `AGENTS.md` — Reglas del proyecto para herramientas automatizadas.

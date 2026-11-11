@@ -20,20 +20,26 @@ pose_app/
 ├── data/
 │   └── users.json
 ├── docs/
-│   ├── adding_a_game_plugin.md
-│   ├── architecture.md
-│   ├── audit_findings.md
-│   ├── code_style.md
-│   ├── coverage_baseline.md
-│   ├── cursor_system.md
-│   ├── directory_structure.md
-│   ├── particles_ecs_system.md
-│   ├── ports_contract.md
-│   ├── render_architecture.md
-│   ├── render_refactor_status.md
-│   ├── spawn_system.md
-│   ├── state_contract.md
-│   └── system_learning.md
+│   ├── architecture/
+│   │   ├── cursor_system.md
+│   │   ├── particles_ecs_system.md
+│   │   ├── render_architecture.md
+│   │   └── spawn_system.md
+│   ├── audits/
+│   │   ├── audit_findings.md
+│   │   └── coverage_baseline.md
+│   ├── contracts/
+│   │   ├── code_style.md
+│   │   ├── ports_contract.md
+│   │   └── state_contract.md
+│   ├── guides/
+│   │   ├── adding_a_game_plugin.md
+│   │   └── system_learning.md
+│   ├── refactors/
+│   │   └── render_refactor_status.md
+│   ├── reference/
+│   │   └── directory_structure.md
+│   └── README.md
 ├── game_profiles/
 │   ├── color/
 │   │   └── normal.json
