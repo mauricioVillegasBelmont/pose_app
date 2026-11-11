@@ -1,6 +1,6 @@
 # Arquitectura de Render
 
-> **Estado**: Propuesta / Borrador
+> **Estado**: Implementada (ver §Estado post-migración)
 > **Fecha**: [fecha]
 > **Autores**: MAuricio Villegas
 > **Revisores**: [pendiente]
@@ -22,10 +22,11 @@ El proyecto tiene un **sistema de render** con las siguientes características:
 
 ### Problema
 
-El diseño actual mezcla **responsabilidades de render** en pocos componentes:
+> 🔴 El problema descrito abajo fue resuelto en `feature/refactor/render-migrate-legacy`. Este documento queda como referencia histórica del diseño.
 
-- `PygameParticlesAdapter`: dibuja partículas.
-- `PygameColorAdapter`: dibuja fondo.
+El diseño legacy mezclaba **responsabilidades de render** en pocos componentes:
+
+- El código legacy (pre-v0.5) mezclaba responsabilidades de render en pocos adaptadores (partículas, color).
 
 **Problemas detectados**:
 
@@ -563,4 +564,9 @@ Si en el futuro los necesitamos, se añaden como **capacidades nuevas**.
 - [Clean Architecture - Robert C. Martin]
 - [Composable Architecture patterns]
 - [Game Engine Architecture - Jason Gregory]
-```
+
+---
+
+## ✅ Estado post-migración (feature/refactor/render-migrate-legacy)
+
+Implementación completa. Ver `docs/render_refactor_status.md` para el estado detallado.

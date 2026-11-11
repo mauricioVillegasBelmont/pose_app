@@ -1,6 +1,6 @@
 # Contrato de Puertos - Pose AR App
 
-> **Versión**: 0.7.0
+> **Versión**: 0.8.0
 > **Última actualización**: [fecha]
 > **Estado**: Vivo (se actualiza con cada fase)
 
@@ -18,18 +18,18 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 - [PoseEstimatorPort](#poseEstimatorPort)
 
 ### Puertos de Salida — Render (el dominio ESCRIBE al exterior)
-**Estado actual:**
-- [BaseRenderPort](#baseRenderPort)
-- [ParticlesRenderPort](#particlesRenderPort)
-- [ColorRenderPort](#colorRenderPort)
-- [LandmarkAwareRenderPort](#landmarkAwareRenderPort)
-
-**Estado futuro (refactor pendiente):**
-- [ColorRenderPort (nuevo)](#colorRenderPortNew)
-- [ParticlesRenderPort (nuevo)](#particlesRenderPortNew)
+**Estado actual (nueva arquitectura):**
+- [ColorRenderPort](#colorRenderPortNew)
+- [ParticlesRenderPort](#particlesRenderPortNew)
 - [HudRenderPort](#hudRenderPort)
 - [OverlayPort](#overlayPort)
 - [ScenePort](#scenePort)
+
+**Estado histórico (🔴 eliminado en `feature/refactor/render-migrate-legacy`):**
+- [BaseRenderPort (🔴 eliminado)](#baseRenderPort)
+- [ParticlesRenderPort (legacy, 🔴 eliminado)](#particlesRenderPort)
+- [ColorRenderPort (legacy, 🔴 eliminado)](#colorRenderPort)
+- [LandmarkAwareRenderPort (🔴 eliminado)](#landmarkAwareRenderPort)
 
 ### Puertos de Estado
 - [GameStatePort](#gameStatePort)
@@ -191,13 +191,15 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 ## 🔌 Puertos de Salida — Render
 
 <a name="baseRenderPort"></a>
-### 🎨 BaseRenderPort
+### 🎨 BaseRenderPort (🔴 eliminado)
 
-> Estado: **actual** (será reemplazado por el refactor de capacidades).
+> 🔴 **ELIMINADO** en `feature/refactor/render-migrate-legacy`. Los puertos nuevos viven en `domain/ports/render/`.
+>
+> _Contenido histórico: se mantiene solo como referencia._
 
 **Propósito**: Operaciones comunes a **cualquier** renderizador.
 
-**Ubicación**: `domain/ports/render_port.py`
+**Ubicación**: 🔴 `domain/ports/render_port.py` (archivo eliminado)
 
 **Quién lo usa**: indirectamente los juegos.
 
@@ -218,15 +220,17 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 ---
 
 <a name="particlesRenderPort"></a>
-### ✨ ParticlesRenderPort (actual)
+### ✨ ParticlesRenderPort (🔴 legacy, eliminado)
 
-> Estado: **actual** (será reemplazado por el refactor de capacidades).
+> 🔴 **ELIMINADO** en `feature/refactor/render-migrate-legacy`. El puerto nuevo está en `domain/ports/render/particles_render_port.py` (`set_particles` + `render_particles()` + `render()` + `close()`).
+>
+> _Contenido histórico: se mantiene solo como referencia._
 
 **Propósito**: Renderizar un sistema de partículas.
 
-**Herencia**: `BaseRenderPort`
+**Herencia**: `BaseRenderPort` (eliminado)
 
-**Quién lo usa**: `ParticlesGame`.
+**Quién lo usa**: 🔴 **nadie** (histórico).
 
 #### Métodos
 
@@ -241,22 +245,24 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
 | `PygameParticlesAdapter` | 🔴 Eliminado | (nunca existió como archivo; el adapter real fue `PygameParticlesRenderer` en `adapters/render/pygame_particles.py`, que implementa la **nueva** `ParticlesRenderPort` en `domain/ports/render/`) |
-| `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `MockParticlesRenderAdapter` | 🔴 Ya no implementa el puerto legacy | Migrado a la nueva `ParticlesRenderPort` (`adapters/mock/mock_render.py`) |
 | `NullParticlesRenderAdapter` | ⏳ Planeado | (headless) |
 | `WebSocketParticlesAdapter` | ⏳ Futuro | (frontend web) |
 
 ---
 
 <a name="colorRenderPort"></a>
-### 🌈 ColorRenderPort (actual)
+### 🌈 ColorRenderPort (🔴 legacy, eliminado)
 
-> Estado: **actual** (será reemplazado por el refactor de capacidades).
+> 🔴 **ELIMINADO** en `feature/refactor/render-migrate-legacy`. El puerto nuevo está en `domain/ports/render/color_render_port.py` (`set_color` + `render_color()` + `render()` + `close()`).
+>
+> _Contenido histórico: se mantiene solo como referencia._
 
 **Propósito**: Renderizar un fondo de color + esqueleto superpuesto.
 
-**Herencia**: `BaseRenderPort`
+**Herencia**: `BaseRenderPort` (eliminado)
 
-**Quién lo usa**: `ColorGame`, `GesturesGame`.
+**Quién lo usa**: 🔴 **nadie** (histórico).
 
 #### Métodos
 
@@ -270,24 +276,24 @@ Este documento define los **contratos** de todos los puertos (interfaces) del do
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `PygameColorAdapter` | ✅ Implementado | `adapters/render/pygame_color_adapter.py` |
-| `MockColorRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `PygameColorAdapter` | 🔴 Eliminado | (era `adapters/render/pygame_color_adapter.py`; reemplazado por `PygameColorRenderer` + `PygameSceneManager`) |
+| `MockColorRenderAdapter` | 🔴 Ya no implementa el puerto legacy | Migrado a la nueva `ColorRenderPort` (`adapters/mock/mock_render.py`) |
 | `NullColorRenderAdapter` | ⏳ Planeado | (headless) |
 | `WebSocketColorAdapter` | ⏳ Futuro | (frontend web) |
 
 ---
 
 <a name="landmarkAwareRenderPort"></a>
-### 🎯 LandmarkAwareRenderPort
+### 🎯 LandmarkAwareRenderPort (🔴 eliminado)
 
-> Estado: **actual** (será reemplazado por el refactor de capacidades).
+> 🔴 **ELIMINADO** en `feature/refactor/render-migrate-legacy`. En la nueva arquitectura, los landmarks llegan al `SceneManager.render_frame(landmarks)` y este los pasa a `overlay.draw(surface, landmarks)`.
 
 **Propósito**: Puerto opcional para renderers que quieren recibir landmarks
 además de su input principal (uso: overlay de debug).
 
-**Ubicación**: `domain/ports/render_port.py`
+**Ubicación**: 🔴 `domain/ports/render_port.py` (archivo eliminado)
 
-**Quién lo usa**: 🔴 **nadie en producción** post-refactor. Antes lo usaba `PoseDebugOverlay`, eliminado en `feature/fix#pygame-single-window` (reemplazado por `OverlayPort`/`PoseOverlay`). Ver §5.11 de `system_learning.md`.
+**Quién lo usa**: 🔴 **nadie en producción**. Antes lo usaba `PoseDebugOverlay`, eliminado en `feature/fix#pygame-single-window` (reemplazado por `OverlayPort`/`PoseOverlay`). Ver §5.11 de `system_learning.md`.
 
 #### Métodos
 
@@ -299,19 +305,17 @@ además de su input principal (uso: overlay de debug).
 
 | Adaptador | Estado | Ubicación |
 |-----------|--------|-----------|
-| `MockParticlesRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
-| `MockColorRenderAdapter` | ✅ Implementado | `adapters/mock/mock_render.py` |
+| `MockParticlesRenderAdapter` | 🔴 Ya no implementa el puerto legacy | Migrado a la nueva arquitectura (`adapters/mock/mock_render.py`) |
+| `MockColorRenderAdapter` | 🔴 Ya no implementa el puerto legacy | Migrado a la nueva arquitectura (`adapters/mock/mock_render.py`) |
 | `PoseDebugOverlay` | 🔴 Eliminado | (era `adapters/render/decorators/pose_debug_overlay.py`, borrado en `feature/fix#pygame-single-window`) |
 
 > **Nota**: en la nueva arquitectura, el "mixin" opcional se reemplaza por `OverlayPort` (`domain/ports/render/overlay_port.py`). Los overlays **no** reciben landmarks por un mixin: el `SceneManager.render_frame(landmarks)` los pasa a `ov.draw(surface, landmarks)`.
 
 ---
 
-### 🚧 NUEVA ARQUITECTURA DE RENDER (pendiente de implementación)
+### 🟢 NUEVA ARQUITECTURA DE RENDER (implementada)
 
-> ⚠️ **Estado**: diseño aprobado, implementación pendiente.
-> Los puertos a continuación reemplazarán a `BaseRenderPort`, `ParticlesRenderPort`,
-> `ColorRenderPort` y `LandmarkAwareRenderPort`.
+> ✅ **Estado**: implementada en `feature/refactor/render-migrate-legacy`. Es la única arquitectura de render; los puertos legacy fueron eliminados.
 >
 > **Referencia**: `docs/render_architecture.md`.
 
@@ -718,8 +722,9 @@ componentes (juegos, API, sistema).
 |---------|-------|---------|
 | 0.4 | [fecha] | StatePort genérico (posteriormente eliminado) |
 | 0.5.1 | [fecha] | Separación de `RenderPort` en `ParticlesRenderPort` y `ColorRenderPort` |
-| 0.6.0 | [fecha] | 1) `StatePort` → `GameStatePort`. 2) Añadido `EventBusPort`. 3) Añadidos `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort`. 4) Añadido `LandmarkAwareRenderPort`. 5) Nueva arquitectura de render (pendiente). |
+| 0.6.0 | [fecha] | 1) `StatePort` → `GameStatePort`. 2) Añadido `EventBusPort`. 3) Añadidos `AuthPort`, `UserRepositoryPort`, `IdentityRepositoryPort`. 4) Añadido `LandmarkAwareRenderPort` (eliminado en 0.8.0). 5) Nueva arquitectura de render (pendiente). |
 | 0.7.0 | [fecha] | 1) Añadido `CameraStatsPort` (métricas opcionales). 2) `CameraPort.get_frame` documentado como no bloqueante y con copia defensiva en `WebcamAdapter`. 3) `WebcamAdapter`: hilo de captura y FourCC configurable (`CAMERA_FOURCC`). |
+| 0.8.0 | [fecha] | 1) 🔴 Eliminados `BaseRenderPort`, `ParticlesRenderPort`/`ColorRenderPort` legacy, `LandmarkAwareRenderPort` y `render_port.py`. 2) Nueva arquitectura de render implementada (SceneManager + capacidades + overlays). 3) `ColorGame` y `GesturesGame` migrados. |
 
 ---
 
