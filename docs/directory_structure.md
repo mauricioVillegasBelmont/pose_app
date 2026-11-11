@@ -88,7 +88,6 @@ pose_app/
 │       │   │   ├── __init__.py
 │       │   │   ├── pygame_base.py
 │       │   │   ├── pygame_color.py
-│       │   │   ├── pygame_color_adapter.py
 │       │   │   ├── pygame_hud.py
 │       │   │   ├── pygame_input_cursor.py
 │       │   │   ├── pygame_particles.py
@@ -170,7 +169,6 @@ pose_app/
 │       │   │   ├── identity_repository_port.py
 │       │   │   ├── pose_estimator_port.py
 │       │   │   ├── pose_interaction_port.py
-│       │   │   ├── render_port.py
 │       │   │   └── user_repository_port.py
 │       │   ├── services/
 │       │   │   ├── __init__.py
@@ -247,8 +245,7 @@ pose_app/
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── test_pygame_base.py
 │   │   │   │   ├── test_pygame_input_cursor.py
-│   │   │   │   ├── test_pygame_particles_ecs.py
-│   │   │   │   └── test_render_adapters.py
+│   │   │   │   └── test_pygame_particles_ecs.py
 │   │   │   └── __init__.py
 │   │   ├── app/
 │   │   │   ├── plugins/

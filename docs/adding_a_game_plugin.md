@@ -277,9 +277,8 @@ from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
 
-# Renderer legacy: si tu juego es simple y usa ColorGame-style, sigue válido.
-# Para la nueva arquitectura (SceneManager + capacidades), ver docs/render_architecture.md.
-from pose_app.domain.ports.render_port import ColorRenderPort
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.infrastructure.logging.logger import get_logger
 
 logger = get_logger("pose_app.domain.games.saludo")
@@ -299,13 +298,15 @@ class SaludoGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
-        renderer: ColorRenderPort,
+        scene: ScenePort,
+        color_capability: ColorRenderPort,
         state: SaludoState,
         event_bus: EventBusPort,
     ):
         self._camera = camera
         self._pose_estimator = pose_estimator
-        self._renderer = renderer
+        self._scene = scene
+        self._color_capability = color_capability
         self._state = state
         self._event_bus = event_bus
         self._frame_count = 0
@@ -340,11 +341,10 @@ class SaludoGame:
                 color = self.GREETING_COLOR if greeting else self.IDLE_COLOR
                 self._state.set_greeting(greeting, color)
 
-                # Render
+                # Render: declarar el estado visual y componer el frame
                 try:
-                    await asyncio.to_thread(
-                        self._renderer.render_background, color, landmarks
-                    )
+                    self._color_capability.set_color(color)
+                    await asyncio.to_thread(self._scene.render_frame, landmarks)
                 except Exception as e:
                     logger.error(f"Error renderizando: {e}")
                     break
@@ -357,9 +357,9 @@ class SaludoGame:
             raise
         finally:
             try:
-                self._renderer.close()
+                self._scene.close()
             except Exception as e:
-                logger.error(f"Error cerrando renderer: {e}")
+                logger.error(f"Error cerrando la escena: {e}")
             try:
                 await asyncio.to_thread(self._camera.stop)
             except Exception as e:
@@ -407,6 +407,8 @@ from pose_app.app.game_context import GameContext
 from pose_app.domain.games.saludo.main import SaludoGame
 from pose_app.domain.games.saludo.state import SaludoState
 from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.domain.state.game_state_port import GameStatePort
 from pose_app.infrastructure.errors.exceptions import ConfigurationError
 from pose_app.infrastructure.logging.logger import get_logger
@@ -433,34 +435,66 @@ class SaludoPlugin(GamePlugin):
         return SaludoState()
 
     def create_game(self, context: GameContext) -> GameProtocol:
-        renderer = self._create_renderer(context)
+        scene, color_capability = self._create_scene(context)
         state = SaludoState()
 
         return SaludoGame(
             camera=context.camera,
             pose_estimator=context.pose_estimator,
-            renderer=renderer,
+            scene=scene,
+            color_capability=color_capability,
             state=state,
             event_bus=context.event_bus,
         )
 
-    def _create_renderer(self, context: GameContext):
+    def _create_scene(
+        self, context: GameContext
+    ) -> tuple[ScenePort, ColorRenderPort]:
+        """Crea el SceneManager y la capacidad de color."""
         cfg = context.settings.render
 
         if cfg.provider == "mock":
-            from pose_app.adapters.mock.mock_render import MockColorRenderAdapter
+            from pose_app.adapters.mock.mock_render import (
+                MockColorRenderAdapter,
+                MockSceneManager,
+            )
 
-            return MockColorRenderAdapter()
+            color_capability: ColorRenderPort = MockColorRenderAdapter()
+            scene: ScenePort = MockSceneManager(capabilities=[color_capability])
+            return scene, color_capability
 
         if cfg.provider == "pygame":
-            from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
+            import pygame
 
-            return PygameColorAdapter(
-                width=cfg.width,
-                height=cfg.height,
-                title="Saludo Game",
+            from pose_app.adapters.render.overlays.pose_overlay import PoseOverlay
+            from pose_app.adapters.render.pygame_color import PygameColorRenderer
+            from pose_app.adapters.render.pygame_scene import PygameSceneManager
+
+            # Bootstrap de pygame: UNA sola ventana por proceso.
+            pygame.init()
+            window = pygame.display.set_mode(
+                (cfg.width, cfg.height),
+                pygame.RESIZABLE,
+            )
+            pygame.display.set_caption(cfg.title)
+
+            color_capability = PygameColorRenderer(
+                surface=window,
+                target_fps=cfg.target_fps,
+                title=cfg.title,
+            )
+
+            overlays: list[PoseOverlay] = []
+            if cfg.debug_overlay:
+                overlays.append(PoseOverlay(mirror=cfg.mirror))
+
+            scene = PygameSceneManager(
+                surface=window,
+                capabilities=[color_capability],
+                overlays=overlays,
                 target_fps=cfg.target_fps,
             )
+            return scene, color_capability
 
         raise ConfigurationError(
             f"Proveedor de render desconocido: {cfg.provider}",
@@ -529,10 +563,8 @@ curl http://localhost:8000/api/v1/state
 | `InputCursorRenderPort` | `set_cursors(cursors)` + `render_cursors()` | Cursores de interacción | 🟢 Nueva (capacidad) |
 | `OverlayPort` | `draw(surface, landmarks)` | Overlays (pose, FPS) | 🟢 Nueva (overlay) |
 | `ScenePort` | `add_capability(...)` + `add_overlay(...)` + `render_frame(landmarks)` | Orquesta capacidades + overlays | 🟢 Nueva (SceneManager) |
-| `ParticlesRenderPort` (legacy) | `render_particles(particles)` | Dibujar partículas (pre-v0.5) | 🔴 Legacy |
-| `ColorRenderPort` (legacy) | `render_background(color, landmarks)` | Fondo + esqueleto (pre-v0.5) | 🔴 Legacy |
 
-**Recomendación**: los juegos nuevos deben usar la **nueva arquitectura** (`ScenePort` + capacidades). El legacy se mantiene para `ColorGame` y `GesturesGame`, no para código nuevo.
+**Recomendación**: usa siempre la **nueva arquitectura** (`ScenePort` + capacidades). El render legacy (`render_port.py`, `PygameColorAdapter`) fue eliminado en `feature/refactor/render-migrate-legacy`.
 
 ### Puertos de comunicación
 

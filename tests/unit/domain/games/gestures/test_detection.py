@@ -24,7 +24,8 @@ def game() -> GesturesGame:
     return GesturesGame(
         camera=None,  # type: ignore
         pose_estimator=None,  # type: ignore
-        renderer=None,  # type: ignore
+        scene=None,  # type: ignore
+        color_capability=None,  # type: ignore
         state=None,  # type: ignore
         event_bus=None,  # type: ignore
     )

@@ -1,6 +1,6 @@
 # Estado del refactor de render
 
-> **Estado**: Congelado
+> **Estado**: Congelado (histórico) → ✅ migración completa en `feature/refactor/render-migrate-legacy`
 > **Fecha de congelación**: 2026-10-12
 > **Rama original**: `refactor/render-capacities` (mergeada a main)
 
@@ -12,11 +12,11 @@
 - ✅ **Fase 4**: Overlays (`PoseOverlay`, `FpsOverlay`).
 - ✅ **Fase 5**: Migración de `ParticlesGame` (con compat dual).
 
-## Fases canceladas
+## Fases canceladas (completadas después)
 
-- ⏸️ **Fase 6**: Migrar `ColorGame` y `GesturesGame`.
-- ⏸️ **Fase 7**: Actualizar mocks y tests.
-- ⏸️ **Fase 8**: Limpieza/deprecación.
+- ✅ **Fase 6**: Migrar `ColorGame` y `GesturesGame` → `feature/refactor/render-migrate-legacy`.
+- ✅ **Fase 7**: Actualizar mocks y tests → `feature/refactor/render-migrate-legacy`.
+- ✅ **Fase 8**: Limpieza/deprecación → `feature/refactor/render-migrate-legacy`.
 
 ## Razón de la congelación
 
@@ -30,13 +30,13 @@ que va a morir.
 
 | Componente | Estado | Acción en el próximo ciclo |
 |-----------|--------|---------------------------|
-| `ParticlesGame` | Compat dual (nuevo + legacy) | Rehacer sin dual |
-| `ColorGame` | Legacy | Rehacer con nueva arquitectura |
-| `GesturesGame` | Legacy | Rehacer con nueva arquitectura |
-| `PygameColorAdapter` | Legacy vivo | Eliminar cuando los juegos usen `PygameColorRenderer` |
-| `PygameParticlesAdapter` | Legacy vivo | Eliminar cuando los juegos usen `PygameParticlesRenderer` |
+| `ParticlesGame` | ✅ Migrado (sin compat dual) | — |
+| `ColorGame` | ✅ Migrado | Migrado a SceneManager + PygameColorRenderer |
+| `GesturesGame` | ✅ Migrado | Migrado a SceneManager + PygameColorRenderer |
+| ~~`PygameColorAdapter`~~ | 🔴 Eliminado | ✅ en `feature/refactor/render-migrate-legacy`. Reemplazado por PygameColorRenderer + SceneManager |
+| ~~`PygameParticlesAdapter`~~ | 🔴 Eliminado | Nunca existió como archivo; el adapter real fue `PygameParticlesRenderer` |
 | ~~`PoseDebugOverlay`~~ | ~~Decorador~~ | ✅ **Eliminado** en `feature/fix#pygame-single-window`. `PoseOverlay` ya lo reemplaza. |
-| `render_port.py` | Legacy vivo | Eliminar cuando todos los juegos migren |
+| ~~`render_port.py`~~ | 🔴 Eliminado | ✅ en `feature/refactor/render-migrate-legacy`. Reemplazado por `domain/ports/render/` |
 
 ## Qué está disponible en `main`
 
@@ -54,12 +54,16 @@ que va a morir.
 
 ## Qué NO tocar (mientras esté congelado)
 
-- NO modificar `PygameParticlesAdapter`, `PygameColorAdapter` hasta su migración a `SceneManager` (Fase 4).
-- NO completar Fases 6-8 sin decidir primero si los mockups van a reescribirse.
+- Fases 6-8 quedaron completadas en `feature/refactor/render-migrate-legacy` (ver abajo).
 
 **Histórico (ya coordinado en `feature/fix#pygame-single-window`)**:
 - `PoseDebugOverlay` — 🔴 eliminado. `PoseOverlay` (`OverlayPort`) lo reemplaza.
-- `render_port.py` — 🔴 `BaseRenderPort.show()` eliminado. `render_port.py` queda como legacy sin `show()`.
+- `render_port.py` — 🔴 `BaseRenderPort.show()` eliminado.
+
+**Histórico (ya coordinado en `feature/refactor/render-migrate-legacy`)**:
+- `PygameColorAdapter` — 🔴 eliminado. Reemplazado por `PygameColorRenderer` + `SceneManager`.
+- `render_port.py` — 🔴 eliminado. Reemplazado por `domain/ports/render/`.
+- `LandmarkAwareRenderPort` — 🔴 eliminado. Los landmarks los pasa `SceneManager.render_frame(landmarks)` a los overlays.
 
 ## Próximos pasos sugeridos
 
@@ -70,7 +74,17 @@ que va a morir.
    - Usar `PygameSceneManager` directamente.
    - Migrar tests al nuevo patrón.
    - Eliminar el path legacy del juego migrado.
-3. **Cuando todos los juegos migren**:
-   - Eliminar adaptadores legacy.
-   - Eliminar `render_port.py`.
-   - Actualizar `docs/ports_contract.md`.
+3. **Cuando todos los juegos migren**: ✅ completado en `feature/refactor/render-migrate-legacy` (adaptadores legacy y `render_port.py` eliminados; `docs/ports_contract.md` actualizado).
+
+---
+
+## ✅ Migración completa (feature/refactor/render-migrate-legacy)
+
+Todos los juegos (`ParticlesGame`, `ColorGame`, `GesturesGame`) usan la nueva arquitectura:
+- SceneManager + capacidades + overlays.
+- Puertos en `domain/ports/render/`.
+- Adaptadores Pygame: `PygameColorRenderer`, `PygameParticlesRenderer`, `PygameHudRenderer`, `PygameInputCursorRenderer`.
+- Adaptadores mock: `MockColorRenderAdapter`, `MockParticlesRenderAdapter`, `MockSceneManager` (headless).
+- Eliminados: `render_port.py` (legacy), `pygame_color_adapter.py`, `PoseDebugOverlay`, `LandmarkAwareRenderPort`.
+
+**No queda código legacy de render.**
