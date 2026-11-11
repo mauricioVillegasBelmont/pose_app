@@ -12,7 +12,9 @@ from pathlib import Path
 
 
 class DirectoryTreeGenerator:
-    def __init__(self, root_dir="../docs", output_file="directory_structure.md"):
+    def __init__(
+        self, root_dir="../docs/reference", output_file="directory_structure.md"
+    ):
         self.root_dir = Path(root_dir)
         self.output_file = Path(output_file)
         # Prefijos de dibujo del árbol
