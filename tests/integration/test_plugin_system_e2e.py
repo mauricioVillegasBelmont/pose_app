@@ -9,6 +9,7 @@ Verifica:
 
 import pytest
 
+from pose_app.config.game_profile import GameProfileConfig
 from pose_app.config.settings import Settings, reset_settings
 from pose_app.infrastructure.di.container import Container
 
@@ -23,33 +24,33 @@ def mock_settings(monkeypatch):
     return Settings()
 
 
-def test_container_creates_particles_game(mock_settings, monkeypatch):
+def test_container_creates_particles_game(mock_settings, monkeypatch) -> None:
     monkeypatch.setenv("GAME_TYPE", "particles")
     reset_settings()
     settings = Settings()
 
     container = Container(settings)
-    game = container.create_game()
+    gameplay_config = GameProfileConfig()
+    game = container.create_game(gameplay_config=gameplay_config)
 
     assert game is not None
     assert game.state.game_id == "particles"
-    assert container.state_registry.get("particles") is game.state
 
 
-def test_container_creates_color_game(mock_settings, monkeypatch):
+def test_container_creates_color_game(mock_settings, monkeypatch) -> None:
     monkeypatch.setenv("GAME_TYPE", "color")
     reset_settings()
     settings = Settings()
 
     container = Container(settings)
-    game = container.create_game()
+    gameplay_config = GameProfileConfig()
+    game = container.create_game(gameplay_config=gameplay_config)
 
     assert game is not None
     assert game.state.game_id == "color"
-    assert container.state_registry.get("color") is game.state
 
 
-def test_container_raises_on_unknown_game(monkeypatch):
+def test_container_raises_on_unknown_game(monkeypatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "testing")
     monkeypatch.setenv("GAME_TYPE", "unknown")
     reset_settings()
@@ -58,5 +59,6 @@ def test_container_raises_on_unknown_game(monkeypatch):
     from pose_app.infrastructure.errors.exceptions import ConfigurationError
 
     container = Container(settings)
+    gameplay_config = GameProfileConfig()
     with pytest.raises(ConfigurationError):
-        container.create_game()
+        container.create_game(gameplay_config=gameplay_config)

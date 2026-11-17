@@ -7,6 +7,7 @@ from pose_app.adapters.mock.mock_pose import MockPoseAdapter
 from pose_app.adapters.mock.mock_render import (
     MockColorRenderAdapter,
     MockParticlesRenderAdapter,
+    MockSceneManager,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "MockColorRenderAdapter",
     "MockParticlesRenderAdapter",
     "MockPoseAdapter",
+    "MockSceneManager",
 ]

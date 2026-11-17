@@ -3,18 +3,20 @@ Adaptador Pygame para SceneManager (composición de capacidades + overlays).
 
 Implementa ScenePort. Compone capacidades en orden de registro,
 luego overlays, con flush centralizado (pygame.display.flip()).
+
+Es el ÚNICO dueño del ciclo de vida de pygame:
+- Crea el Clock.
+- Hace flip() en cada frame.
+- Llama pygame.quit() en close().
 """
 
 from collections.abc import Iterable
-from typing import Any
 
 import pygame
 
 from pose_app.domain.entities.pose_landmark import PoseLandmark
-from pose_app.domain.ports.render.color_render_port import ColorRenderPort
-from pose_app.domain.ports.render.hud_render_port import HudRenderPort
 from pose_app.domain.ports.render.overlay_port import OverlayPort
-from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
+from pose_app.domain.ports.render.render_capability import RenderCapability
 from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.infrastructure.logging.logger import get_logger
 
@@ -26,7 +28,7 @@ class PygameSceneManager(ScenePort):
 
     def __init__(
         self,
-        surface: Any,
+        surface: pygame.Surface,
         capabilities: Iterable[object] | None = None,
         overlays: Iterable[OverlayPort] | None = None,
         target_fps: int = 60,
@@ -35,7 +37,7 @@ class PygameSceneManager(ScenePort):
         Inicializa el SceneManager.
 
         Args:
-            surface: Superficie de dibujo de Pygame (pygame.Surface).
+            surface: Superficie de dibujo compartida (creada por el bootstrap).
             capabilities: Iterable de capacidades a registrar (orden preservado).
             overlays: Iterable de overlays a registrar (orden preservado).
             target_fps: FPS objetivo para clock.tick().
@@ -56,21 +58,11 @@ class PygameSceneManager(ScenePort):
                 self.add_overlay(ov)
 
     def add_capability(self, capability: object) -> None:
-        """
-        Registra una capacidad (color, particles, hud, ...).
-
-        Args:
-            capability: Instancia que implementa alguna capacidad de render.
-        """
+        """Registra una capacidad (color, particles, hud, ...)."""
         self._capabilities.append(capability)
 
     def add_overlay(self, overlay: OverlayPort) -> None:
-        """
-        Registra un overlay.
-
-        Args:
-            overlay: Instancia que implementa OverlayPort.
-        """
+        """Registra un overlay."""
         self._overlays.append(overlay)
 
     def render_frame(self, landmarks: list[PoseLandmark]) -> None:
@@ -79,20 +71,13 @@ class PygameSceneManager(ScenePort):
 
         Las capacidades se renderizan en orden de registro, seguidas
         de los overlays. El flush se realiza de forma centralizada.
-
-        Args:
-            landmarks: Landmarks actuales de pose (puede ser lista vacía).
         """
         if self._closed:
             return
 
         for cap in self._capabilities:
-            if isinstance(cap, ColorRenderPort):
-                cap.render_color()
-            elif isinstance(cap, ParticlesRenderPort):
-                cap.render_particles()
-            elif isinstance(cap, HudRenderPort):
-                cap.render_hud()
+            if isinstance(cap, RenderCapability):
+                cap.render()
 
         for ov in self._overlays:
             ov.draw(self._surface, landmarks)
@@ -102,9 +87,9 @@ class PygameSceneManager(ScenePort):
 
     def close(self) -> None:
         """
-        Cierra todas las capacidades y overlays.
+        Cierra todas las capacidades, overlays y pygame.
 
-        Debe ser idempotente.
+        Es el ÚNICO punto del proceso que llama pygame.quit(). Idempotente.
         """
         if self._closed:
             return
@@ -114,4 +99,7 @@ class PygameSceneManager(ScenePort):
                 cap.close()
         for ov in self._overlays:
             ov.close()
+
+        pygame.quit()
         self._closed = True
+        logger.info("Pygame cerrado por SceneManager")

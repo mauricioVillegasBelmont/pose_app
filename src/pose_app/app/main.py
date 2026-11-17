@@ -7,6 +7,8 @@ import contextlib
 import signal
 import sys
 
+from pose_app import infrastructure
+from pose_app.config.game_profile import load_game_profile
 from pose_app.config.settings import get_settings
 from pose_app.infrastructure.di.container import Container
 from pose_app.infrastructure.errors.exceptions import AppError, ConfigurationError
@@ -42,7 +44,20 @@ async def main_async() -> int:
         # Fase de construcción (errores de config)
         # ==========================================
         try:
-            game = container.create_game()
+            config_path = (
+                infrastructure.paths.GAME_PROFILES_DIR
+                / settings.game.type
+                / f"{settings.game.profile_name}.json"
+            )
+            try:
+                game_profile = load_game_profile(config_path)
+            except FileNotFoundError:
+                logger.critical(f"Perfil de juego no encontrado en: {config_path}")
+                logger.critical(
+                    f"Verifica que existe {settings.game.type}/{settings.game.profile_name}.json"
+                )
+                sys.exit(2)
+            game = container.create_game(gameplay_config=game_profile)
         except ConfigurationError as e:
             # Error de configuración: mensaje claro, sin stack trace
             logger.critical(f"Error de configuración: {e.message}")

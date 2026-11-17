@@ -6,6 +6,8 @@ from pose_app.app.game_context import GameContext
 from pose_app.domain.games.gestures.main import GesturesGame
 from pose_app.domain.games.gestures.state import GesturesState
 from pose_app.domain.plugins.game_plugin import GamePlugin, GameProtocol
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.domain.state.game_state_port import GameStatePort
 from pose_app.infrastructure.errors.exceptions import ConfigurationError
 from pose_app.infrastructure.logging.logger import get_logger
@@ -35,34 +37,86 @@ class GesturesPlugin(GamePlugin):
         return GesturesState()
 
     def create_game(self, context: GameContext) -> GameProtocol:
-        renderer = self._create_renderer(context)
+        """Construye el juego con SceneManager + capacidad de color.
+
+        Args:
+            context: dependencias compartidas y configuración del perfil.
+
+        Returns:
+            Instancia de ``GesturesGame`` configurada desde el JSON.
+        """
+        scene, color_capability = self._create_scene(context)
         state = GesturesState()
 
         return GesturesGame(
             camera=context.camera,
             pose_estimator=context.pose_estimator,
-            renderer=renderer,
+            scene=scene,
+            color_capability=color_capability,
             state=state,
             event_bus=context.event_bus,
         )
 
-    def _create_renderer(self, context: GameContext):
+    # ==========================================
+    # Helpers privados
+    # ==========================================
+
+    def _create_scene(self, context: GameContext) -> tuple[ScenePort, ColorRenderPort]:
+        """Construye la escena y la capacidad de color según el proveedor.
+
+        Args:
+            context: dependencias compartidas y configuración del perfil.
+
+        Returns:
+            Tupla ``(scene, color_capability)`` lista para el juego.
+
+        Raises:
+            ConfigurationError: Si el proveedor de render es desconocido.
+        """
         cfg = context.settings.render
 
         if cfg.provider == "mock":
-            from pose_app.adapters.mock.mock_render import MockColorRenderAdapter
+            from pose_app.adapters.mock.mock_render import (
+                MockColorRenderAdapter,
+                MockSceneManager,
+            )
 
-            return MockColorRenderAdapter()
+            color_capability: ColorRenderPort = MockColorRenderAdapter()
+            scene: ScenePort = MockSceneManager(capabilities=[color_capability])
+            return scene, color_capability
 
         if cfg.provider == "pygame":
-            from pose_app.adapters.render.pygame_color_adapter import PygameColorAdapter
+            import pygame
 
-            return PygameColorAdapter(
-                width=cfg.width,
-                height=cfg.height,
-                title="Gestures Game",
+            from pose_app.adapters.render.overlays.pose_overlay import PoseOverlay
+            from pose_app.adapters.render.pygame_color import PygameColorRenderer
+            from pose_app.adapters.render.pygame_scene import PygameSceneManager
+
+            # Bootstrap de pygame: UNA sola ventana por proceso.
+            pygame.init()
+            window = pygame.display.set_mode(
+                (cfg.width, cfg.height),
+                pygame.RESIZABLE,
+            )
+            pygame.display.set_caption(cfg.title)
+
+            color_capability = PygameColorRenderer(
+                surface=window,
+                target_fps=cfg.target_fps,
+                title=cfg.title,
+            )
+
+            overlays: list[PoseOverlay] = []
+            if cfg.debug_overlay:
+                overlays.append(PoseOverlay(mirror=cfg.mirror))
+
+            scene = PygameSceneManager(
+                surface=window,
+                capabilities=[color_capability],
+                overlays=overlays,
                 target_fps=cfg.target_fps,
             )
+            return scene, color_capability
 
         raise ConfigurationError(
             f"Proveedor de render desconocido: {cfg.provider}",

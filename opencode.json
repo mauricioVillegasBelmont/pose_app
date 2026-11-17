@@ -2,9 +2,11 @@
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
     "AGENTS.md",
-    "docs/ports_contract.md",
-    "docs/render_architecture.md",
-    "docs/code_style.md"
+    "docs/README.md",
+    "docs/guides/system_learning.md",
+    "docs/contracts/ports_contract.md",
+    "docs/architecture/render_architecture.md",
+    "docs/contracts/code_style.md"
   ],
   "permission": {
     "read": "allow",

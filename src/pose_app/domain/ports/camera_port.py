@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Self
+from typing import Self, runtime_checkable
 
 import numpy as np
+from typing_extensions import Protocol
 
 
 class CameraPort(ABC):
@@ -32,3 +33,8 @@ class CameraPort(ABC):
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.stop()
+
+
+@runtime_checkable
+class CameraStatsPort(Protocol):
+    def get_stats(self) -> dict: ...

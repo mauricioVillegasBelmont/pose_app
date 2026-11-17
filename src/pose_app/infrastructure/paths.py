@@ -16,3 +16,4 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 # Directorio de assets en la raíz del proyecto
 ASSETS_DIR = PROJECT_ROOT / "assets"
+GAME_PROFILES_DIR = PROJECT_ROOT / "game_profiles"

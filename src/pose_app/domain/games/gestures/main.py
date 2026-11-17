@@ -12,13 +12,15 @@ si el usuario lo vuelve a hacer).
 import asyncio
 from collections.abc import Callable
 
+from pose_app.domain.entities.color import RGBColor
 from pose_app.domain.entities.gesture import Gesture
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.gestures.state import GesturesState
 from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
-from pose_app.domain.ports.render_port import ColorRenderPort
+from pose_app.domain.ports.render.color_render_port import ColorRenderPort
+from pose_app.domain.ports.render.scene_port import ScenePort
 from pose_app.infrastructure.logging.logger import get_logger
 
 logger = get_logger("use_cases.gestures")
@@ -58,13 +60,15 @@ class GesturesGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
-        renderer: ColorRenderPort,
+        scene: ScenePort,
+        color_capability: ColorRenderPort,
         state: GesturesState,
         event_bus: EventBusPort,
-    ):
+    ) -> None:
         self._camera = camera
         self._pose_estimator = pose_estimator
-        self._renderer = renderer
+        self._scene = scene
+        self._color_capability = color_capability
         self._state = state
         self._event_bus = event_bus
 
@@ -111,13 +115,8 @@ class GesturesGame:
 
                 # Render (fondo + esqueleto)
                 try:
-                    from pose_app.domain.entities.color import RGBColor
-
-                    await asyncio.to_thread(
-                        self._renderer.render_background,
-                        RGBColor(20, 20, 30),
-                        landmarks,
-                    )
+                    self._color_capability.set_color(RGBColor(20, 20, 30))
+                    await asyncio.to_thread(self._scene.render_frame, landmarks)
                 except (ValueError, AttributeError) as e:
                     logger.error(f"Error renderizando: {e}")
                     break
@@ -130,9 +129,9 @@ class GesturesGame:
             raise
         finally:
             try:
-                self._renderer.close()
+                self._scene.close()
             except (ValueError, AttributeError) as e:
-                logger.error(f"Error cerrando renderer: {e}")
+                logger.error(f"Error cerrando scene: {e}")
             try:
                 await asyncio.to_thread(self._camera.stop)
             except (ValueError, AttributeError) as e:

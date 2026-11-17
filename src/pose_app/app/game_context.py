@@ -11,11 +11,15 @@ Motivación:
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from pose_app.config.settings import Settings
 from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
+
+if TYPE_CHECKING:
+    from pose_app.config.game_profile import GameProfileConfig
 
 
 @dataclass(frozen=True)
@@ -31,3 +35,4 @@ class GameContext:
     pose_estimator: PoseEstimatorPort
     event_bus: EventBusPort
     settings: Settings
+    gameplay_config: "GameProfileConfig"

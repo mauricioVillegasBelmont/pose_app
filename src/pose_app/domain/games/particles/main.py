@@ -14,25 +14,27 @@ import asyncio
 import random
 import time
 from collections.abc import Callable
+from typing import Any
 
+from pose_app.adapters.render.pygame_input_cursor import PygameInputCursorRenderer
 from pose_app.domain.entities.particle import Particle
-from pose_app.domain.entities.particles.components import SpriteConfig
+from pose_app.domain.entities.particles.archetype import ParticleArchetype
+from pose_app.domain.entities.particles.spawn.ports import SpawnStrategy
 from pose_app.domain.entities.particles.systems import AnimationSystem
 from pose_app.domain.entities.pose_landmark import PoseLandmark
 from pose_app.domain.games.particles.geometry import (
     Workspace,
-    detect_collisions,
 )
 from pose_app.domain.games.particles.scoring import (
     color_for_score,
     is_winner,
     particles_per_round,
 )
-from pose_app.domain.games.particles.spawn import spawn_particles
 from pose_app.domain.games.particles.state import ParticlesState
 from pose_app.domain.ports.camera_port import CameraPort
 from pose_app.domain.ports.event_bus_port import EventBusPort
 from pose_app.domain.ports.pose_estimator_port import PoseEstimatorPort
+from pose_app.domain.ports.pose_interaction_port import PoseInteractionPort
 from pose_app.domain.ports.render.color_render_port import ColorRenderPort
 from pose_app.domain.ports.render.hud_render_port import HudRenderPort
 from pose_app.domain.ports.render.particles_render_port import ParticlesRenderPort
@@ -49,24 +51,24 @@ class ParticlesGame:
         self,
         camera: CameraPort,
         pose_estimator: PoseEstimatorPort,
+        pose_interaction: PoseInteractionPort,
         scene: ScenePort,
         particles_capability: ParticlesRenderPort,
         color_capability: ColorRenderPort,
         hud_capability: HudRenderPort,
         state: ParticlesState,
         event_bus: EventBusPort,
+        spawn_strategy: SpawnStrategy,
+        archetypes: list[ParticleArchetype],
         screen_width: int = 800,
         screen_height: int = 600,
         rng: random.Random | None = None,
         max_score: int = 10,
-        time_per_round: float = 10.0,
+        time_per_round: float = 30.0,
         hit_radius: float = 30.0,
         workspace: Workspace | None = None,
-        particle_min_distance: float = 0.15,
-        particle_size: float = 20.0,
-        particle_color: tuple[int, int, int] = (255, 200, 50),
         animation_system: AnimationSystem | None = None,
-        sprite_config: SpriteConfig | None = None,
+        cursors: list[Any] | None = None,
     ) -> None:
         """
         Inicializa el juego.
@@ -80,6 +82,8 @@ class ParticlesGame:
             hud_capability: capacidad de render de HUD.
             state: estado del juego (consultable).
             event_bus: bus de eventos.
+            spawn_strategy: estrategia de creación de partículas.
+            archetypes: arquetipos disponibles para el spawn.
             screen_width: ancho de pantalla en píxeles.
             screen_height: alto de pantalla en píxeles.
             rng: generador aleatorio (inyectable para tests).
@@ -87,12 +91,10 @@ class ParticlesGame:
             time_per_round: segundos por ronda.
             hit_radius: radio de colisión en píxeles.
             workspace: zona de spawn (default: Workspace por defecto).
-            particle_min_distance: distancia mínima normalizada entre partículas.
-            particle_size: tamaño base de partícula en píxeles.
-            particle_color: color RGB base de partícula.
         """
         self._camera = camera
         self._pose_estimator = pose_estimator
+        self._pose_interaction = pose_interaction
         self._scene = scene
         self._particles_capability = particles_capability
         self._color_capability = color_capability
@@ -107,9 +109,8 @@ class ParticlesGame:
         self._time_per_round = time_per_round
         self._hit_radius = hit_radius
         self._workspace = workspace or Workspace()
-        self._particle_min_distance = particle_min_distance
-        self._particle_size = particle_size
-        self._particle_color = particle_color
+        self._spawn_strategy = spawn_strategy
+        self._archetypes = archetypes
 
         self._particles: list[Particle] = []
         self._current_round: int = 1
@@ -117,7 +118,8 @@ class ParticlesGame:
         self._frame_count: int = 0
 
         self._animation_system = animation_system or AnimationSystem()
-        self._sprite_config = sprite_config
+
+        self._cursors = cursors or []
 
     @property
     def state(self) -> ParticlesState:
@@ -131,11 +133,11 @@ class ParticlesGame:
     async def run_async(self, should_stop: Callable[[], bool] | None = None) -> None:
         """Loop principal del juego."""
         should_stop = should_stop or (lambda: False)
-
         await asyncio.to_thread(self._camera.start)
-        logger.info("Juego de partículas iniciado")
-
         self._start_new_round()
+        last_time = time.monotonic()
+
+        logger.info("Juego de partículas iniciado")
 
         last_time = time.monotonic()
 
@@ -150,25 +152,26 @@ class ParticlesGame:
                     await asyncio.sleep(0.001)
                     continue
 
-                try:
-                    landmarks = await asyncio.to_thread(
-                        self._pose_estimator.estimate, frame
-                    )
-                except Exception as e:
-                    logger.warning(f"Error estimando pose: {e}")
-                    continue
+                # Estimación de pose (puede ser lenta, pero el juego no se bloquea visualmente
+                # gracias a que la fachada mantiene la última posición suavizada válida)
+                raw_landmarks = await asyncio.to_thread(
+                    self._pose_estimator.estimate, frame
+                )
+
+                # ¡La magia de la fachada! Actualiza y suaviza internamente
+                self._pose_interaction.update(raw_landmarks)
 
                 # Delta time
                 now = time.monotonic()
                 dt = now - last_time
                 last_time = now
 
-                # Lógica
-                self._update_logic(landmarks, dt)
+                # Lógica (ya no necesita pasar landmarks crudos)
+                self._update_logic(dt)
 
                 # Render
                 try:
-                    await self._render_frame(landmarks)
+                    await self._render_frame(raw_landmarks)
                 except Exception as e:
                     logger.error(f"Error renderizando: {e}")
                     break
@@ -198,16 +201,13 @@ class ParticlesGame:
         """Genera partículas nuevas al inicio de una ronda."""
         num_particles = particles_per_round(self._current_round)
 
-        self._particles = spawn_particles(
+        self._particles = self._spawn_strategy.spawn(
             count=num_particles,
+            archetypes=self._archetypes,
             workspace=self._workspace,
-            screen_width=self._screen_width,
-            screen_height=self._screen_height,
+            screen_w=self._screen_width,
+            screen_h=self._screen_height,
             rng=self._rng,
-            min_distance=self._particle_min_distance,
-            particle_size=self._particle_size,
-            particle_color=self._particle_color,
-            sprite_config=self._sprite_config,
         )
 
         self._time_remaining = self._time_per_round
@@ -218,21 +218,34 @@ class ParticlesGame:
 
         logger.info(f"Ronda {self._current_round}: {len(self._particles)} partículas")
 
-    def _update_logic(self, landmarks: list[PoseLandmark], dt: float) -> None:
+    def _update_logic(self, dt: float) -> None:
         """Actualiza la lógica del juego para este frame."""
         # 0. Animar sprites (NUEVO)
         self._animation_system.update(self._particles, dt)
 
-        # 1. Detectar colisiones
-        remaining, hits = detect_collisions(
-            particles=self._particles,
-            landmarks=landmarks,
-            screen_width=self._screen_width,
-            screen_height=self._screen_height,
-            hit_radius=self._hit_radius,
-        )
+        # 1. Detectar colisiones usando la fachada
+        remaining_particles = []
+        hits = 0
+        for particle in self._particles:
+            # Fallback seguro al radio de colisión o la mitad del tamaño visual
+            radius = (
+                particle.collision.radius
+                if particle.collision
+                else (particle.appearance.size / 2)
+            )
 
-        self._particles = remaining
+            if self._pose_interaction.is_touching(
+                particle.position.x,
+                particle.position.y,
+                radius,
+                self._screen_width,
+                self._screen_height,
+            ):
+                hits += 1
+            else:
+                remaining_particles.append(particle)
+
+        self._particles = remaining_particles
         self._state.set_particles_count(len(self._particles))
 
         if hits > 0:
@@ -285,6 +298,16 @@ class ParticlesGame:
             rounds=self._current_round,
             timer=self._time_remaining,
         )
+
+        # Cursores de interacción (NUEVO)
+        # Actualizar cursores desde la fachada
+        if hasattr(self._pose_interaction, "get_all_cursors"):
+            current_cursors = self._pose_interaction.get_all_cursors()
+            # Buscar el renderer de cursores en las capacidades del scene
+            for capability in getattr(self._scene, "_capabilities", []):
+                if isinstance(capability, PygameInputCursorRenderer):
+                    capability.set_cursors(current_cursors)
+                    break
 
         # Render
         await asyncio.to_thread(self._scene.render_frame, landmarks)

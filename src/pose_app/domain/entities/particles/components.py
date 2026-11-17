@@ -29,8 +29,8 @@ class Position:
 class Appearance:
     """Componente inmutable de representación visual."""
 
-    size: float = 5.0
-    color: tuple[int, int, int] = (255, 255, 255)
+    size: float = 20.0
+    color: tuple[int, int, int] = (255, 200, 50)
     padding_x: float = 0.0
     padding_y: float = 0.0
 

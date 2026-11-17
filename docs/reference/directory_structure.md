@@ -1,0 +1,335 @@
+# Directory Structure
+```
+pose_app/
+├── .github/
+│   └── workflows/
+│       ├── ci.yml
+│       ├── security.yml
+│       └── slow-tests.yml
+├── .opencode/
+│   ├── agents/
+│   │   └── games_refator.md
+│   ├── .gitignore
+│   ├── package-lock.json
+│   └── package.json
+├── assets/
+│   └── particles/
+│       └── sprites/
+│           ├── demo.json
+│           └── demo.png
+├── data/
+│   └── users.json
+├── docs/
+│   ├── architecture/
+│   │   ├── cursor_system.md
+│   │   ├── particles_ecs_system.md
+│   │   ├── render_architecture.md
+│   │   └── spawn_system.md
+│   ├── audits/
+│   │   ├── audit_findings.md
+│   │   └── coverage_baseline.md
+│   ├── contracts/
+│   │   ├── code_style.md
+│   │   ├── ports_contract.md
+│   │   └── state_contract.md
+│   ├── guides/
+│   │   ├── adding_a_game_plugin.md
+│   │   └── system_learning.md
+│   ├── refactors/
+│   │   └── render_refactor_status.md
+│   ├── reference/
+│   │   └── directory_structure.md
+│   └── README.md
+├── game_profiles/
+│   ├── color/
+│   │   └── normal.json
+│   ├── gestures/
+│   │   └── normal.json
+│   └── particles/
+│       └── normal.json
+├── logs/
+│   └── app.log
+├── scripts/
+│   ├── __init__.py
+│   ├── check_coverage.py
+│   ├── coverage_check.sh
+│   ├── directory_tree_generator.py
+│   └── probe_camera.py
+├── src/
+│   └── pose_app/
+│       ├── adapters/
+│       │   ├── api/
+│       │   │   ├── __init__.py
+│       │   │   ├── auth_routes.py
+│       │   │   ├── dependencies.py
+│       │   │   ├── fastapi_adapter.py
+│       │   │   ├── routes.py
+│       │   │   ├── schemas.py
+│       │   │   ├── user_routes.py
+│       │   │   └── user_schemas.py
+│       │   ├── auth/
+│       │   │   ├── credentials_auth_provider.py
+│       │   │   ├── in_memory_identity_repository.py
+│       │   │   ├── in_memory_user_repository.py
+│       │   │   ├── json_bootstrap.py
+│       │   │   └── password_hasher.py
+│       │   ├── camera/
+│       │   │   ├── __init__.py
+│       │   │   └── webcam_adapter.py
+│       │   ├── mock/
+│       │   │   ├── __init__.py
+│       │   │   ├── mock_camera.py
+│       │   │   ├── mock_pose.py
+│       │   │   └── mock_render.py
+│       │   ├── pose/
+│       │   │   ├── models/
+│       │   │   │   └── pose_landmarker_full.task
+│       │   │   ├── __init__.py
+│       │   │   └── mediapipe_adapter.py
+│       │   ├── render/
+│       │   │   ├── overlays/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── fps_overlay.py
+│       │   │   │   └── pose_overlay.py
+│       │   │   ├── __init__.py
+│       │   │   ├── pygame_base.py
+│       │   │   ├── pygame_color.py
+│       │   │   ├── pygame_hud.py
+│       │   │   ├── pygame_input_cursor.py
+│       │   │   ├── pygame_particles.py
+│       │   │   └── pygame_scene.py
+│       │   └── __init__.py
+│       ├── app/
+│       │   ├── plugins/
+│       │   │   ├── __init__.py
+│       │   │   ├── color_plugin.py
+│       │   │   ├── gestures_plugin.py
+│       │   │   └── particles_plugin.py
+│       │   ├── __init__.py
+│       │   ├── game_context.py
+│       │   ├── main.py
+│       │   ├── plugin_registry.py
+│       │   └── state_registry.py
+│       ├── config/
+│       │   ├── __init__.py
+│       │   ├── game_profile.py
+│       │   └── settings.py
+│       ├── domain/
+│       │   ├── entities/
+│       │   │   ├── particles/
+│       │   │   │   ├── spawn/
+│       │   │   │   │   ├── __init__.py
+│       │   │   │   │   ├── ports.py
+│       │   │   │   │   ├── positions.py
+│       │   │   │   │   ├── selectors.py
+│       │   │   │   │   └── strategies.py
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── archetype.py
+│       │   │   │   ├── components.py
+│       │   │   │   ├── lifespan.py
+│       │   │   │   └── systems.py
+│       │   │   ├── __init__.py
+│       │   │   ├── color.py
+│       │   │   ├── gesture.py
+│       │   │   ├── hand_landmark_config.py
+│       │   │   ├── identity.py
+│       │   │   ├── input_cursor.py
+│       │   │   ├── particle.py
+│       │   │   ├── pose_landmark.py
+│       │   │   └── user.py
+│       │   ├── events/
+│       │   │   ├── __init__.py
+│       │   │   ├── base.py
+│       │   │   ├── game_events.py
+│       │   │   └── pose_events.py
+│       │   ├── games/
+│       │   │   ├── color/
+│       │   │   │   ├── main.py
+│       │   │   │   └── state.py
+│       │   │   ├── gestures/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── main.py
+│       │   │   │   └── state.py
+│       │   │   └── particles/
+│       │   │       ├── __init__.py
+│       │   │       ├── geometry.py
+│       │   │       ├── main.py
+│       │   │       ├── scoring.py
+│       │   │       └── state.py
+│       │   ├── plugins/
+│       │   │   └── game_plugin.py
+│       │   ├── ports/
+│       │   │   ├── render/
+│       │   │   │   ├── __init__.py
+│       │   │   │   ├── color_render_port.py
+│       │   │   │   ├── hud_render_port.py
+│       │   │   │   ├── input_cursor_render_port.py
+│       │   │   │   ├── overlay_port.py
+│       │   │   │   ├── particles_render_port.py
+│       │   │   │   ├── render_capability.py
+│       │   │   │   └── scene_port.py
+│       │   │   ├── __init__.py
+│       │   │   ├── auth_port.py
+│       │   │   ├── camera_port.py
+│       │   │   ├── event_bus_port.py
+│       │   │   ├── identity_repository_port.py
+│       │   │   ├── pose_estimator_port.py
+│       │   │   ├── pose_interaction_port.py
+│       │   │   └── user_repository_port.py
+│       │   ├── services/
+│       │   │   ├── __init__.py
+│       │   │   ├── collision_handler.py
+│       │   │   └── pose_interaction_facade.py
+│       │   ├── state/
+│       │   │   ├── game_state_port.py
+│       │   │   └── snapshot.py
+│       │   └── __init__.py
+│       ├── infrastructure/
+│       │   ├── assets/
+│       │   │   ├── __init__.py
+│       │   │   ├── asset_loader.py
+│       │   │   └── sprite_sheet_parser.py
+│       │   ├── auth/
+│       │   │   └── jwt_service.py
+│       │   ├── di/
+│       │   │   └── container.py
+│       │   ├── errors/
+│       │   │   ├── error_handler.py
+│       │   │   └── exceptions.py
+│       │   ├── events/
+│       │   │   └── async_event_bus.py
+│       │   ├── logging/
+│       │   │   ├── __init__.py
+│       │   │   └── logger.py
+│       │   ├── __init__.py
+│       │   └── paths.py
+│       └── __init__.py
+├── tests/
+│   ├── integration/
+│   │   ├── pose/
+│   │   │   └── test_mediapipe_adapter.py
+│   │   ├── __init__.py
+│   │   ├── test_auth_endpoints.py
+│   │   ├── test_gestures_plugin_e2e.py
+│   │   ├── test_particles_ecs_integration.py
+│   │   ├── test_plugin_system_e2e.py
+│   │   └── test_user_endpoints.py
+│   ├── manual/
+│   │   ├── webcam_capture.py
+│   │   ├── webcam_mediapipe.py
+│   │   └── webcam_mock_pose.py
+│   ├── property/
+│   │   ├── __init__.py
+│   │   ├── test_identity_properties.py
+│   │   ├── test_particle_properties.py
+│   │   ├── test_password_hasher_properties.py
+│   │   ├── test_plugin_registry_properties.py
+│   │   ├── test_pose_landmark_properties.py
+│   │   ├── test_rgb_color_properties.py
+│   │   └── test_user_properties.py
+│   ├── unit/
+│   │   ├── adapters/
+│   │   │   ├── auth/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_credentials_auth_provider.py
+│   │   │   │   ├── test_identity_repository.py
+│   │   │   │   └── test_user_repository.py
+│   │   │   ├── camera/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_webcam_adapter.py
+│   │   │   │   └── test_webcam_adapter_threading.py
+│   │   │   ├── mock/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_mock_render.py
+│   │   │   ├── pose/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_mediapipe_adapter.py
+│   │   │   ├── render/
+│   │   │   │   ├── overlays/
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   └── test_mirror_mode.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_pygame_base.py
+│   │   │   │   ├── test_pygame_input_cursor.py
+│   │   │   │   └── test_pygame_particles_ecs.py
+│   │   │   └── __init__.py
+│   │   ├── app/
+│   │   │   ├── plugins/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_builtin_plugins.py
+│   │   │   │   ├── test_particles_plugin_cursors.py
+│   │   │   │   ├── test_particles_plugin_spawn.py
+│   │   │   │   └── test_particles_plugin_window.py
+│   │   │   ├── __init__.py
+│   │   │   ├── test_game_context.py
+│   │   │   └── test_plugin_registry.py
+│   │   ├── config/
+│   │   │   ├── __init__.py
+│   │   │   ├── test_game_profile_config.py
+│   │   │   └── test_settings.py
+│   │   ├── domain/
+│   │   │   ├── entities/
+│   │   │   │   ├── particles/
+│   │   │   │   │   ├── spawn/
+│   │   │   │   │   │   ├── __init__.py
+│   │   │   │   │   │   ├── test_ports.py
+│   │   │   │   │   │   ├── test_positions.py
+│   │   │   │   │   │   ├── test_selectors.py
+│   │   │   │   │   │   └── test_strategies.py
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── test_archetype.py
+│   │   │   │   │   ├── test_components.py
+│   │   │   │   │   └── test_systems.py
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_hand_landmark_config.py
+│   │   │   │   └── test_input_cursor.py
+│   │   │   ├── games/
+│   │   │   │   ├── color/
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   └── test_main.py
+│   │   │   │   ├── gestures/
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── test_detection.py
+│   │   │   │   │   └── test_state.py
+│   │   │   │   ├── particles/
+│   │   │   │   │   ├── __init__.py
+│   │   │   │   │   ├── test_geometry.py
+│   │   │   │   │   ├── test_geometry_ecs.py
+│   │   │   │   │   ├── test_main.py
+│   │   │   │   │   └── test_scoring.py
+│   │   │   │   └── __init__.py
+│   │   │   ├── services/
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── test_collision_handler.py
+│   │   │   │   └── test_pose_interaction_facade.py
+│   │   │   └── __init__.py
+│   │   ├── infrastructure/
+│   │   │   ├── assets/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_sprite_sheet_parser.py
+│   │   │   ├── auth/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_jwt_service.py
+│   │   │   ├── logging/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── test_console_formatter.py
+│   │   │   ├── __init__.py
+│   │   │   └── test_paths.py
+│   │   └── __init__.py
+│   └── __init__.py
+├── .coverage
+├── .env
+├── .env.example
+├── .gitignore
+├── .pre-commit-config.yaml
+├── .python-version
+├── AGENTS.md
+├── check_structure.py
+├── coverage.xml
+├── opencode.json
+├── pyproject.toml
+├── README.md
+├── requirements-dev.txt
+├── requirements.txt
+└── uv.lock
+```

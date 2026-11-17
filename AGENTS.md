@@ -9,8 +9,10 @@ Cualquier cambio debe respetar esta arquitectura.
 
 Antes de cualquier tarea, **lee estos documentos**:
 
-1. `docs/ports_contract.md` — Contratos de puertos (fuente de verdad).
-2. `docs/render_architecture.md` — Nueva arquitectura de render (si existe).
+1. `docs/contracts/ports_contract.md` — Contratos de puertos (fuente de verdad).
+2. `docs/architecture/render_architecture.md` — Nueva arquitectura de render (si existe).
+3. `docs/refactors/render_refactor_status.md` — Estado del refactor de render (si existe).
+4. `docs/architecture/particles_ecs_system.md` — Estado del refactor de particles entity (si existe).
 
 Si algo contradice estos documentos, **detente y pregunta**.
 
@@ -18,8 +20,9 @@ Si algo contradice estos documentos, **detente y pregunta**.
 
 ## 📚 Documentación de apoyo
 
-1. `docs/directory_structure.md` — Estrucutra actual del proyecto.
-2. `docs/particles_ecs_system.md` — Entidades / Particulas.
+1. `docs/reference/directory_structure.md` — Estrucutra actual del proyecto.
+2. `docs/audits/audit_findings.md` — Lista de hallazgos pendientes (si existe).
+3. `docs/contracts/code_style.md` — Guía de estilo y tipado.
 
 ---
 
@@ -60,9 +63,9 @@ Si algo contradice estos documentos, **detente y pregunta**.
 
 **Para cualquier tarea que toque >1 archivo**, sigue este flujo:
 
-1. **Leer** los archivos relevantes + `AGENTS.md` + `docs/ports_contract.md`.
+1. **Leer** los archivos relevantes + `AGENTS.md` + `docs/contracts/ports_contract.md`.
 2. **Resumir** el estado actual (3-6 puntos).
-3. **Listar** los archivos que vas a tocar (máximo 4 por iteración).
+3. **Listar** los archivos que vas a tocar (máximo 6 por iteración).
 4. **Describir** los pasos numerados del cambio.
 5. **Listar** dudas o decisiones ambiguas.
 6. **DETENERTE** y esperar confirmación del usuario.
@@ -93,7 +96,7 @@ Si el usuario pide explícitamente "solo hazlo", salta los pasos 3-6 pero **mant
 
 ### Cuando refactorices arquitectura:
 
-- **Lee `docs/render_architecture.md` primero**.
+- **Lee `docs/architecture/render_architecture.md` primero**.
 - Los **puertos nuevos** deben ser **pequeños y específicos** (una sola responsabilidad).
 - **Los puertos viejos** se marcan como deprecados pero **no se eliminan** hasta que todo migre.
 - **Los adaptadores** implementan **un puerto específico**, nunca varios a la vez.
@@ -136,7 +139,7 @@ GAME_TYPE=particles POSE_PROVIDER=mock RENDER_PROVIDER=mock uv run python -m app
 
 ## 🎨 Guía de estilos y tipado
 
-**Referencia extendida**: `docs/code_style.md`.
+**Referencia extendida**: `docs/contracts/code_style.md`.
 
 Esta sección resume las reglas **obligatorias**. Cualquier código nuevo debe cumplirlas.
 
@@ -150,6 +153,9 @@ Esta sección resume las reglas **obligatorias**. Cualquier código nuevo debe c
 - Usa `from collections.abc import Callable, Awaitable` — **NO** `typing.Callable`.
 - Anota **siempre** parámetros y retornos de funciones públicas.
 - Anota **propiedades** con `@property` + tipo de retorno.
+- Usa **docstrings** descriptivos con Args/Returns/Raises.
+- Añade **logging** apropiado (`logger.debug/info/warning/error`).
+- **No dejes TODOs sin contexto**. Si pones uno, explica qué y por qué.
 
 **Ejemplos del proyecto**:
 
@@ -292,7 +298,7 @@ class MiClase: ...
 | Privados | prefijo `_` | `_particles`, `_initialize` |
 | Puertos | sufijo `Port` | `CameraPort`, `RenderPort` |
 | Adaptadores | sufijo `Adapter` | `PygameParticlesAdapter` |
-| Decoradores | sufijo `Decorator` o `Overlay` | `PoseDebugOverlay` |
+| Decoradores / Overlays | sufijo `Decorator` o `Overlay` | `PoseOverlay`, `FpsOverlay` |
 | Plugins | sufijo `Plugin` | `ParticlesPlugin` |
 | Estados | sufijo `State` | `ParticlesState` |
 
@@ -475,8 +481,8 @@ def test_particles_are_cleared_on_reset(game: ParticlesGame) -> None:
 # comportamiento no documentado entre versiones.
 password_bytes = password.encode("utf-8")[:72]
 
-# TODO(refactor-render): PoseDebugOverlay será reemplazado por PoseOverlay.
-return PoseDebugOverlay(base)  # type: ignore[arg-type]
+# TODO(perf): cachear el font en vez de recrearlo por frame.
+self._font = pygame.font.SysFont(None, 24)
 
 # ❌ MAL: comenta el qué
 x = x + 1  # incrementa x
