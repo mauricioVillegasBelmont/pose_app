@@ -12,9 +12,7 @@ from pathlib import Path
 
 
 class DirectoryTreeGenerator:
-    def __init__(
-        self, root_dir="../docs/reference", output_file="directory_structure.md"
-    ):
+    def __init__(self, root_dir="./docs", output_file="directory_structure.md"):
         self.root_dir = Path(root_dir)
         self.output_file = Path(output_file)
         # Prefijos de dibujo del árbol
@@ -48,7 +46,7 @@ class DirectoryTreeGenerator:
         self._walk(self.root_dir, [], lines)
 
         body = "\n".join(lines)
-        content = f"# Directory Structure\n```\n{body}\n```"
+        content = f"# Directory Structure\n```\n{body}\n```\n"
 
         self.output_file.parent.mkdir(parents=True, exist_ok=True)
         self.output_file.write_text(content, encoding="utf-8")
@@ -91,7 +89,7 @@ def main() -> None:
             print(f"Error: '{target_arg}' no es un directorio.")
             return
 
-        docs_dir = target_path / "docs"
+        docs_dir = target_path / "docs/reference"
         docs_dir.mkdir(parents=True, exist_ok=True)
         output_path = docs_dir / "directory_structure.md"
 
